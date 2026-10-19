@@ -17,10 +17,19 @@ interface Props {
   className?: string
 }
 
-export function TranscriptList({ segments, selectedIdx, onSelect, hideText, className }: Props) {
+export function TranscriptList({
+  segments,
+  selectedIdx,
+  onSelect,
+  hideText,
+  className,
+}: Props) {
   const parentRef = useRef<HTMLDivElement>(null)
   const currentMs = useSelector(playerStore, (s) => s.currentMs)
-  const playingIdx = useMemo(() => findSegmentIndex(segments, currentMs), [segments, currentMs])
+  const playingIdx = useMemo(
+    () => findSegmentIndex(segments, currentMs),
+    [segments, currentMs],
+  )
   const activeIdx = selectedIdx ?? playingIdx
 
   const virtualizer = useVirtualizer({
@@ -32,18 +41,30 @@ export function TranscriptList({ segments, selectedIdx, onSelect, hideText, clas
 
   // cuộn câu đang active vào giữa khi nó đổi
   useEffect(() => {
-    if (activeIdx >= 0) virtualizer.scrollToIndex(activeIdx, { align: 'center', behavior: 'smooth' })
+    if (activeIdx >= 0)
+      virtualizer.scrollToIndex(activeIdx, {
+        align: 'center',
+        behavior: 'smooth',
+      })
   }, [activeIdx, virtualizer])
 
   return (
-    <div ref={parentRef} className={cn('overflow-y-auto overscroll-contain', className)}>
-      <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+    <div
+      ref={parentRef}
+      className={cn('overflow-y-auto overscroll-contain', className)}
+    >
+      <div
+        className="relative w-full"
+        style={{ height: virtualizer.getTotalSize() }}
+      >
         {virtualizer.getVirtualItems().map((item) => {
           const seg = segments[item.index]
           const active = item.index === activeIdx
           const playingHere = item.index === playingIdx
-          const done = seg.dictationBest != null || seg.pronunciationBest != null
-          const masked = hideText && seg.dictationBest == null && !active
+          const done =
+            seg.dictationBest != null || seg.pronunciationBest != null
+          // chép chính tả: che cả câu đang làm, chỉ hiện câu đã nộp bài
+          const masked = hideText && seg.dictationBest == null
           return (
             <div
               key={item.key}
@@ -57,7 +78,9 @@ export function TranscriptList({ segments, selectedIdx, onSelect, hideText, clas
                 onClick={() => onSelect(item.index)}
                 className={cn(
                   'group flex w-full gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                  active ? 'bg-accent text-accent-foreground' : 'hover:bg-muted',
+                  active
+                    ? 'bg-accent text-accent-foreground'
+                    : 'hover:bg-muted',
                 )}
               >
                 <span
@@ -68,7 +91,12 @@ export function TranscriptList({ segments, selectedIdx, onSelect, hideText, clas
                 >
                   {formatTime(seg.startMs)}
                 </span>
-                <span className={cn('flex-1 leading-relaxed', masked && 'select-none blur-[5px]')}>
+                <span
+                  className={cn(
+                    'flex-1 leading-relaxed',
+                    masked && 'select-none blur-[5px]',
+                  )}
+                >
                   {seg.text}
                 </span>
                 {done && (

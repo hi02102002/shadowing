@@ -10,6 +10,9 @@ export interface YTPlayer {
   setPlaybackRate: (rate: number) => void
   getAvailablePlaybackRates: () => number[]
   destroy: () => void
+  /** API không chính thức nhưng ổn định: tắt module phụ đề ('captions' / 'cc') */
+  unloadModule?: (name: string) => void
+  loadModule?: (name: string) => void
 }
 
 export const PLAYER_STATE = {
@@ -56,6 +59,34 @@ const START_PAD_MS = 80
 /** timing từng từ trong phụ đề thường lệch ±100ms → mở rộng clip để không cụt âm */
 const CLIP_LEAD_MS = 150
 const CLIP_TAIL_MS = 250
+/**
+ * Sau seekTo, getCurrentTime() của YouTube vẫn trả vị trí CŨ thêm vài trăm ms.
+ * Nếu vị trí cũ nằm sau điểm kết thúc câu/clip, vòng poll sẽ tưởng đã phát xong và pause ngay
+ * → bấm play "không chạy". Vì vậy bỏ qua kiểm tra kết thúc cho tới khi thời gian báo về đã tới gần
+ * điểm seek (hoặc quá SEEK_SETTLE_TIMEOUT_MS).
+ */
+const SEEK_TOLERANCE_MS = 600
+const SEEK_SETTLE_TIMEOUT_MS = 2000
+let pendingSeek: { ms: number; at: number } | null = null
+
+function seekTo(ms: number) {
+  const target = Math.max(0, ms)
+  pendingSeek = { ms: target, at: Date.now() }
+  yt?.seekTo(target / 1000, true)
+}
+
+/** true khi vị trí báo về đã phản ánh lần seek gần nhất */
+function seekSettled(currentMs: number) {
+  if (!pendingSeek) return true
+  const near =
+    currentMs >= pendingSeek.ms - SEEK_TOLERANCE_MS &&
+    currentMs <= pendingSeek.ms + SEEK_TOLERANCE_MS * 3
+  if (near || Date.now() - pendingSeek.at > SEEK_SETTLE_TIMEOUT_MS) {
+    pendingSeek = null
+    return true
+  }
+  return false
+}
 
 export const playerStore = createStore(initial, ({ setState, get }) => ({
   attach(player: YTPlayer) {
@@ -65,12 +96,13 @@ export const playerStore = createStore(initial, ({ setState, get }) => ({
   },
   detach() {
     yt = null
+    pendingSeek = null
     setState(() => initial)
   },
   /** phát một đoạn [startMs, endMs] rồi tự dừng (hoặc lặp nếu loop) */
   playRange(startMs: number, endMs: number) {
     if (!yt) return
-    yt.seekTo(Math.max(0, startMs - START_PAD_MS) / 1000, true)
+    seekTo(startMs - START_PAD_MS)
     yt.playVideo()
     setState((s) => ({ ...s, range: { startMs, endMs }, plays: 0, clip: null }))
   },
@@ -81,7 +113,7 @@ export const playerStore = createStore(initial, ({ setState, get }) => ({
       startMs: Math.max(0, startMs - CLIP_LEAD_MS),
       endMs: endMs + CLIP_TAIL_MS,
     }
-    yt.seekTo(clip.startMs / 1000, true)
+    seekTo(clip.startMs)
     yt.playVideo()
     setState((s) => ({ ...s, clip }))
   },
@@ -101,12 +133,12 @@ export const playerStore = createStore(initial, ({ setState, get }) => ({
     const { range, currentMs } = get()
     // đang đứng ở cuối câu → phát lại từ đầu câu
     if (range && currentMs >= range.endMs - END_PAD_MS * 2) {
-      yt.seekTo(Math.max(0, range.startMs - START_PAD_MS) / 1000, true)
+      seekTo(range.startMs - START_PAD_MS)
     }
     yt.playVideo()
   },
   seek(ms: number) {
-    yt?.seekTo(ms / 1000, true)
+    seekTo(ms)
     setState((s) => ({ ...s, currentMs: ms }))
   },
   /** xem video tự do (chế độ transcript) — bỏ giới hạn range */
@@ -125,6 +157,9 @@ export const playerStore = createStore(initial, ({ setState, get }) => ({
     const s = get()
     const playing =
       ytState === PLAYER_STATE.PLAYING || ytState === PLAYER_STATE.BUFFERING
+    // vị trí còn là của trước lần seek → chưa được kết luận "đã phát hết"
+    if (!seekSettled(currentMs))
+      return { playing, changed: s.playing !== playing }
     if (s.clip) {
       if (playing && currentMs >= s.clip.endMs) {
         yt?.pauseVideo()
@@ -134,7 +169,7 @@ export const playerStore = createStore(initial, ({ setState, get }) => ({
     }
     if (s.range && playing && currentMs >= s.range.endMs - END_PAD_MS) {
       if (s.loop) {
-        yt?.seekTo(Math.max(0, s.range.startMs - START_PAD_MS) / 1000, true)
+        seekTo(s.range.startMs - START_PAD_MS)
       } else {
         yt?.pauseVideo()
       }
