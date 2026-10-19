@@ -44,6 +44,33 @@ pnpm dev
 
 Database `data/app.db` được tạo và migrate tự động khi khởi động.
 
+## Chạy bằng Docker
+
+Image đã có sẵn node, ffmpeg và yt-dlp. yt-dlp tự cập nhật mỗi lần container khởi động; tắt bằng `YTDLP_AUTO_UPDATE=0`.
+
+```bash
+cp .env.example .env      # tuỳ chọn: điền key, hoặc cấu hình sau ở /settings
+docker compose up -d --build
+# mở http://localhost:3000   (đổi cổng: PORT=8080 docker compose up -d)
+```
+
+Dữ liệu (SQLite, bản ghi âm, cache tra từ) nằm trong volume `shadowing-data` và được giữ nguyên khi cập nhật image.
+
+```bash
+docker compose logs -f                 # xem log
+docker compose up -d --build           # cập nhật sau khi sửa code
+docker compose down                    # dừng, vẫn giữ dữ liệu
+docker run --rm -v shadowing_shadowing-data:/data -v "$PWD":/backup busybox \
+  tar czf /backup/shadowing-backup.tgz -C /data .   # sao lưu dữ liệu
+```
+
+Không dùng compose:
+
+```bash
+docker build -t shadowing .
+docker run -d -p 3000:3000 -v shadowing-data:/app/data --env-file .env shadowing
+```
+
 ## Cấu hình AI
 
 Có thể dùng bất kỳ provider nào; vào **Cài đặt** để đổi (giá trị ở đó ghi đè `.env`).

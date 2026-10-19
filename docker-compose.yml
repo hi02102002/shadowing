@@ -1,0 +1,21 @@
+services:
+  shadowing:
+    build: .
+    image: shadowing:latest
+    container_name: shadowing
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    # LLM_*, STT_*, PRONUNCIATION_ENGINE… (xem .env.example). Có thể để trống và cấu hình ở trang /settings.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # .env dành cho chạy local có thể đặt DATABASE_URL tương đối → luôn dùng volume trong container
+      DATABASE_URL: /app/data/app.db
+    volumes:
+      # SQLite, bản ghi âm, cache tra từ
+      - shadowing-data:/app/data
+
+volumes:
+  shadowing-data:

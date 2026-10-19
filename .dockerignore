@@ -1,0 +1,17 @@
+node_modules
+.output
+.nitro
+.tanstack
+.vinxi
+dist
+data
+bin
+.git
+.vscode
+.env
+.env.*
+!.env.example
+*.log
+Dockerfile
+docker-compose.yml
+.dockerignore
