@@ -1,0 +1,60 @@
+import { z } from 'zod'
+import { db } from '#/db/index.ts'
+import { settings } from '#/db/schema.ts'
+
+export const LLM_PROVIDERS = ['openai', 'anthropic', 'gemini', 'ollama', 'openai-compatible'] as const
+/** llm-audio: model LLM nghe trực tiếp bản ghi âm · stt: Whisper rồi LLM đọc chữ */
+export const PRONUNCIATION_ENGINES = ['llm-audio', 'stt'] as const
+
+export const AppConfigSchema = z.object({
+  llmProvider: z.enum(LLM_PROVIDERS),
+  llmModel: z.string().min(1),
+  llmApiKey: z.string(),
+  llmBaseUrl: z.string(),
+  sttBaseUrl: z.string(),
+  sttApiKey: z.string(),
+  sttModel: z.string().min(1),
+  pronunciationEngine: z.enum(PRONUNCIATION_ENGINES),
+})
+export type AppConfig = z.infer<typeof AppConfigSchema>
+
+function fromEnv(): AppConfig {
+  const e = process.env
+  return {
+    llmProvider: (LLM_PROVIDERS as readonly string[]).includes(e.LLM_PROVIDER ?? '')
+      ? (e.LLM_PROVIDER as AppConfig['llmProvider'])
+      : 'openai',
+    llmModel: e.LLM_MODEL ?? 'gpt-5-mini',
+    llmApiKey: e.LLM_API_KEY ?? e.OPENAI_API_KEY ?? '',
+    llmBaseUrl: e.LLM_BASE_URL ?? '',
+    sttBaseUrl: e.STT_BASE_URL ?? '',
+    sttApiKey: e.STT_API_KEY ?? e.OPENAI_API_KEY ?? '',
+    sttModel: e.STT_MODEL ?? 'whisper-1',
+    pronunciationEngine: e.PRONUNCIATION_ENGINE === 'stt' ? 'stt' : 'llm-audio',
+  }
+}
+
+/** Cấu hình hiện hành: giá trị lưu ở trang /settings ghi đè .env */
+export function getConfig(): AppConfig {
+  const base = fromEnv()
+  const rows = db.select().from(settings).all()
+  const overrides = Object.fromEntries(rows.filter((r) => r.value !== '').map((r) => [r.key, r.value]))
+  const merged = AppConfigSchema.safeParse({ ...base, ...overrides })
+  return merged.success ? merged.data : base
+}
+
+export function saveConfig(patch: Partial<AppConfig>) {
+  for (const [key, value] of Object.entries(patch) as Array<[string, string | undefined]>) {
+    if (value === undefined) continue
+    db.insert(settings)
+      .values({ key, value: String(value) })
+      .onConflictDoUpdate({ target: settings.key, set: { value: String(value) } })
+      .run()
+  }
+}
+
+/** Trả về cấu hình cho client: che API key */
+export function publicConfig(cfg: AppConfig) {
+  const mask = (k: string) => (k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '')
+  return { ...cfg, llmApiKey: mask(cfg.llmApiKey), sttApiKey: mask(cfg.sttApiKey) }
+}

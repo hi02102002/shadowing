@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.985 0.004 85);
+  --foreground: oklch(0.22 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 260);
+  --primary: oklch(0.45 0.13 262);
+  --primary-foreground: oklch(0.98 0.005 260);
+  --secondary: oklch(0.955 0.008 260);
+  --secondary-foreground: oklch(0.28 0.03 260);
+  --muted: oklch(0.955 0.006 85);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --accent: oklch(0.94 0.02 262);
+  --accent-foreground: oklch(0.3 0.08 262);
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.9 0.008 260);
+  --input: oklch(0.88 0.01 260);
+  --ring: oklch(0.6 0.12 262);
+  --radius: 0.7rem;
+
+  /* trạng thái chấm điểm */
+  --ok: oklch(0.6 0.13 155);
+  --ok-soft: oklch(0.95 0.05 155);
+  --bad: oklch(0.58 0.19 25);
+  --bad-soft: oklch(0.95 0.04 25);
+  --miss: oklch(0.68 0.14 70);
+  --miss-soft: oklch(0.96 0.05 80);
+  --extra: oklch(0.55 0.12 300);
+  --extra-soft: oklch(0.95 0.03 300);
+  --rec: oklch(0.6 0.22 25);
+  --karaoke: oklch(0.45 0.13 262);
+}
+
+.dark {
+  --background: oklch(0.17 0.015 260);
+  --foreground: oklch(0.93 0.01 260);
+  --card: oklch(0.21 0.018 260);
+  --card-foreground: oklch(0.93 0.01 260);
+  --popover: oklch(0.21 0.018 260);
+  --popover-foreground: oklch(0.93 0.01 260);
+  --primary: oklch(0.72 0.12 262);
+  --primary-foreground: oklch(0.18 0.02 260);
+  --secondary: oklch(0.26 0.02 260);
+  --secondary-foreground: oklch(0.9 0.01 260);
+  --muted: oklch(0.25 0.015 260);
+  --muted-foreground: oklch(0.68 0.02 260);
+  --accent: oklch(0.29 0.04 262);
+  --accent-foreground: oklch(0.9 0.04 262);
+  --destructive: oklch(0.65 0.19 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.3 0.02 260);
+  --input: oklch(0.33 0.02 260);
+  --ring: oklch(0.6 0.1 262);
+
+  --ok: oklch(0.75 0.14 155);
+  --ok-soft: oklch(0.3 0.06 155);
+  --bad: oklch(0.72 0.16 25);
+  --bad-soft: oklch(0.3 0.07 25);
+  --miss: oklch(0.8 0.13 75);
+  --miss-soft: oklch(0.32 0.06 75);
+  --extra: oklch(0.75 0.11 300);
+  --extra-soft: oklch(0.3 0.05 300);
+  --rec: oklch(0.68 0.2 25);
+  --karaoke: oklch(0.78 0.12 262);
+}
+
+@theme inline {
+  --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-miss: var(--miss);
+  --color-miss-soft: var(--miss-soft);
+  --color-extra: var(--extra);
+  --color-extra-soft: var(--extra-soft);
+  --color-rec: var(--rec);
+  --color-karaoke: var(--karaoke);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    min-height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+}
+
+.ipa {
+  font-family: 'Noto Sans', 'Segoe UI', 'Lucida Sans Unicode', 'DejaVu Sans', sans-serif;
+}
+
+@keyframes rec-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--rec) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 10px color-mix(in oklab, var(--rec) 0%, transparent);
+  }
+}
+.rec-pulse {
+  animation: rec-pulse 1.4s ease-in-out infinite;
+}

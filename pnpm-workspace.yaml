@@ -1,0 +1,11 @@
+allowBuilds:
+  esbuild: true
+  lightningcss: true
+  better-sqlite3: true
+  unrs-resolver: true
+  '@google/genai': false
+  protobufjs: false
+minimumReleaseAgeExclude:
+  - '@tanstack/db@0.15.1'
+  - '@tanstack/query-db-collection@1.4.7'
+  - '@tanstack/react-db@0.5.11'

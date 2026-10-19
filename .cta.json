@@ -1,0 +1,32 @@
+{
+  "projectName": "shadowing",
+  "mode": "file-router",
+  "bundler": "vite",
+  "typescript": true,
+  "tailwind": true,
+  "packageManager": "pnpm",
+  "git": true,
+  "install": true,
+  "intent": false,
+  "addOnOptions": {
+    "drizzle": {
+      "database": "sqlite"
+    }
+  },
+  "projectPreset": "default",
+  "routerOnly": false,
+  "includeExamples": false,
+  "version": 1,
+  "framework": "react",
+  "chosenAddOns": [
+    "tanstack-query",
+    "form",
+    "table",
+    "store",
+    "db",
+    "drizzle",
+    "shadcn",
+    "nitro",
+    "eslint"
+  ]
+}
