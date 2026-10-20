@@ -33,6 +33,8 @@ win:
   target: nsis
 
 nsis:
+  # không dấu cách: GitHub đổi " " thành "." khi upload → tên trong latest.yml không khớp, cập nhật lỗi 404
+  artifactName: ${productName}-Setup-${version}.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
 
@@ -40,3 +42,9 @@ linux:
   target: AppImage
   category: Education
   syncDesktopName: true
+
+# electron-updater đọc latest*.yml từ GitHub Releases; workflow `desktop` upload các file này cùng bộ cài
+publish:
+  provider: github
+  owner: hi02102002
+  repo: shadowing

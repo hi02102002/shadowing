@@ -17,10 +17,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # latest*.yml + .blockmap: electron-updater dùng để phát hiện và tải bản mới
           - os: ubuntu-latest
-            files: desktop/dist/*.AppImage
+            files: |
+              desktop/dist/*.AppImage
+              desktop/dist/latest-linux.yml
           - os: windows-latest
-            files: desktop/dist/*.exe
+            files: |
+              desktop/dist/*.exe
+              desktop/dist/*.exe.blockmap
+              desktop/dist/latest.yml
+          # macOS chưa ký → không tự cài được, app chỉ báo có bản mới
           - os: macos-latest
             files: desktop/dist/*.dmg
     runs-on: ${{ matrix.os }}

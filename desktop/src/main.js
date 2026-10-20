@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
 import ffmpegStatic from 'ffmpeg-static'
 
+import { checkForUpdates, initUpdater } from './updater.js'
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 // localStorage gắn với origin (có cả cổng) → cố định cổng để không mất cài đặt phía client giữa các lần mở
@@ -79,6 +81,7 @@ async function start() {
     await waitForServer(origin)
     lockToOrigin(win, origin)
     await win.loadURL(origin)
+    initUpdater()
   } catch (err) {
     fail(err)
   }
@@ -207,6 +210,7 @@ function buildMenu() {
       submenu: [
         { label: 'Mở thư mục dữ liệu', click: () => shell.openPath(dataDir) },
         { label: 'Mở log', click: () => shell.openPath(logDir) },
+        { label: 'Kiểm tra cập nhật…', click: () => checkForUpdates(true) },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit', label: 'Thoát' },
       ],
