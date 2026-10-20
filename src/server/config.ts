@@ -9,6 +9,8 @@ export const PRONUNCIATION_ENGINES = ['llm-audio', 'stt'] as const
 export const CAPTION_ENGINES = ['local', 'api'] as const
 /** giọng dùng cho phiên âm IPA */
 export const ACCENTS = ['us', 'uk'] as const
+/** off: không tự gọi AI phân tích lỗi sau mỗi lần chấm, chỉ khi người dùng bấm */
+export const AI_ANALYSIS = ['on', 'off'] as const
 
 export const AppConfigSchema = z.object({
   llmProvider: z.enum(LLM_PROVIDERS),
@@ -21,6 +23,7 @@ export const AppConfigSchema = z.object({
   pronunciationEngine: z.enum(PRONUNCIATION_ENGINES),
   captionEngine: z.enum(CAPTION_ENGINES),
   accent: z.enum(ACCENTS),
+  aiAnalysis: z.enum(AI_ANALYSIS),
 })
 export type AppConfig = z.infer<typeof AppConfigSchema>
 
@@ -39,6 +42,7 @@ function fromEnv(): AppConfig {
     pronunciationEngine: e.PRONUNCIATION_ENGINE === 'stt' ? 'stt' : 'llm-audio',
     captionEngine: e.CAPTION_ENGINE === 'api' ? 'api' : 'local',
     accent: e.ACCENT === 'uk' ? 'uk' : 'us',
+    aiAnalysis: e.AI_ANALYSIS === 'off' ? 'off' : 'on',
   }
 }
 

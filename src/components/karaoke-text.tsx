@@ -129,6 +129,12 @@ export function KaraokeText({
                 ? 'now'
                 : 'future'
           const selected = sel !== null && i >= sel[0] && i <= sel[1]
+          const tone = cn(
+            state === 'past' && 'text-karaoke',
+            state === 'now' &&
+              'bg-karaoke text-primary-foreground hover:bg-karaoke',
+            state === 'future' && 'text-muted-foreground',
+          )
           return (
             <button
               key={i}
@@ -139,21 +145,36 @@ export function KaraokeText({
               title="Click: nghe lại · Shift+click: chọn cụm · Chuột phải: tra từ"
               className={cn(
                 'cursor-pointer rounded px-0.5 transition-colors duration-100 outline-none',
-                ipaWords && 'inline-flex flex-col items-center',
                 'hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
-                state === 'past' && 'text-karaoke',
-                state === 'now' &&
-                  'bg-karaoke text-primary-foreground hover:bg-karaoke',
-                state === 'future' && 'text-muted-foreground',
+                // có IPA: chỉ tô nền phần chữ, dòng IPA bên dưới vẫn đọc được
+                ipaWords ? 'inline-flex flex-col items-center gap-0.5' : tone,
                 selected &&
                   'ring-2 ring-primary/60 ring-offset-1 ring-offset-card',
               )}
             >
-              {w.w}
-              {ipaWords && (
-                <span className="font-mono text-xs font-normal text-muted-foreground">
-                  {ipaWords[i] ? `/${ipaWords[i]}/` : '\u00a0'}
-                </span>
+              {ipaWords ? (
+                <>
+                  <span
+                    className={cn(
+                      'rounded px-0.5 transition-colors duration-100',
+                      tone,
+                    )}
+                  >
+                    {w.w}
+                  </span>
+                  <span
+                    className={cn(
+                      'font-mono text-xs font-normal transition-colors duration-100',
+                      state === 'now'
+                        ? 'text-karaoke'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {ipaWords[i] ? `/${ipaWords[i]}/` : ' '}
+                  </span>
+                </>
+              ) : (
+                w.w
               )}
             </button>
           )

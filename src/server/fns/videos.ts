@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
@@ -11,7 +11,7 @@ import { isLocalKey, localKey, localThumbUrl, parseVideoSource, vimeoKey } from 
 import { youtubeThumbnail } from '#/lib/youtube-id.ts'
 import { estimateCaptioning, generateCaptionWords, MAX_CAPTION_SEC } from '../captions.ts'
 import type { CaptionEstimate } from '../captions.ts'
-import { fetchEllloLesson } from '../elllo/elllo.ts'
+import { downloadEllloFile, fetchEllloLesson } from '../elllo/elllo.ts'
 import { startJob } from '../jobs.ts'
 import { makeThumbnail, probeMedia } from '../media.ts'
 import type { MediaInfo } from '../media.ts'
@@ -181,6 +181,7 @@ async function importYouTube(youtubeId: string, generate: boolean): Promise<Impo
 /** Bài elllo.org: video Vimeo nhúng trong trang, phụ đề lấy từ Vimeo */
 async function importElllo(pageUrl: string, generate: boolean): Promise<ImportResult> {
   const lesson = await fetchEllloLesson(pageUrl)
+  if (!lesson.vimeoId) return importEllloAudio(lesson.audioUrl!, lesson.title, generate)
   const youtubeId = vimeoKey(lesson.vimeoId)
 
   const existing = db.select().from(videos).where(eq(videos.youtubeId, youtubeId)).get()
@@ -218,10 +219,34 @@ type VideoValues = Omit<typeof videos.$inferInsert, 'captionSource'>
  * Video online không có phụ đề: lần đầu trả ước tính để client hỏi lại người dùng,
  * khi được đồng ý thì tải audio và tạo phụ đề bằng Whisper trong một job nền.
  */
+/**
+ * Bài elllo chỉ có audio (mục hội thoại "Views"): tải mp3 về làm media trên máy, tạo phụ đề bằng Whisper.
+ * Khoá tính từ link mp3 nên import lại cùng bài không bị trùng.
+ */
+async function importEllloAudio(audioUrl: string, title: string, generate: boolean): Promise<ImportResult> {
+  const youtubeId = localKey(`elllo-${createHash('sha1').update(audioUrl).digest('hex').slice(0, 16)}`)
+  const existing = db.select().from(videos).where(eq(videos.youtubeId, youtubeId)).get()
+  if (existing) return { status: 'ready', youtubeId, existed: true }
+
+  // ffmpeg đọc thẳng từ link nên không phải tải cả file chỉ để biết thời lượng
+  const { durationSec } = await probeMedia(audioUrl)
+  return captionFromAudio(
+    { youtubeId, title, channel: 'ELLLO', durationSec: Math.round(durationSec), thumbnail: null },
+    generate,
+    async (dir, signal) => {
+      await fs.mkdir(dir, { recursive: true })
+      return downloadEllloFile(audioUrl, path.join(dir, `audio${path.extname(new URL(audioUrl).pathname)}`), signal)
+    },
+    { keepAudio: true },
+  )
+}
+
 function captionFromAudio(
   values: VideoValues,
   generate: boolean,
   fetchAudio: (dir: string, signal: AbortSignal) => Promise<string>,
+  /** keepAudio: file audio tải về chính là media của bài (phát bằng LocalPlayer) */
+  opts: { keepAudio?: boolean } = {},
 ): ImportResult {
   const durationSec = values.durationSec ?? 0
   if (durationSec > MAX_CAPTION_SEC) {
@@ -244,7 +269,11 @@ function captionFromAudio(
       signal.throwIfAborted()
       // người dùng có thể đã import cùng video trong lúc chờ
       if (!db.select().from(videos).where(eq(videos.youtubeId, values.youtubeId)).get()) {
-        saveVideo({ ...values, durationSec: values.durationSec ?? Math.round(realSec), captionSource: 'whisper' }, sentences)
+        const mediaPath = opts.keepAudio ? await moveUploadToMedia(audio, values.youtubeId) : values.mediaPath
+        saveVideo(
+          { ...values, mediaPath, durationSec: values.durationSec ?? Math.round(realSec), captionSource: 'whisper' },
+          sentences,
+        )
       }
       return { youtubeId: values.youtubeId }
     },

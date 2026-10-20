@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   AudioLines,
+  BookOpen,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -13,14 +14,19 @@ import { z } from 'zod'
 import { Button } from '#/components/ui/button'
 import { useVideoImport } from '#/hooks/use-video-import'
 import { formatDuration } from '#/lib/format'
-import { CATALOG_MAX_PAGE, LEVEL_LABEL, LEVELS } from '#/lib/levels'
+import {
+  CATALOG_MAX_PAGE,
+  CATALOG_SOURCES,
+  LEVEL_LABEL,
+  LEVELS,
+} from '#/lib/levels'
 import { catalogQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
 import type { CatalogItem, CatalogPage } from '#/server/fns/catalog'
 
 const searchSchema = z.object({
   level: z.enum(LEVELS).catch('A1'),
-  source: z.enum(['elllo', 'youtube']).catch('elllo'),
+  source: z.enum(CATALOG_SOURCES).catch('elllo'),
   page: z
     .number()
     .int()
@@ -38,6 +44,8 @@ export const Route = createFileRoute('/explore')({
 
 const SOURCES = [
   { id: 'elllo', label: 'elllo.org' },
+  { id: 'elllo-views', label: 'Hội thoại elllo' },
+  { id: 'elllo-book', label: 'Ngữ pháp elllo' },
   { id: 'youtube', label: 'YouTube' },
 ] as const
 
@@ -134,7 +142,9 @@ function Explore() {
         </div>
       ) : catalog.data.items.length === 0 ? (
         <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
-          Không có bài nào cho cấp độ này.
+          {source === 'elllo-views' && level === 'A1'
+            ? 'elllo chưa có bài hội thoại cho cấp A1. Thử mục Video hoặc Ngữ pháp.'
+            : 'Không có bài nào cho cấp độ này.'}
         </div>
       ) : (
         <ul
@@ -253,6 +263,12 @@ function CatalogCard({
             referrerPolicy="no-referrer"
             className="size-full object-cover"
           />
+        ) : item.label ? (
+          // sách ngữ pháp elllo không có ảnh bìa
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
+            <BookOpen className="size-8 opacity-50" />
+            <span className="text-lg font-semibold">{item.label}</span>
+          </div>
         ) : (
           <AudioLines className="absolute inset-0 m-auto size-12 text-muted-foreground/40" />
         )}
@@ -276,7 +292,7 @@ function CatalogCard({
       <div className="flex flex-col gap-1 p-3">
         <h3 className="line-clamp-2 font-medium leading-snug">{item.title}</h3>
         <span className="truncate text-xs text-muted-foreground">
-          {item.number ? `Video ${item.number} · ` : ''}
+          {item.label ? `${item.label} · ` : ''}
           {item.channel}
         </span>
       </div>

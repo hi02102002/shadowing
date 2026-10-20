@@ -3,13 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from '@tanstack/react-store'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { Link } from '@tanstack/react-router'
-import { Cpu, Headphones, Play, Volume2 } from 'lucide-react'
+import { Cpu, Headphones, Play, Sparkles, Volume2 } from 'lucide-react'
 
-import { AiFeedback } from '#/components/ai-feedback'
+import { AiAnalysisToggle, AiFeedback } from '#/components/ai-feedback'
 import { DiffLegend, DiffView } from '#/components/diff-view'
 import { RecordButton } from '#/components/record-button'
 import { ScoreRing } from '#/components/score-ring'
 import { Button } from '#/components/ui/button'
+import { useAiAnalysis } from '#/hooks/use-app-settings'
 import { useRecorder } from '#/hooks/use-recorder'
 import { playerActions, playerStore } from '#/lib/player-store'
 import { pronunciationEnginesQuery, pronunciationHistoryQuery, videoQuery } from '#/lib/queries'
@@ -88,6 +89,7 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
     },
     onSuccess: (r) => {
       setResult(r)
+      setAskedAi(false)
       void queryClient.invalidateQueries({ queryKey: videoQuery(youtubeId).queryKey })
       void queryClient.invalidateQueries({ queryKey: pronunciationHistoryQuery(segment.id).queryKey })
     },
@@ -102,11 +104,15 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
     },
   })
 
+  // Cài đặt tắt "AI tự phân tích lỗi" → chỉ gọi khi người dùng bấm
+  const [askedAi, setAskedAi] = useState(false)
+  const [autoAi] = useAiAnalysis()
+  const wantAi = !!result?.aiFeedback && (autoAi || askedAi)
   const feedback = useQuery({
     queryKey: ['pronunciation-feedback', result?.attemptId],
     queryFn: () => pronunciationFeedback({ data: { attemptId: result!.attemptId } }),
     // chưa cấu hình LLM → chỉ có điểm chấm trên máy, không gọi AI nhận xét
-    enabled: !!result?.aiFeedback,
+    enabled: wantAi,
     staleTime: Infinity,
     retry: false,
   })
@@ -157,6 +163,7 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
           </p>
         )}
         <EnginePicker value={engine} onChange={setEngine} info={engines.data} />
+        <AiAnalysisToggle />
         <RecordButton
           recording={recorder.recording}
           busy={assess.isPending}
@@ -210,7 +217,14 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
         </div>
       )}
 
-      {result?.aiFeedback && (
+      {result?.aiFeedback && !wantAi && (
+        <Button variant="outline" className="self-start" onClick={() => setAskedAi(true)}>
+          <Sparkles />
+          Nhờ AI phân tích lỗi
+        </Button>
+      )}
+
+      {wantAi && (
         <AiFeedback
           status={feedback.status}
           error={feedback.error}

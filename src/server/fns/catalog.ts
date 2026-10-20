@@ -4,13 +4,18 @@ import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
 import { videos } from '#/db/schema.ts'
-import { CATALOG_MAX_PAGE, LEVELS } from '#/lib/levels.ts'
-import type { Level } from '#/lib/levels.ts'
+import { CATALOG_MAX_PAGE, CATALOG_SOURCES, LEVELS } from '#/lib/levels.ts'
+import type { CatalogSource, Level } from '#/lib/levels.ts'
 import { youtubeThumbnail } from '#/lib/youtube-id.ts'
-import { fetchEllloLevel } from '../elllo/elllo.ts'
+import {
+  ELLLO_VIEWS_LEVELS,
+  fetchEllloBook,
+  fetchEllloLevel,
+  fetchEllloViews,
+} from '../elllo/elllo.ts'
 import { searchVideos, watchUrl } from '../youtube/ytdlp.ts'
 
-export type CatalogSource = 'elllo' | 'youtube'
+export type { CatalogSource }
 
 export interface CatalogItem {
   /** link đưa cho importVideo */
@@ -19,8 +24,8 @@ export interface CatalogItem {
   thumbnail?: string
   durationSec?: number
   channel?: string
-  /** số thứ tự bài trên elllo */
-  number?: number
+  /** số thứ tự bài trên elllo, vd. "Video 50", "Bài 3" */
+  label?: string
   /** đã có trong thư viện (chỉ biết trước với YouTube) → mở thẳng bằng khoá này */
   youtubeId?: string
   imported: boolean
@@ -58,17 +63,8 @@ async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   return value
 }
 
-async function ellloPage(level: Level, page: number): Promise<Page> {
-  // trang mục lục elllo chứa cả cấp độ (~50 bài) → tải một lần rồi cắt
-  const all = await cached(`elllo:${level}`, async () =>
-    (await fetchEllloLevel(level)).map((l): Item => ({
-      url: l.url,
-      title: l.title,
-      thumbnail: l.thumbnail,
-      channel: 'ELLLO',
-      number: l.number,
-    })),
-  )
+/** danh sách elllo nằm gọn trong một trang mục lục → tải một lần rồi cắt trang */
+function paginate(all: Item[], page: number): Page {
   const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE))
   return {
     items: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
@@ -76,6 +72,54 @@ async function ellloPage(level: Level, page: number): Promise<Page> {
     totalPages,
     hasMore: page < totalPages,
   }
+}
+
+const ellloPage = async (level: Level, page: number) =>
+  paginate(
+    await cached(`elllo:${level}`, async () =>
+      (await fetchEllloLevel(level)).map((l): Item => ({
+        url: l.url,
+        title: l.title,
+        thumbnail: l.thumbnail,
+        channel: 'ELLLO',
+        label: `Video ${l.number}`,
+      })),
+    ),
+    page,
+  )
+
+const ellloBookPage = async (level: Level, page: number) => {
+  // một trang mục lục chứa cả 5 cấp độ
+  const book = await cached('elllo-book', fetchEllloBook)
+  return paginate(
+    book
+      .filter((l) => l.level === level)
+      .map((l) => ({
+        url: l.url,
+        title: l.title,
+        channel: 'ELLLO Grammar',
+        label: `Bài ${l.number}`,
+      })),
+    page,
+  )
+}
+
+const ellloViewsPage = async (level: Level, page: number) => {
+  // elllo không có trang hội thoại cho A1
+  const viewsLevel = ELLLO_VIEWS_LEVELS.find((l) => l === level)
+  if (!viewsLevel) return paginate([], page)
+  return paginate(
+    await cached(`elllo-views:${level}`, async () =>
+      (await fetchEllloViews(viewsLevel)).map((l): Item => ({
+        url: l.url,
+        title: l.title,
+        thumbnail: l.thumbnail,
+        channel: 'ELLLO',
+        label: `#${l.number}`,
+      })),
+    ),
+    page,
+  )
 }
 
 async function youtubePage(level: Level, page: number): Promise<Page> {
@@ -102,16 +146,19 @@ async function youtubePage(level: Level, page: number): Promise<Page> {
 export const listCatalog = createServerFn({ method: 'GET' })
   .validator(
     z.object({
-      source: z.enum(['elllo', 'youtube']),
+      source: z.enum(CATALOG_SOURCES),
       level: z.enum(LEVELS),
       page: z.number().int().min(1).max(CATALOG_MAX_PAGE),
     }),
   )
   .handler(async ({ data }): Promise<CatalogPage> => {
-    const res =
-      data.source === 'elllo'
-        ? await ellloPage(data.level, data.page)
-        : await youtubePage(data.level, data.page)
+    const load = {
+      elllo: ellloPage,
+      'elllo-views': ellloViewsPage,
+      'elllo-book': ellloBookPage,
+      youtube: youtubePage,
+    }[data.source]
+    const res = await load(data.level, data.page)
     const ids = res.items.flatMap((i) => (i.youtubeId ? [i.youtubeId] : []))
     const owned = new Set(
       ids.length

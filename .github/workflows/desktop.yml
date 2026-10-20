@@ -1,6 +1,6 @@
 # Build app desktop cho Linux / Windows / macOS.
 # Chạy khi push tag v* (vd. v0.1.0) hoặc bấm "Run workflow" trên GitHub.
-# Tag → khi cả 3 bản build xong mới tạo bản nháp GitHub Release kèm đủ file; chạy tay → tải ở mục Artifacts của run.
+# Tag → khi cả 3 bản build xong mới publish GitHub Release kèm đủ file (không qua bản nháp); chạy tay → tải ở mục Artifacts của run.
 name: desktop
 
 on:
@@ -87,8 +87,11 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # publish thẳng: release nào cũng có file cài và latest*.yml cho electron-updater
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
+          make_latest: true
+          generate_release_notes: true
           fail_on_unmatched_files: true
           files: dist/*

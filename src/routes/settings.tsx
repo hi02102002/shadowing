@@ -19,11 +19,12 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Progress } from '#/components/ui/progress'
+import { Switch } from '#/components/ui/switch'
 import { settingsQuery } from '#/lib/queries'
 import { downloadWhisperModel, whisperStatus } from '#/server/fns/captions'
 import { saveSettings, testLlm } from '#/server/fns/settings'
 import type { PublicSettings } from '#/server/fns/settings'
-import { ACCENT_DEPENDENT_KEYS } from '#/hooks/use-accent'
+import { ACCENT_DEPENDENT_KEYS } from '#/hooks/use-app-settings'
 
 export const Route = createFileRoute('/settings')({
   loader: ({ context }) => context.queryClient.ensureQueryData(settingsQuery()),
@@ -327,6 +328,28 @@ function SettingsPage() {
                     </span>
                   </label>
                 ))}
+              </div>
+            )}
+          </form.Field>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+          <legend className="px-1 text-sm font-semibold">AI phân tích lỗi</legend>
+          <form.Field name="aiAnalysis">
+            {(field) => (
+              <div className="flex items-start gap-3">
+                <Switch
+                  id={field.name}
+                  checked={field.state.value === 'on'}
+                  onCheckedChange={(on) => field.handleChange(on ? 'on' : 'off')}
+                />
+                <Label htmlFor={field.name} className="flex flex-col items-start gap-1 font-normal">
+                  <span className="font-medium">Tự động phân tích sau mỗi lần chấm</span>
+                  <span className="text-xs text-muted-foreground">
+                    Bật: AI giải thích lỗi và ghi vào Sổ lỗi ngay sau khi chấm phát âm / chép chính tả. Tắt: vẫn có
+                    điểm và so từng từ, chỉ gọi AI khi bạn bấm &quot;Nhờ AI phân tích lỗi&quot; (tiết kiệm lượt gọi API).
+                  </span>
+                </Label>
               </div>
             )}
           </form.Field>

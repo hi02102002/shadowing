@@ -5,7 +5,7 @@ import { AudioLines, Lightbulb, Loader2, Volume2, X } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { playerActions } from '#/lib/player-store'
-import { useAccent } from '#/hooks/use-accent'
+import { useAccent } from '#/hooks/use-app-settings'
 import { canSpeak, speak } from '#/lib/speech'
 import { cn } from '#/lib/utils'
 import { lookupWord } from '#/server/fns/dictionary'

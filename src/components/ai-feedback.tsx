@@ -1,8 +1,13 @@
 import { AlertCircle, Lightbulb, Loader2, Sparkles } from 'lucide-react'
+import { useId } from 'react'
 import { Link } from '@tanstack/react-router'
 
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
+import { Label } from '#/components/ui/label'
+import { Switch } from '#/components/ui/switch'
+import { useAiAnalysis } from '#/hooks/use-app-settings'
+import { cn } from '#/lib/utils'
 import { mistakeLabel } from '#/server/ai/prompts'
 import type { DictationAnalysis, PronunciationFeedback } from '#/server/ai/prompts'
 
@@ -119,5 +124,23 @@ export function AiFeedback({ status, error, summary, mistakes, connectedSpeech, 
         </div>
       )}
     </section>
+  )
+}
+
+/** Công tắc "AI tự phân tích lỗi" đặt ngay trong khung luyện tập, đồng bộ với Cài đặt */
+export function AiAnalysisToggle({ className }: { className?: string }) {
+  const [on, setOn] = useAiAnalysis()
+  const id = useId()
+  return (
+    <div
+      className={cn('flex items-center gap-2', className)}
+      title="Tắt: chỉ gọi AI khi bạn bấm “Nhờ AI phân tích lỗi”"
+    >
+      <Switch id={id} checked={on} onCheckedChange={setOn} />
+      <Label htmlFor={id} className="flex items-center gap-1 text-sm font-normal text-muted-foreground">
+        <Sparkles className="size-3.5" />
+        AI tự phân tích
+      </Label>
+    </div>
   )
 }

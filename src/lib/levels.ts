@@ -12,3 +12,7 @@ export const LEVEL_LABEL: Record<Level, string> = {
 
 /** trang danh sách Khám phá: YouTube không cho lật quá xa, kết quả cuối ít liên quan */
 export const CATALOG_MAX_PAGE = 20
+
+/** nguồn bài trên trang Khám phá: video, hội thoại, sách ngữ pháp elllo và tìm kiếm YouTube */
+export const CATALOG_SOURCES = ['elllo', 'elllo-views', 'elllo-book', 'youtube'] as const
+export type CatalogSource = (typeof CATALOG_SOURCES)[number]

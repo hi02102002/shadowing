@@ -3,11 +3,12 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, ChevronRight, Eye, Lightbulb, Send, Sparkles } from 'lucide-react'
 
-import { AiFeedback } from '#/components/ai-feedback'
+import { AiAnalysisToggle, AiFeedback } from '#/components/ai-feedback'
 import { DiffLegend, DiffView } from '#/components/diff-view'
 import { ScoreRing } from '#/components/score-ring'
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
+import { useAiAnalysis } from '#/hooks/use-app-settings'
 import { displayWords, firstLetterHint } from '#/lib/align'
 import { playerActions } from '#/lib/player-store'
 import { dictationHistoryQuery, videoQuery } from '#/lib/queries'
@@ -28,23 +29,26 @@ export function DictationPanel({ youtubeId, segment, hasNext, onNext }: Props) {
   const queryClient = useQueryClient()
   const [hint, setHint] = useState<HintLevel>(0)
   const [revealed, setRevealed] = useState(false)
-  const [wantAi, setWantAi] = useState(false)
+  // bấm "Nhờ AI phân tích" / "Giải thích nối âm"
+  const [askedAi, setAskedAi] = useState(false)
+  const [autoAi] = useAiAnalysis()
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const submit = useMutation({
     mutationFn: (input: string) => submitDictation({ data: { segmentId: segment.id, input } }),
-    onSuccess: (r) => {
-      setWantAi(r.score < 100)
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: videoQuery(youtubeId).queryKey })
       void queryClient.invalidateQueries({ queryKey: dictationHistoryQuery(segment.id).queryKey })
     },
   })
   const result = submit.data
+  // tự phân tích khi sai (theo công tắc), hoặc khi người dùng bấm
+  const wantAi = !!result && (askedAi || (autoAi && result.score < 100))
 
   const analysis = useQuery({
     queryKey: ['dictation-analysis', result?.attemptId],
     queryFn: () => analyzeDictation({ data: { attemptId: result!.attemptId } }),
-    enabled: !!result && wantAi,
+    enabled: wantAi,
     staleTime: Infinity,
     retry: false,
   })
@@ -62,7 +66,7 @@ export function DictationPanel({ youtubeId, segment, hasNext, onNext }: Props) {
     submit.reset()
     setHint(0)
     setRevealed(false)
-    setWantAi(false)
+    setAskedAi(false)
     const t = setTimeout(() => {
       replay()
       inputRef.current?.focus()
@@ -87,7 +91,8 @@ export function DictationPanel({ youtubeId, segment, hasNext, onNext }: Props) {
           <label htmlFor="dictation-input" className="text-sm font-medium">
             Nghe và gõ lại câu <span className="text-muted-foreground">({wordCount} từ)</span>
           </label>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
+            <AiAnalysisToggle className="mr-2" />
             <Button
               type="button"
               size="sm"
@@ -164,7 +169,7 @@ export function DictationPanel({ youtubeId, segment, hasNext, onNext }: Props) {
                 variant="outline"
                 onClick={() => {
                   submit.reset()
-                  setWantAi(false)
+                  setAskedAi(false)
                   inputRef.current?.focus()
                 }}
               >
@@ -214,9 +219,9 @@ export function DictationPanel({ youtubeId, segment, hasNext, onNext }: Props) {
         />
       )}
       {result && !wantAi && (
-        <Button variant="outline" className="self-start" onClick={() => setWantAi(true)}>
+        <Button variant="outline" className="self-start" onClick={() => setAskedAi(true)}>
           <Sparkles />
-          Giải thích nối âm trong câu
+          {result.score < 100 ? 'Nhờ AI phân tích lỗi' : 'Giải thích nối âm trong câu'}
         </Button>
       )}
 

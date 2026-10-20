@@ -173,7 +173,8 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
         cfg,
       )
       transcript = heard.trim()
-      feedback = rest
+      // tắt tự phân tích: chỉ lấy chữ nghe được; bấm "Nhờ AI phân tích" sẽ phân tích lại và ghi Sổ lỗi
+      feedback = cfg.aiAnalysis === 'on' ? rest : null
       spokenSec = durationMs / 1000
     } else if (engine === 'local') {
       const { wav, durationMs } = await toWav16k(raw)
