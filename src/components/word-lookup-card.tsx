@@ -8,7 +8,8 @@ import { playerActions } from '#/lib/player-store'
 import { useAccent } from '#/hooks/use-app-settings'
 import { canSpeak, speak } from '#/lib/speech'
 import { cn } from '#/lib/utils'
-import { lookupWord } from '#/server/fns/dictionary'
+import { dictionaryEntry, lookupWord } from '#/server/fns/dictionary'
+import type { DictEntry } from '#/server/dunno'
 
 export interface LookupTarget {
   text: string
@@ -37,10 +38,18 @@ export function WordLookupCard({
     left: target.rect.left,
   })
 
+  // nghĩa theo ngữ cảnh bằng AI (null khi chưa cấu hình AI)
   const query = useQuery({
     queryKey: ['lookup', target.text.toLowerCase(), target.sentence],
     queryFn: () =>
       lookupWord({ data: { text: target.text, sentence: target.sentence } }),
+    staleTime: Infinity,
+    retry: false,
+  })
+  // từ điển Anh–Việt, không cần AI
+  const dictQuery = useQuery({
+    queryKey: ['dict', target.text.toLowerCase()],
+    queryFn: () => dictionaryEntry({ data: { text: target.text } }),
     staleTime: Infinity,
     retry: false,
   })
@@ -58,7 +67,7 @@ export function WordLookupCard({
         ? target.rect.top - GAP - h
         : below
     setPos({ top, left })
-  }, [target, query.status])
+  }, [target, query.status, dictQuery.status])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -77,6 +86,10 @@ export function WordLookupCard({
   }, [onClose])
 
   const d = query.data
+  const dict = dictQuery.data
+  const headword = d?.headword ?? dict?.word ?? target.text
+  const ipaUk = d?.ipa ?? dict?.ipaUk ?? ''
+  const ipaUs = d?.ipaUs ?? dict?.ipaUs ?? ''
 
   return (
     <div
@@ -93,15 +106,11 @@ export function WordLookupCard({
       <header className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-lg font-semibold">
-            {d?.headword ?? target.text}
+            {headword}
           </h3>
           <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-muted-foreground">
-            {d && (
-              <>
-                <IpaTag label="UK" ipa={d.ipa} active={accent === 'uk'} />
-                <IpaTag label="US" ipa={d.ipaUs} active={accent === 'us'} />
-              </>
-            )}
+            <IpaTag label="UK" ipa={ipaUk} active={accent === 'uk'} />
+            <IpaTag label="US" ipa={ipaUs} active={accent === 'us'} />
             {d?.partOfSpeech && (
               <span className="italic">{d.partOfSpeech}</span>
             )}
@@ -132,7 +141,7 @@ export function WordLookupCard({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => speak(d?.headword ?? target.text, { accent })}
+              onClick={() => speak(headword, { accent })}
             >
               <Volume2 />
               Giọng chuẩn
@@ -149,7 +158,7 @@ export function WordLookupCard({
                   aria-pressed={accent === a}
                   onClick={() => {
                     chooseAccent(a)
-                    speak(d?.headword ?? target.text, { accent: a })
+                    speak(headword, { accent: a })
                   }}
                   className={cn(
                     'rounded px-1.5 py-0.5 text-xs font-medium',
@@ -166,7 +175,7 @@ export function WordLookupCard({
             <Button size="sm" variant="ghost" asChild>
               <a
                 href={`https://dictionary.cambridge.org/dictionary/english/${encodeURIComponent(
-                  (d?.headword ?? target.text).trim().toLowerCase().replace(/\s+/g, '-'),
+                  headword.trim().toLowerCase().replace(/\s+/g, '-'),
                 )}`}
                 target="_blank"
                 rel="noreferrer"
@@ -180,7 +189,7 @@ export function WordLookupCard({
         )}
       </div>
 
-      <div className="mt-3 border-t pt-3 text-sm">
+      <div className="mt-3 flex flex-col gap-3 border-t pt-3 text-sm">
         {query.isPending && (
           <p className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> Đang tra nghĩa theo ngữ
@@ -239,7 +248,106 @@ export function WordLookupCard({
             )}
           </div>
         )}
+
+        <DictionarySection
+          entry={dict}
+          pending={dictQuery.isPending}
+          error={dictQuery.error?.message}
+          divided={!!d}
+        />
       </div>
+    </div>
+  )
+}
+
+/** Nghĩa từ điển Anh–Việt (dunno.ai): nghĩa thông dụng, nghĩa chuyên ngành thu gọn, dạng từ, đồng/trái nghĩa */
+function DictionarySection({
+  entry,
+  pending,
+  error,
+  divided,
+}: {
+  entry: DictEntry | null | undefined
+  pending: boolean
+  error: string | undefined
+  divided: boolean
+}) {
+  if (pending) {
+    return (
+      <p className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> Đang tra từ điển…
+      </p>
+    )
+  }
+  if (error) return <p className="text-destructive">{error}</p>
+  if (!entry) {
+    return (
+      <p className="text-muted-foreground">Không có từ này trong từ điển.</p>
+    )
+  }
+
+  const common = entry.senses.filter((s) => !s.specialized)
+  const specialized = entry.senses.filter((s) => s.specialized)
+
+  return (
+    <div className={cn('flex flex-col gap-2', divided && 'border-t pt-3')}>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Từ điển
+      </div>
+      {common.map((sense) => (
+        <Sense key={sense.kind + sense.means[0]} kind={sense.kind} means={sense.means} />
+      ))}
+      {specialized.length > 0 && (
+        <details className="text-muted-foreground">
+          <summary className="cursor-pointer select-none text-xs hover:text-foreground">
+            Nghĩa chuyên ngành ({specialized.length})
+          </summary>
+          <div className="mt-2 flex flex-col gap-2">
+            {specialized.map((sense) => (
+              <Sense key={sense.kind + sense.means[0]} kind={sense.kind} means={sense.means} />
+            ))}
+          </div>
+        </details>
+      )}
+      {entry.forms.length > 0 && (
+        <p className="text-muted-foreground">
+          <span className="font-medium text-foreground">Dạng từ:</span>{' '}
+          {entry.forms.join(', ')}
+        </p>
+      )}
+      {entry.synonyms.length > 0 && (
+        <p className="text-muted-foreground">
+          <span className="font-medium text-foreground">Đồng nghĩa:</span>{' '}
+          {entry.synonyms.join(', ')}
+        </p>
+      )}
+      {entry.antonyms.length > 0 && (
+        <p className="text-muted-foreground">
+          <span className="font-medium text-foreground">Trái nghĩa:</span>{' '}
+          {entry.antonyms.join(', ')}
+        </p>
+      )}
+      <a
+        href={`https://dunno.ai/search/word/${encodeURIComponent(entry.word)}?hl=vi`}
+        target="_blank"
+        rel="noreferrer"
+        className="self-end text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        Nguồn: dunno.ai
+      </a>
+    </div>
+  )
+}
+
+function Sense({ kind, means }: { kind: string; means: string[] }) {
+  return (
+    <div>
+      {kind && <div className="text-xs italic text-muted-foreground">{kind}</div>}
+      <ol className="list-decimal pl-5">
+        {means.map((mean) => (
+          <li key={mean}>{mean}</li>
+        ))}
+      </ol>
     </div>
   )
 }
