@@ -1,19 +1,33 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { AudioLines, CheckCircle2, Loader2, RotateCw } from 'lucide-react'
+import {
+  AudioLines,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  RotateCw,
+} from 'lucide-react'
 import { z } from 'zod'
 
 import { Button } from '#/components/ui/button'
 import { useVideoImport } from '#/hooks/use-video-import'
 import { formatDuration } from '#/lib/format'
-import { LEVEL_LABEL, LEVELS } from '#/lib/levels'
+import { CATALOG_MAX_PAGE, LEVEL_LABEL, LEVELS } from '#/lib/levels'
 import { catalogQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
-import type { CatalogItem } from '#/server/fns/catalog'
+import type { CatalogItem, CatalogPage } from '#/server/fns/catalog'
 
 const searchSchema = z.object({
   level: z.enum(LEVELS).catch('A1'),
   source: z.enum(['elllo', 'youtube']).catch('elllo'),
+  page: z
+    .number()
+    .int()
+    .min(1)
+    .max(CATALOG_MAX_PAGE)
+    .optional()
+    .catch(undefined),
 })
 
 export const Route = createFileRoute('/explore')({
@@ -30,8 +44,8 @@ const SOURCES = [
 const SKELETONS = ['s1', 's2', 's3', 's4', 's5', 's6']
 
 function Explore() {
-  const { level, source } = Route.useSearch()
-  const catalog = useQuery(catalogQuery(source, level))
+  const { level, source, page = 1 } = Route.useSearch()
+  const catalog = useQuery(catalogQuery(source, level, page))
   const { importUrl, importing, error, dialog } = useVideoImport()
 
   return (
@@ -118,13 +132,18 @@ function Explore() {
             Thử lại
           </Button>
         </div>
-      ) : catalog.data.length === 0 ? (
+      ) : catalog.data.items.length === 0 ? (
         <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
           Không có bài nào cho cấp độ này.
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {catalog.data.map((item) => (
+        <ul
+          className={cn(
+            'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 transition-opacity',
+            catalog.isPlaceholderData && 'opacity-60',
+          )}
+        >
+          {catalog.data.items.map((item) => (
             <CatalogCard
               key={item.url}
               item={item}
@@ -136,8 +155,78 @@ function Explore() {
         </ul>
       )}
 
+      {catalog.data && (catalog.data.hasMore || catalog.data.page > 1) && (
+        <Pagination data={catalog.data} loading={catalog.isPlaceholderData} />
+      )}
+
       {dialog}
     </div>
+  )
+}
+
+function Pagination({
+  data,
+  loading,
+}: {
+  data: CatalogPage
+  loading: boolean
+}) {
+  const { level, source } = Route.useSearch()
+  const { page, totalPages } = data
+  // biết tổng số trang (elllo) → hiện đủ các số trang; YouTube chỉ có trước/sau
+  const numbers = totalPages
+    ? Array.from({ length: totalPages }, (_, i) => i + 1)
+    : []
+  const step = (
+    p: number,
+    disabled: boolean,
+    children: React.ReactNode,
+    label: string,
+  ) =>
+    disabled ? (
+      <Button variant="outline" size="sm" disabled aria-label={label}>
+        {children}
+      </Button>
+    ) : (
+      <Button variant="outline" size="sm" asChild aria-label={label}>
+        <Link to="/explore" search={{ level, source, page: p }}>
+          {children}
+        </Link>
+      </Button>
+    )
+
+  return (
+    <nav
+      className="flex flex-wrap items-center justify-center gap-1"
+      aria-label="Phân trang"
+    >
+      {step(page - 1, page <= 1, <ChevronLeft />, 'Trang trước')}
+      {numbers.length > 0 ? (
+        numbers.map((n) => (
+          <Button
+            key={n}
+            variant={n === page ? 'default' : 'ghost'}
+            size="sm"
+            className="min-w-9"
+            asChild
+          >
+            <Link
+              to="/explore"
+              search={{ level, source, page: n }}
+              aria-current={n === page ? 'page' : undefined}
+            >
+              {n}
+            </Link>
+          </Button>
+        ))
+      ) : (
+        <span className="px-3 text-sm text-muted-foreground">Trang {page}</span>
+      )}
+      {step(page + 1, !data.hasMore, <ChevronRight />, 'Trang sau')}
+      {loading && (
+        <Loader2 className="ml-2 size-4 animate-spin text-muted-foreground" />
+      )}
+    </nav>
   )
 }
 

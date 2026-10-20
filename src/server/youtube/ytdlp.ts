@@ -70,9 +70,15 @@ export interface SearchEntry {
   thumbnails?: { url: string }[]
 }
 
-/** Tìm video YouTube, chỉ lấy thông tin danh sách (không mở từng video) */
-export async function searchVideos(query: string, limit: number): Promise<SearchEntry[]> {
-  const out = await ytdlp(['--flat-playlist', '--dump-single-json', `ytsearch${limit}:${query}`])
+/** Tìm video YouTube, chỉ lấy thông tin danh sách (không mở từng video). `start`, `end` tính từ 1 */
+export async function searchVideos(query: string, start: number, end: number): Promise<SearchEntry[]> {
+  const out = await ytdlp([
+    '--flat-playlist',
+    '--dump-single-json',
+    '--playlist-items',
+    `${start}:${end}`,
+    `ytsearch${end}:${query}`,
+  ])
   return ((JSON.parse(out) as { entries?: SearchEntry[] }).entries ?? []).filter((e) => e.id)
 }
 

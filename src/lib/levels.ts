@@ -9,3 +9,6 @@ export const LEVEL_LABEL: Record<Level, string> = {
   B2: 'Trung cao cấp',
   C1: 'Cao cấp',
 }
+
+/** trang danh sách Khám phá: YouTube không cho lật quá xa, kết quả cuối ít liên quan */
+export const CATALOG_MAX_PAGE = 20

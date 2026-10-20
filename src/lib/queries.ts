@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 
 import { listCatalog } from '#/server/fns/catalog.ts'
 import type { CatalogSource } from '#/server/fns/catalog.ts'
@@ -49,9 +49,11 @@ export const pronunciationHistoryQuery = (segmentId: number) =>
     queryFn: () => pronunciationHistory({ data: { segmentId } }),
   })
 
-export const catalogQuery = (source: CatalogSource, level: Level) =>
+export const catalogQuery = (source: CatalogSource, level: Level, page: number) =>
   queryOptions({
-    queryKey: ['catalog', source, level],
-    queryFn: () => listCatalog({ data: { source, level } }),
+    queryKey: ['catalog', source, level, page],
+    queryFn: () => listCatalog({ data: { source, level, page } }),
     staleTime: 60 * 60_000,
+    // lật trang: giữ trang cũ trên màn hình tới khi trang mới về
+    placeholderData: keepPreviousData,
   })

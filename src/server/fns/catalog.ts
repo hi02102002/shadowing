@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
 import { videos } from '#/db/schema.ts'
-import { LEVELS } from '#/lib/levels.ts'
+import { CATALOG_MAX_PAGE, LEVELS } from '#/lib/levels.ts'
 import type { Level } from '#/lib/levels.ts'
 import { youtubeThumbnail } from '#/lib/youtube-id.ts'
 import { fetchEllloLevel } from '../elllo/elllo.ts'
@@ -26,6 +26,16 @@ export interface CatalogItem {
   imported: boolean
 }
 
+export interface CatalogPage {
+  items: CatalogItem[]
+  page: number
+  /** chỉ biết với elllo; YouTube tìm kiếm không giới hạn → dùng hasMore */
+  totalPages?: number
+  hasMore: boolean
+}
+
+const PAGE_SIZE = 12
+
 const YT_QUERY: Record<Level, string> = {
   A1: 'A1 English listening practice beginner',
   A2: 'A2 English listening practice elementary',
@@ -33,31 +43,47 @@ const YT_QUERY: Record<Level, string> = {
   B2: 'B2 English listening practice upper intermediate',
   C1: 'C1 English listening practice advanced',
 }
-const YT_LIMIT = 30
+
+type Item = Omit<CatalogItem, 'imported'>
+type Page = Omit<CatalogPage, 'items'> & { items: Item[] }
 
 const CACHE_MS = 6 * 60 * 60 * 1000
-const cache = new Map<
-  string,
-  { at: number; items: Omit<CatalogItem, 'imported'>[] }
->()
+const cache = new Map<string, { at: number; value: unknown }>()
 
-async function load(
-  source: CatalogSource,
-  level: Level,
-): Promise<Omit<CatalogItem, 'imported'>[]> {
-  if (source === 'elllo') {
-    const lessons = await fetchEllloLevel(level)
-    return lessons.map((l) => ({
+async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value as T
+  const value = await load()
+  cache.set(key, { at: Date.now(), value })
+  return value
+}
+
+async function ellloPage(level: Level, page: number): Promise<Page> {
+  // trang mục lục elllo chứa cả cấp độ (~50 bài) → tải một lần rồi cắt
+  const all = await cached(`elllo:${level}`, async () =>
+    (await fetchEllloLevel(level)).map((l): Item => ({
       url: l.url,
       title: l.title,
       thumbnail: l.thumbnail,
       channel: 'ELLLO',
       number: l.number,
-    }))
+    })),
+  )
+  const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE))
+  return {
+    items: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    page,
+    totalPages,
+    hasMore: page < totalPages,
   }
-  const entries = await searchVideos(YT_QUERY[level], YT_LIMIT)
-  return (
-    entries
+}
+
+async function youtubePage(level: Level, page: number): Promise<Page> {
+  const entries = await cached(`youtube:${level}:${page}`, () =>
+    searchVideos(YT_QUERY[level], (page - 1) * PAGE_SIZE + 1, page * PAGE_SIZE),
+  )
+  return {
+    items: entries
       // bỏ livestream (không có thời lượng) và Shorts
       .filter((e) => e.duration && e.duration >= 60)
       .map((e) => ({
@@ -67,22 +93,26 @@ async function load(
         durationSec: Math.round(e.duration!),
         channel: e.channel,
         youtubeId: e.id,
-      }))
-  )
+      })),
+    page,
+    hasMore: entries.length === PAGE_SIZE && page < CATALOG_MAX_PAGE,
+  }
 }
 
 export const listCatalog = createServerFn({ method: 'GET' })
   .validator(
-    z.object({ source: z.enum(['elllo', 'youtube']), level: z.enum(LEVELS) }),
+    z.object({
+      source: z.enum(['elllo', 'youtube']),
+      level: z.enum(LEVELS),
+      page: z.number().int().min(1).max(CATALOG_MAX_PAGE),
+    }),
   )
-  .handler(async ({ data }): Promise<CatalogItem[]> => {
-    const key = `${data.source}:${data.level}`
-    let hit = cache.get(key)
-    if (!hit || Date.now() - hit.at > CACHE_MS) {
-      hit = { at: Date.now(), items: await load(data.source, data.level) }
-      cache.set(key, hit)
-    }
-    const ids = hit.items.flatMap((i) => (i.youtubeId ? [i.youtubeId] : []))
+  .handler(async ({ data }): Promise<CatalogPage> => {
+    const res =
+      data.source === 'elllo'
+        ? await ellloPage(data.level, data.page)
+        : await youtubePage(data.level, data.page)
+    const ids = res.items.flatMap((i) => (i.youtubeId ? [i.youtubeId] : []))
     const owned = new Set(
       ids.length
         ? db
@@ -93,8 +123,11 @@ export const listCatalog = createServerFn({ method: 'GET' })
             .map((r) => r.id)
         : [],
     )
-    return hit.items.map((i) => ({
-      ...i,
-      imported: !!i.youtubeId && owned.has(i.youtubeId),
-    }))
+    return {
+      ...res,
+      items: res.items.map((i) => ({
+        ...i,
+        imported: !!i.youtubeId && owned.has(i.youtubeId),
+      })),
+    }
   })
