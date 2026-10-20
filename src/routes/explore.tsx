@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   AudioLines,
@@ -8,10 +9,13 @@ import {
   ChevronRight,
   Loader2,
   RotateCw,
+  Search,
+  X,
 } from 'lucide-react'
 import { z } from 'zod'
 
 import { Button } from '#/components/ui/button'
+import { Input } from '#/components/ui/input'
 import { useVideoImport } from '#/hooks/use-video-import'
 import { formatDuration } from '#/lib/format'
 import {
@@ -34,6 +38,8 @@ const searchSchema = z.object({
     .max(CATALOG_MAX_PAGE)
     .optional()
     .catch(undefined),
+  /** từ khoá tìm trên YouTube */
+  q: z.string().max(100).optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/explore')({
@@ -52,8 +58,9 @@ const SOURCES = [
 const SKELETONS = ['s1', 's2', 's3', 's4', 's5', 's6']
 
 function Explore() {
-  const { level, source, page = 1 } = Route.useSearch()
-  const catalog = useQuery(catalogQuery(source, level, page))
+  const { level, source, page = 1, q } = Route.useSearch()
+  const query = source === 'youtube' ? q?.trim() || undefined : undefined
+  const catalog = useQuery(catalogQuery(source, level, page, query))
   const { importUrl, importing, error, dialog } = useVideoImport()
 
   return (
@@ -80,7 +87,9 @@ function Explore() {
               search={{ level: l, source }}
               className={cn(
                 'flex flex-col items-center rounded-md px-3 py-1 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground',
-                l === level && 'bg-background text-foreground shadow-sm',
+                l === level &&
+                  !query &&
+                  'bg-background text-foreground shadow-sm',
               )}
             >
               <span className="font-semibold">{l}</span>
@@ -109,6 +118,8 @@ function Explore() {
           ))}
         </nav>
       </div>
+
+      {source === 'youtube' && <YoutubeSearch initial={query} />}
 
       {error && <p className="text-sm text-destructive">{error.message}</p>}
 
@@ -174,6 +185,88 @@ function Explore() {
   )
 }
 
+/** ngừng gõ chừng này thì tự tìm */
+const SEARCH_DEBOUNCE_MS = 500
+
+/** Tìm video YouTube theo từ khoá (tự tìm khi ngừng gõ); xoá từ khoá thì quay lại gợi ý theo cấp độ */
+function YoutubeSearch({ initial }: { initial?: string }) {
+  const navigate = useNavigate({ from: '/explore' })
+  const [value, setValue] = useState(initial ?? '')
+  // từ khoá gần nhất đã đưa lên URL: phân biệt URL đổi do mình hay do bên ngoài (bấm cấp độ, nút Back)
+  const sent = useRef(initial ?? '')
+
+  const search = (text: string, replace = false) => {
+    const q = text.trim()
+    if (q === sent.current) return
+    sent.current = q
+    void navigate({
+      // trang 1 cho từ khoá mới; tự tìm khi gõ thì không thêm mục lịch sử cho từng chữ
+      replace,
+      search: (prev) => ({
+        level: prev.level,
+        source: 'youtube',
+        q: q || undefined,
+      }),
+    })
+  }
+
+  useEffect(() => {
+    const t = setTimeout(() => search(value, true), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [value])
+
+  // URL đổi từ bên ngoài → cập nhật ô nhập, không đè chữ đang gõ
+  useEffect(() => {
+    const q = initial ?? ''
+    if (q === sent.current) return
+    sent.current = q
+    setValue(q)
+  }, [initial])
+
+  return (
+    <form
+      className="flex flex-col gap-1.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        search(value)
+      }}
+    >
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Tìm trên YouTube, vd. TED talk, BBC 6 Minute English, travel vlog…"
+            className="pl-9"
+            maxLength={100}
+            aria-label="Tìm video YouTube"
+          />
+        </div>
+        <Button type="submit">Tìm</Button>
+        {initial && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setValue('')
+              search('')
+            }}
+          >
+            <X />
+            Xoá
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {initial
+          ? `Kết quả cho “${initial}”. Bấm một cấp độ ở trên để quay lại gợi ý theo trình độ.`
+          : 'Đang hiện gợi ý luyện nghe theo cấp độ. Gõ từ khoá để tìm video bất kỳ.'}
+      </p>
+    </form>
+  )
+}
+
 function Pagination({
   data,
   loading,
@@ -181,7 +274,7 @@ function Pagination({
   data: CatalogPage
   loading: boolean
 }) {
-  const { level, source } = Route.useSearch()
+  const { level, source, q } = Route.useSearch()
   const { page, totalPages } = data
   // biết tổng số trang (elllo) → hiện đủ các số trang; YouTube chỉ có trước/sau
   const numbers = totalPages
@@ -199,7 +292,7 @@ function Pagination({
       </Button>
     ) : (
       <Button variant="outline" size="sm" asChild aria-label={label}>
-        <Link to="/explore" search={{ level, source, page: p }}>
+        <Link to="/explore" search={{ level, source, page: p, q }}>
           {children}
         </Link>
       </Button>
@@ -222,7 +315,7 @@ function Pagination({
           >
             <Link
               to="/explore"
-              search={{ level, source, page: n }}
+              search={{ level, source, page: n, q }}
               aria-current={n === page ? 'page' : undefined}
             >
               {n}

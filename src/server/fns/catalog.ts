@@ -122,9 +122,15 @@ const ellloViewsPage = async (level: Level, page: number) => {
   )
 }
 
-async function youtubePage(level: Level, page: number): Promise<Page> {
-  const entries = await cached(`youtube:${level}:${page}`, () =>
-    searchVideos(YT_QUERY[level], (page - 1) * PAGE_SIZE + 1, page * PAGE_SIZE),
+/** `q`: từ khoá người dùng gõ; không có thì tìm bài luyện nghe theo cấp độ */
+async function youtubePage(
+  level: Level,
+  page: number,
+  q?: string,
+): Promise<Page> {
+  const query = q || YT_QUERY[level]
+  const entries = await cached(`youtube:${query.toLowerCase()}:${page}`, () =>
+    searchVideos(query, (page - 1) * PAGE_SIZE + 1, page * PAGE_SIZE),
   )
   return {
     items: entries
@@ -149,6 +155,8 @@ export const listCatalog = createServerFn({ method: 'GET' })
       source: z.enum(CATALOG_SOURCES),
       level: z.enum(LEVELS),
       page: z.number().int().min(1).max(CATALOG_MAX_PAGE),
+      /** từ khoá tìm trên YouTube (bỏ qua với nguồn elllo) */
+      q: z.string().trim().max(100).optional(),
     }),
   )
   .handler(async ({ data }): Promise<CatalogPage> => {
@@ -158,7 +166,7 @@ export const listCatalog = createServerFn({ method: 'GET' })
       'elllo-book': ellloBookPage,
       youtube: youtubePage,
     }[data.source]
-    const res = await load(data.level, data.page)
+    const res = await load(data.level, data.page, data.q)
     const ids = res.items.flatMap((i) => (i.youtubeId ? [i.youtubeId] : []))
     const owned = new Set(
       ids.length
