@@ -1,15 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
-import { lookups } from '#/db/schema.ts'
+import { lookups, segments } from '#/db/schema.ts'
 import { LOOKUP_SYSTEM, LookupSchema, lookupPrompt } from '../ai/prompts.ts'
 import type { Lookup } from '../ai/prompts.ts'
 import { structured } from '../ai/provider.ts'
 import { getConfig } from '../config.ts'
 import { wordsToIpa } from '../ipa.ts'
-import { googleTranslate } from '../translate.ts'
+import { googleTranslateLines } from '../translate.ts'
 
 export const lookupWord = createServerFn({ method: 'POST' })
   .validator(
@@ -49,18 +49,74 @@ export const wordsIpa = createServerFn({ method: 'POST' })
   .validator(z.object({ words: z.array(z.string().max(80)).max(300) }))
   .handler(async ({ data }) => wordsToIpa(data.words, getConfig().accent))
 
-/** Dịch cả câu sang tiếng Việt bằng Google Dịch (miễn phí), lưu cache để mỗi câu chỉ dịch một lần */
+const translationKey = (text: string) => `gtranslate|vi|${text}`
+
+/** đang dịch cả video → các câu khác của cùng video chờ chung, không gọi Google thêm lần nữa */
+const inflight = new Map<number, Promise<void>>()
+
+/** Dịch mọi câu chưa có bản dịch của một video trong vài lần gọi (thay vì mỗi câu một lần → dễ bị Google chặn) */
+async function translateVideo(videoId: number) {
+  const pending = db
+    .select({ text: segments.text })
+    .from(segments)
+    .where(eq(segments.videoId, videoId))
+    .orderBy(asc(segments.startMs))
+    .all()
+    .map((r) => r.text)
+    .filter((text, i, all) => all.indexOf(text) === i)
+    .filter(
+      (text) =>
+        !db
+          .select({ key: lookups.key })
+          .from(lookups)
+          .where(eq(lookups.key, translationKey(text)))
+          .get(),
+    )
+  if (!pending.length) return
+
+  const translated = await googleTranslateLines(pending)
+  db.transaction((tx) => {
+    pending.forEach((text, i) =>
+      tx
+        .insert(lookups)
+        .values({
+          key: translationKey(text),
+          json: JSON.stringify(translated[i]),
+        })
+        .onConflictDoNothing()
+        .run(),
+    )
+  })
+}
+
+/** Dịch câu sang tiếng Việt bằng Google Dịch (miễn phí); dịch luôn cả video và lưu cache từng câu */
 export const translateSentence = createServerFn({ method: 'POST' })
-  .validator(z.object({ text: z.string().trim().min(1).max(2000) }))
+  .validator(z.object({ segmentId: z.number().int() }))
   .handler(async ({ data }): Promise<string> => {
-    const key = `gtranslate|vi|${data.text}`
-    const cached = db.select().from(lookups).where(eq(lookups.key, key)).get()
+    const seg = db
+      .select()
+      .from(segments)
+      .where(eq(segments.id, data.segmentId))
+      .get()
+    if (!seg) throw new Error('Không tìm thấy câu')
+    const read = () =>
+      db
+        .select()
+        .from(lookups)
+        .where(eq(lookups.key, translationKey(seg.text)))
+        .get()
+    const cached = read()
     if (cached) return JSON.parse(cached.json) as string
 
-    const translated = await googleTranslate(data.text)
-    db.insert(lookups)
-      .values({ key, json: JSON.stringify(translated) })
-      .onConflictDoNothing()
-      .run()
-    return translated
+    let job = inflight.get(seg.videoId)
+    if (!job) {
+      job = translateVideo(seg.videoId).finally(() =>
+        inflight.delete(seg.videoId),
+      )
+      inflight.set(seg.videoId, job)
+    }
+    await job
+    const row = read()
+    if (!row) throw new Error('Không dịch được câu này')
+    return JSON.parse(row.json) as string
   })

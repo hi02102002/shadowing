@@ -51,7 +51,7 @@ export function KaraokeText({
 
   const translation = useQuery({
     queryKey: ['translate', segment.id],
-    queryFn: () => translateSentence({ data: { text: segment.text } }),
+    queryFn: () => translateSentence({ data: { segmentId: segment.id } }),
     enabled: !!translate,
     staleTime: Infinity,
     retry: 1,
