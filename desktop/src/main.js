@@ -37,6 +37,8 @@ const whisperPath = path.join(
 let server = null
 /** @type {BrowserWindow | null} */
 let win = null
+/** http://127.0.0.1:<port> của server, có sau khi server chạy */
+let appOrigin = null
 let quitting = false
 
 if (!app.requestSingleInstanceLock()) {
@@ -70,7 +72,8 @@ async function start() {
     // macOS lấy icon từ bundle; Linux/Windows cần chỉ định cho cửa sổ + taskbar
     icon: path.join(here, '../resources/icon.png'),
     autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, sandbox: true },
+    // preload: cầu nối cập nhật cho trang Cài đặt (window.shadowingDesktop)
+    webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(here, 'preload.cjs') },
   })
   win.on('closed', () => {
     win = null
@@ -88,8 +91,10 @@ async function start() {
     startServer(port)
     await waitForServer(origin)
     lockToOrigin(win, origin)
-    await win.loadURL(origin)
+    appOrigin = origin
+    // đăng ký IPC trước khi trang tải, trang Cài đặt hỏi trạng thái ngay khi mở
     initUpdater()
+    await win.loadURL(origin)
   } catch (err) {
     fail(err)
   }
@@ -239,6 +244,12 @@ function fail(err) {
   app.quit()
 }
 
+/** mục cập nhật nằm trong trang Cài đặt: mở trang rồi kiểm tra luôn */
+function openUpdateSettings() {
+  if (win && appOrigin) void win.loadURL(`${appOrigin}/settings#update`)
+  void checkForUpdates()
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin'
   return Menu.buildFromTemplate([
@@ -248,7 +259,7 @@ function buildMenu() {
       submenu: [
         { label: 'Mở thư mục dữ liệu', click: () => shell.openPath(dataDir) },
         { label: 'Mở log', click: () => shell.openPath(logDir) },
-        { label: 'Kiểm tra cập nhật…', click: () => checkForUpdates(true) },
+        { label: 'Kiểm tra cập nhật…', click: openUpdateSettings },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit', label: 'Thoát' },
       ],

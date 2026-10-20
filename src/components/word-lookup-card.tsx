@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { AudioLines, Lightbulb, Loader2, Volume2, X } from 'lucide-react'
+import { AudioLines, ExternalLink, Lightbulb, Loader2, Volume2, X } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { playerActions } from '#/lib/player-store'
@@ -162,6 +162,20 @@ export function WordLookupCard({
                 </button>
               ))}
             </div>
+            {/* giọng người thật: Cambridge chặn tải tự động nên mở trang để nghe */}
+            <Button size="sm" variant="ghost" asChild>
+              <a
+                href={`https://dictionary.cambridge.org/dictionary/english/${encodeURIComponent(
+                  (d?.headword ?? target.text).trim().toLowerCase().replace(/\s+/g, '-'),
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                title="Mở Cambridge Dictionary để nghe giọng người thật"
+              >
+                Cambridge
+                <ExternalLink />
+              </a>
+            </Button>
           </div>
         )}
       </div>

@@ -11,6 +11,8 @@ import {
   Download,
   Loader2,
   PlugZap,
+  RefreshCw,
+  RotateCw,
   Save,
   XCircle,
 } from 'lucide-react'
@@ -20,6 +22,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { Progress } from '#/components/ui/progress'
 import { Switch } from '#/components/ui/switch'
+import { desktopBridge, useDesktopUpdate } from '#/lib/desktop'
 import { settingsQuery } from '#/lib/queries'
 import { downloadWhisperModel, whisperStatus } from '#/server/fns/captions'
 import { saveSettings, testLlm } from '#/server/fns/settings'
@@ -530,6 +533,8 @@ function SettingsPage() {
           )}
         </form.Subscribe>
       </form>
+
+      <AppVersion />
     </div>
   )
 }
@@ -626,5 +631,95 @@ function TextField({
         </span>
       )}
     </div>
+  )
+}
+
+/** Phiên bản app desktop + cập nhật khi người dùng bấm (không tự tải / tự cài) */
+function AppVersion() {
+  const update = useDesktopUpdate()
+  const bridge = desktopBridge()
+
+  return (
+    <section id="update" className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+      <h2 className="text-sm font-semibold">Phiên bản</h2>
+      {!update || !bridge ? (
+        <p className="text-sm text-muted-foreground">
+          Đang chạy bản web. Cập nhật bằng cách kéo code mới (git pull) hoặc build lại image Docker.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span>
+              Đang dùng <b>Shadowing {update.currentVersion}</b>
+            </span>
+            {update.status === 'up-to-date' && (
+              <span className="flex items-center gap-1 text-ok">
+                <CheckCircle2 className="size-4" /> Đã là bản mới nhất
+              </span>
+            )}
+            {(update.status === 'available' || update.status === 'downloading' || update.status === 'downloaded') &&
+              update.latestVersion && (
+                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                  Có bản mới {update.latestVersion}
+                </span>
+              )}
+          </div>
+
+          {update.status === 'downloading' && (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Progress value={update.progress * 100} className="h-1.5" />
+              <span className="shrink-0 font-mono text-xs">{Math.round(update.progress * 100)}%</span>
+            </div>
+          )}
+          {update.status === 'error' && update.error && (
+            <p className="text-xs text-destructive">Không cập nhật được: {update.error}</p>
+          )}
+          {update.status === 'dev' && (
+            <p className="text-xs text-muted-foreground">Bản đang chạy từ mã nguồn, chỉ bản đã cài mới cập nhật.</p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {update.status === 'available' && update.canInstall && (
+              <Button type="button" size="sm" onClick={() => void bridge.updater.download()}>
+                <Download />
+                Cập nhật lên {update.latestVersion}
+              </Button>
+            )}
+            {update.status === 'available' && !update.canInstall && (
+              <Button type="button" size="sm" onClick={() => void bridge.updater.openRelease()}>
+                <Download />
+                Tải bản {update.latestVersion}
+              </Button>
+            )}
+            {update.status === 'downloaded' && (
+              <Button type="button" size="sm" onClick={() => void bridge.updater.install()}>
+                <RotateCw />
+                Khởi động lại để cài {update.latestVersion}
+              </Button>
+            )}
+            {update.status !== 'dev' && update.status !== 'downloading' && update.status !== 'downloaded' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={update.status === 'checking'}
+                onClick={() => void bridge.updater.check()}
+              >
+                {update.status === 'checking' ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                {update.status === 'checking' ? 'Đang kiểm tra…' : 'Kiểm tra cập nhật'}
+              </Button>
+            )}
+            {update.latestVersion && (
+              <Button type="button" size="sm" variant="ghost" onClick={() => void bridge.updater.openRelease()}>
+                Có gì mới?
+              </Button>
+            )}
+          </div>
+          {update.status === 'downloaded' && navigator.userAgent.includes('Linux') && (
+            <p className="text-xs text-muted-foreground">Bản cài .deb sẽ hỏi mật khẩu máy khi cài.</p>
+          )}
+        </>
+      )}
+    </section>
   )
 }

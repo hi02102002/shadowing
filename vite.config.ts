@@ -14,7 +14,10 @@ const config = defineConfig({
     nitro({
       rollupConfig: { external: [/^@sentry\//] },
       // route Nitro thuần (không qua TanStack), xem giải thích trong file
-      routes: { '/api/media/:key': './src/server/media-route.ts' },
+      routes: {
+        '/api/media/:key': './src/server/media-route.ts',
+        '/api/tts': './src/server/tts-route.ts',
+      },
     }),
     tailwindcss(),
     tanstackStart(),

@@ -2,13 +2,33 @@ export type Accent = 'uk' | 'us'
 
 const LANG: Record<Accent, string> = { uk: 'en-GB', us: 'en-US' }
 
-/** Đọc từ bằng giọng TTS của trình duyệt, dùng khi muốn nghe phát âm "chuẩn từ điển" */
+let player: HTMLAudioElement | null = null
+
+/**
+ * Đọc mẫu bằng giọng Google (mp3 qua /api/tts, đúng giọng UK/US, có cache).
+ * Lỗi mạng thì lùi về giọng TTS của trình duyệt (Electron trên Linux không có giọng nào → im lặng).
+ */
 export function speak(
   text: string,
   /** giọng chuẩn lấy từ Cài đặt (useAccent) */
   opts: { accent: Accent; rate?: number },
 ) {
-  if (!canSpeak()) return false
+  if (typeof window === 'undefined') return false
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  player?.pause()
+  player = new Audio(
+    `/api/tts?${new URLSearchParams({ text, accent: opts.accent })}`,
+  )
+  player.playbackRate = opts.rate ?? 1
+  player.play().catch(() => speakWithBrowser(text, opts))
+  return true
+}
+
+function speakWithBrowser(
+  text: string,
+  opts: { accent: Accent; rate?: number },
+) {
+  if (!('speechSynthesis' in window)) return
   const lang = LANG[opts.accent]
   const synth = window.speechSynthesis
   synth.cancel()
@@ -25,8 +45,6 @@ export function speak(
     voices.find((v) => v.lang.startsWith('en'))
   if (voice) u.voice = voice
   synth.speak(u)
-  return true
 }
 
-export const canSpeak = () =>
-  typeof window !== 'undefined' && 'speechSynthesis' in window
+export const canSpeak = () => typeof window !== 'undefined'
