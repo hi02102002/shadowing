@@ -51,6 +51,7 @@
     "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmu-pronouncing-dictionary": "3.0.0",
     "cn": "^0.5.0",
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",

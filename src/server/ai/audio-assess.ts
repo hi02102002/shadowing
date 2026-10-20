@@ -3,9 +3,9 @@ import { z } from 'zod'
 import { getConfig } from '../config.ts'
 import type { AppConfig } from '../config.ts'
 import {
-  AUDIO_PRONUNCIATION_SYSTEM,
   AudioAssessmentSchema,
   audioPronunciationPrompt,
+  audioPronunciationSystem,
 } from './prompts.ts'
 import type { AudioAssessment } from './prompts.ts'
 
@@ -78,7 +78,7 @@ export async function assessWithAudioLlm(
 ): Promise<AudioAssessment> {
   const url = resolveEndpoint(cfg)
   const messages = [
-    { role: 'system', content: AUDIO_PRONUNCIATION_SYSTEM },
+    { role: 'system', content: audioPronunciationSystem(cfg.accent) },
     {
       role: 'user',
       content: [
@@ -108,7 +108,7 @@ export async function assessWithAudioLlm(
   ) {
     messages[0] = {
       role: 'system',
-      content: `${AUDIO_PRONUNCIATION_SYSTEM}\n\nChỉ trả về một object JSON đúng schema sau, không kèm chữ nào khác:\n${JSON.stringify(schema)}`,
+      content: `${audioPronunciationSystem(cfg.accent)}\n\nChỉ trả về một object JSON đúng schema sau, không kèm chữ nào khác:\n${JSON.stringify(schema)}`,
     }
     res = await post(url, cfg.llmApiKey, { model: cfg.llmModel, messages })
   }

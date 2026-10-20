@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
 import { desc, eq } from 'drizzle-orm'
@@ -10,23 +11,113 @@ import { alignWords, displayWords } from '#/lib/align.ts'
 import type { AlignToken } from '#/lib/align.ts'
 import { assessWithAudioLlm } from '../ai/audio-assess.ts'
 import {
-  PRONUNCIATION_SYSTEM,
   PronunciationFeedbackSchema,
   pronunciationPrompt,
+  pronunciationSystem,
 } from '../ai/prompts.ts'
 import type { PronunciationFeedback } from '../ai/prompts.ts'
 import { structured } from '../ai/provider.ts'
 import { toWav16k } from '../audio.ts'
-import { getConfig } from '../config.ts'
+import { getConfig, hasAudioLlm, hasLlm, hasStt } from '../config.ts'
+import type { AppConfig } from '../config.ts'
 import { recordMistakes } from '../mistakes.ts'
 import { transcribe } from '../stt.ts'
 import type { SttWord } from '../stt.ts'
+import { fromWhisperCppJson } from '../transcript/whisper.ts'
+import {
+  ensureModel,
+  transcribeLocal,
+  whisperBinary,
+  whisperLocalStatus,
+} from '../whisper-local.ts'
 
 const RECORDINGS_DIR = path.resolve(
   process.env.DATA_DIR ?? 'data',
   'recordings',
 )
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024
+
+/** llm-audio / stt dùng API đã cấu hình; local = whisper.cpp trên máy (không cần AI) */
+const ENGINES = ['llm-audio', 'stt', 'local'] as const
+export type PronunciationEngine = (typeof ENGINES)[number]
+
+/** lý do không dùng được, null = dùng được */
+function engineUnavailable(
+  engine: PronunciationEngine,
+  cfg: AppConfig,
+): string | null {
+  switch (engine) {
+    case 'llm-audio':
+      return hasAudioLlm(cfg)
+        ? null
+        : 'Cần provider nghe được audio (Gemini / OpenAI / OpenAI-compatible) trong Cài đặt'
+    case 'stt':
+      return hasStt(cfg)
+        ? null
+        : 'Chưa nhập STT API key / Base URL trong Cài đặt'
+    case 'local':
+      return whisperBinary() ? null : 'Không tìm thấy whisper-cli trên máy này'
+  }
+}
+
+/** Tự động: theo Cài đặt, thiếu cấu hình thì lùi dần LLM nghe audio → STT API → Whisper trên máy */
+function autoEngine(cfg: AppConfig): PronunciationEngine {
+  const order: PronunciationEngine[] =
+    cfg.pronunciationEngine === 'llm-audio'
+      ? ['llm-audio', 'stt', 'local']
+      : ['stt', 'local']
+  return order.find((e) => !engineUnavailable(e, cfg)) ?? 'local'
+}
+
+const PICKABLE: PronunciationEngine[] = ['llm-audio', 'local']
+
+export const pronunciationEngines = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const cfg = getConfig()
+    return {
+      auto: autoEngine(cfg),
+      // các cách chọn được lúc ghi âm; STT API chỉ dùng qua "Tự động" khi Cài đặt chọn Whisper (STT)
+      engines: PICKABLE.map((id) => ({
+        id,
+        unavailable: engineUnavailable(id, cfg),
+      })),
+      /** chấm trên máy lần đầu phải tải model */
+      localModelReady: whisperLocalStatus().model === 'ready',
+    }
+  },
+)
+
+/** Nhận dạng bản ghi bằng whisper.cpp trên máy (không cần API) */
+async function transcribeOnDevice(wav: Buffer): Promise<SttWord[]> {
+  if (!whisperBinary()) {
+    throw new Error(
+      'Chưa cấu hình AI và không tìm thấy whisper-cli để chấm trên máy. Vào Cài đặt để nhập API key.',
+    )
+  }
+  const status = whisperLocalStatus()
+  if (status.model !== 'ready') {
+    // tải ở nền (vài trăm MB) thay vì bắt người dùng chờ trong lúc chấm
+    ensureModel().catch(() => {
+      /* lỗi được ghi vào whisperLocalStatus().error */
+    })
+    const pct = Math.round(whisperLocalStatus().progress * 100)
+    throw new Error(
+      `Chưa cấu hình AI nên app chấm phát âm trên máy bằng Whisper. Đang tải model (${pct}%), thử lại sau ít phút — xem tiến độ ở Cài đặt.`,
+    )
+  }
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'shadowing-pron-'))
+  try {
+    const wavPath = path.join(dir, 'rec.wav')
+    await fs.writeFile(wavPath, wav)
+    return fromWhisperCppJson(await transcribeLocal(wavPath)).map((w) => ({
+      word: w.w,
+      start: w.s / 1000,
+      end: w.e / 1000,
+    }))
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+}
 
 interface StoredWords {
   stt: SttWord[]
@@ -46,6 +137,10 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
       audio,
       segmentId: z.coerce.number().int().parse(form.get('segmentId')),
       mode: z.enum(['shadow', 'repeat']).parse(form.get('mode') ?? 'repeat'),
+      engine: z
+        .enum(['auto', ...ENGINES])
+        .catch('auto')
+        .parse(form.get('engine')),
     }
   })
   .handler(async ({ data }) => {
@@ -64,7 +159,11 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
     let feedback: PronunciationFeedback | null = null
     let spokenSec = 0
 
-    if (cfg.pronunciationEngine === 'llm-audio') {
+    const engine = data.engine === 'auto' ? autoEngine(cfg) : data.engine
+    const unavailable = engineUnavailable(engine, cfg)
+    if (unavailable) throw new Error(unavailable)
+
+    if (engine === 'llm-audio') {
       // model nghe trực tiếp: chữ nghe được + nhận xét trong một lần gọi
       const { wav, durationMs } = await toWav16k(raw)
       if (durationMs < 400) throw new Error('Bản ghi quá ngắn, hãy nói lại')
@@ -76,6 +175,14 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
       transcript = heard.trim()
       feedback = rest
       spokenSec = durationMs / 1000
+    } else if (engine === 'local') {
+      const { wav, durationMs } = await toWav16k(raw)
+      if (durationMs < 400) throw new Error('Bản ghi quá ngắn, hãy nói lại')
+      words = await transcribeOnDevice(wav)
+      transcript = words.map((w) => w.word).join(' ')
+      spokenSec = words.length
+        ? words[words.length - 1].end - words[0].start
+        : 0
     } else {
       const stt = await transcribe(data.audio, { cfg })
       transcript = stt.text.trim()
@@ -143,7 +250,9 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
 
     return {
       attemptId: attempt.id,
-      engine: cfg.pronunciationEngine,
+      engine,
+      /** có LLM để viết nhận xét chi tiết (pronunciationFeedback) */
+      aiFeedback: hasLlm(cfg),
       transcript,
       accuracy: result.score,
       completeness,
@@ -173,7 +282,7 @@ export const pronunciationFeedback = createServerFn({ method: 'POST' })
 
     const stored = JSON.parse(row.attempt.wordsJson) as StoredWords
     const feedback = await structured({
-      system: PRONUNCIATION_SYSTEM,
+      system: pronunciationSystem(getConfig().accent),
       prompt: pronunciationPrompt({
         reference: row.seg.text,
         transcript: row.attempt.transcript,
@@ -212,3 +321,7 @@ export const pronunciationHistory = createServerFn({ method: 'GET' })
       .limit(10)
       .all(),
   )
+
+export type PronunciationEngines = Awaited<
+  ReturnType<typeof pronunciationEngines>
+>

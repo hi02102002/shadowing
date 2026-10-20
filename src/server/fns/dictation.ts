@@ -6,9 +6,10 @@ import { db } from '#/db/index.ts'
 import { dictationAttempts, segments } from '#/db/schema.ts'
 import { alignWords } from '#/lib/align.ts'
 import type { AlignToken } from '#/lib/align.ts'
-import { DICTATION_SYSTEM, DictationAnalysisSchema, dictationPrompt } from '../ai/prompts.ts'
+import { DictationAnalysisSchema, dictationPrompt, dictationSystem } from '../ai/prompts.ts'
 import type { DictationAnalysis } from '../ai/prompts.ts'
 import { structured } from '../ai/provider.ts'
+import { getConfig } from '../config.ts'
 import { recordMistakes } from '../mistakes.ts'
 
 export const submitDictation = createServerFn({ method: 'POST' })
@@ -50,7 +51,7 @@ export const analyzeDictation = createServerFn({ method: 'POST' })
 
     const tokens = JSON.parse(row.attempt.diffJson) as AlignToken[]
     const analysis = await structured({
-      system: DICTATION_SYSTEM,
+      system: dictationSystem(getConfig().accent),
       prompt: dictationPrompt(row.seg.text, row.attempt.input, tokens, prev?.text),
       schema: DictationAnalysisSchema,
     })

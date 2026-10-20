@@ -7,6 +7,8 @@ export const LLM_PROVIDERS = ['openai', 'anthropic', 'gemini', 'ollama', 'openai
 export const PRONUNCIATION_ENGINES = ['llm-audio', 'stt'] as const
 /** Tạo phụ đề cho video không có sẵn: local = whisper.cpp trên máy · api = STT API ở trên (tốn phí) */
 export const CAPTION_ENGINES = ['local', 'api'] as const
+/** giọng dùng cho phiên âm IPA */
+export const ACCENTS = ['us', 'uk'] as const
 
 export const AppConfigSchema = z.object({
   llmProvider: z.enum(LLM_PROVIDERS),
@@ -18,6 +20,7 @@ export const AppConfigSchema = z.object({
   sttModel: z.string().min(1),
   pronunciationEngine: z.enum(PRONUNCIATION_ENGINES),
   captionEngine: z.enum(CAPTION_ENGINES),
+  accent: z.enum(ACCENTS),
 })
 export type AppConfig = z.infer<typeof AppConfigSchema>
 
@@ -35,6 +38,7 @@ function fromEnv(): AppConfig {
     sttModel: e.STT_MODEL ?? 'whisper-1',
     pronunciationEngine: e.PRONUNCIATION_ENGINE === 'stt' ? 'stt' : 'llm-audio',
     captionEngine: e.CAPTION_ENGINE === 'api' ? 'api' : 'local',
+    accent: e.ACCENT === 'uk' ? 'uk' : 'us',
   }
 }
 
@@ -61,4 +65,20 @@ export function saveConfig(patch: Partial<AppConfig>) {
 export function publicConfig(cfg: AppConfig) {
   const mask = (k: string) => (k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '')
   return { ...cfg, llmApiKey: mask(cfg.llmApiKey), sttApiKey: mask(cfg.sttApiKey) }
+}
+
+/** Đã cấu hình LLM (Ollama / OpenAI-compatible chạy local không cần key) */
+export function hasLlm(cfg: AppConfig): boolean {
+  if (cfg.llmProvider === 'ollama') return true
+  if (cfg.llmProvider === 'openai-compatible') return !!cfg.llmBaseUrl
+  return !!cfg.llmApiKey
+}
+
+/** LLM nghe được audio trực tiếp (gửi `input_audio` qua API tương thích OpenAI) */
+export function hasAudioLlm(cfg: AppConfig): boolean {
+  return cfg.llmProvider !== 'anthropic' && cfg.llmProvider !== 'ollama' && hasLlm(cfg)
+}
+
+export function hasStt(cfg: AppConfig): boolean {
+  return !!(cfg.sttApiKey || cfg.sttBaseUrl)
 }

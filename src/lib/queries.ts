@@ -3,7 +3,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { listCatalog } from '#/server/fns/catalog.ts'
 import type { CatalogSource } from '#/server/fns/catalog.ts'
 import { dictationHistory } from '#/server/fns/dictation.ts'
-import { pronunciationHistory } from '#/server/fns/pronunciation.ts'
+import { pronunciationEngines, pronunciationHistory } from '#/server/fns/pronunciation.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
@@ -56,4 +56,10 @@ export const catalogQuery = (source: CatalogSource, level: Level, page: number) 
     staleTime: 60 * 60_000,
     // lật trang: giữ trang cũ trên màn hình tới khi trang mới về
     placeholderData: keepPreviousData,
+  })
+
+export const pronunciationEnginesQuery = () =>
+  queryOptions({
+    queryKey: ['pronunciation-engines'],
+    queryFn: () => pronunciationEngines(),
   })

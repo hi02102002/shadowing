@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from '@tanstack/react-store'
 import { useHotkey } from '@tanstack/react-hotkeys'
-import { Headphones, Play, Volume2 } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Cpu, Headphones, Play, Volume2 } from 'lucide-react'
 
 import { AiFeedback } from '#/components/ai-feedback'
 import { DiffLegend, DiffView } from '#/components/diff-view'
@@ -11,17 +12,59 @@ import { ScoreRing } from '#/components/score-ring'
 import { Button } from '#/components/ui/button'
 import { useRecorder } from '#/hooks/use-recorder'
 import { playerActions, playerStore } from '#/lib/player-store'
-import { pronunciationHistoryQuery, videoQuery } from '#/lib/queries'
+import { pronunciationEnginesQuery, pronunciationHistoryQuery, videoQuery } from '#/lib/queries'
 import { relativeTime, scoreTone } from '#/lib/format'
 import { cn } from '#/lib/utils'
 import { assessPronunciation, pronunciationFeedback } from '#/server/fns/pronunciation'
-import type { PronunciationResult } from '#/server/fns/pronunciation'
+import type {
+  PronunciationEngine,
+  PronunciationEngines,
+  PronunciationResult,
+} from '#/server/fns/pronunciation'
 import type { SegmentView } from '#/server/fns/videos'
 
 interface Props {
   youtubeId: string
   segment: SegmentView
   mode: 'shadow' | 'repeat'
+}
+
+type EngineChoice = PronunciationEngine | 'auto'
+
+const ENGINE_LABEL: Record<EngineChoice, string> = {
+  auto: 'Tự động',
+  'llm-audio': 'AI nghe',
+  stt: 'Whisper API',
+  local: 'Trên máy',
+}
+const ENGINE_HINT: Record<EngineChoice, string> = {
+  auto: 'Theo Cài đặt, thiếu cấu hình thì tự lùi về cách khác',
+  'llm-audio': 'Model AI nghe trực tiếp bản ghi và nhận xét',
+  stt: 'Nhận dạng giọng nói qua STT API rồi so từng từ',
+  local: 'Whisper chạy ngay trên máy, không cần mạng hay API key',
+}
+const ENGINE_KEY = 'pronunciation-engine'
+
+/** lựa chọn cách chấm, nhớ trong trình duyệt */
+function useEngineChoice() {
+  const [choice, setChoice] = useState<EngineChoice>('auto')
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ENGINE_KEY)
+      if (saved === 'auto' || saved === 'llm-audio' || saved === 'local') setChoice(saved)
+    } catch {
+      /* private mode */
+    }
+  }, [])
+  const change = (next: EngineChoice) => {
+    setChoice(next)
+    try {
+      localStorage.setItem(ENGINE_KEY, next)
+    } catch {
+      /* private mode */
+    }
+  }
+  return [choice, change] as const
 }
 
 /** thời gian chờ thêm sau khi câu gốc kết thúc trước khi tự dừng ghi âm (shadow) */
@@ -31,12 +74,15 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
   const queryClient = useQueryClient()
   const [result, setResult] = useState<PronunciationResult | null>(null)
   const shadowingRef = useRef(false)
+  const [engine, setEngine] = useEngineChoice()
+  const engines = useQuery(pronunciationEnginesQuery())
 
   const assess = useMutation({
     mutationFn: (blob: Blob) => {
       const form = new FormData()
       form.set('segmentId', String(segment.id))
       form.set('mode', mode)
+      form.set('engine', engine)
       form.set('audio', new File([blob], `rec.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`, { type: blob.type }))
       return assessPronunciation({ data: form })
     },
@@ -59,7 +105,8 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
   const feedback = useQuery({
     queryKey: ['pronunciation-feedback', result?.attemptId],
     queryFn: () => pronunciationFeedback({ data: { attemptId: result!.attemptId } }),
-    enabled: !!result,
+    // chưa cấu hình LLM → chỉ có điểm chấm trên máy, không gọi AI nhận xét
+    enabled: !!result?.aiFeedback,
     staleTime: Infinity,
     retry: false,
   })
@@ -109,6 +156,7 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
             Nghe câu gốc (có thể lặp và giảm tốc độ), sau đó bấm ghi âm và <b>nhắc lại</b>.
           </p>
         )}
+        <EnginePicker value={engine} onChange={setEngine} info={engines.data} />
         <RecordButton
           recording={recorder.recording}
           busy={assess.isPending}
@@ -152,7 +200,17 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
         </div>
       )}
 
-      {result && (
+      {result && !result.aiFeedback && (
+        <div className="flex items-start gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+          <Cpu className="mt-0.5 size-4 shrink-0" />
+          <p>
+            Đã chấm trên máy (chưa cấu hình AI). Nhập API key ở <Link to="/settings">Cài đặt</Link> để AI nhận xét chi
+            tiết từng lỗi.
+          </p>
+        </div>
+      )}
+
+      {result?.aiFeedback && (
         <AiFeedback
           status={feedback.status}
           error={feedback.error}
@@ -164,6 +222,56 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
       )}
 
       <PronunciationHistory segmentId={segment.id} />
+    </div>
+  )
+}
+
+function EnginePicker({
+  value,
+  onChange,
+  info,
+}: {
+  value: EngineChoice
+  onChange: (v: EngineChoice) => void
+  info?: PronunciationEngines
+}) {
+  const options: Array<{ id: EngineChoice; unavailable: string | null }> = [
+    { id: 'auto', unavailable: null },
+    ...(info?.engines ?? []),
+  ]
+  const selected = options.find((o) => o.id === value)
+  const needsModel =
+    info && !info.localModelReady && (value === 'local' || (value === 'auto' && info.auto === 'local'))
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-wrap items-center justify-center gap-1 text-xs" role="group" aria-label="Chấm bằng">
+        <span className="mr-1 text-muted-foreground">Chấm bằng</span>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            aria-pressed={o.id === value}
+            disabled={!!o.unavailable}
+            title={o.unavailable ?? ENGINE_HINT[o.id]}
+            onClick={() => onChange(o.id)}
+            className={cn(
+              'rounded-md border px-2 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+              o.id === value ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted',
+            )}
+          >
+            {ENGINE_LABEL[o.id]}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {selected?.unavailable
+          ? `${ENGINE_LABEL[value]} không dùng được: ${selected.unavailable}`
+          : value === 'auto' && info
+            ? `Đang dùng: ${ENGINE_LABEL[info.auto]}`
+            : ENGINE_HINT[value]}
+        {needsModel ? ' · lần đầu cần tải model Whisper' : ''}
+      </p>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { AlignToken } from '#/lib/align.ts'
+import type { Accent } from '#/lib/speech.ts'
 
 export const MISTAKE_TYPES = [
   'weak_form', // dạng yếu: to → /tə/, and → /ən/
@@ -89,13 +90,24 @@ const BASE_SYSTEM = `Bạn là giáo viên phát âm và nghe tiếng Anh giàu 
 - Luôn trả lời bằng tiếng Việt, ngắn gọn, cụ thể, dễ hiểu.
 - Hiểu rõ các lỗi đặc trưng của người Việt: bỏ âm cuối (-s, -ed, -t, -k), nhầm /θ/ /ð/ với /t/ /d/ /z/, /v/ vs /w/, /ʃ/ vs /s/, /l/ vs /n/ cuối, không bật hơi, không có trọng âm, đọc từng từ rời rạc.
 - Hiểu connected speech: weak forms, linking, elision, assimilation, flap T.
-- Chỉ liệt kê lỗi thực sự có trong dữ liệu, không bịa thêm. Phiên âm IPA theo giọng Mỹ (General American).`
+- Chỉ liệt kê lỗi thực sự có trong dữ liệu, không bịa thêm.`
 
-export const DICTATION_SYSTEM = `${BASE_SYSTEM}
+const ACCENT_NAME: Record<Accent, string> = {
+  us: 'giọng Mỹ (General American)',
+  uk: 'giọng Anh-Anh (British RP)',
+}
+
+/** giọng chuẩn người học chọn trong Cài đặt: IPA, mẹo khẩu hình và cách chấm đều theo giọng này */
+export const accentRule = (accent: Accent) =>
+  `- Lấy ${ACCENT_NAME[accent]} làm chuẩn: phiên âm IPA, hướng dẫn phát âm và đánh giá đều theo giọng này. Không tính là lỗi nếu người học đọc đúng theo giọng chuẩn còn lại.`
+
+export const dictationSystem = (accent: Accent) => `${BASE_SYSTEM}
+${accentRule(accent)}
 Nhiệm vụ: phân tích bài nghe chép chính tả. Với mỗi từ sai/thiếu/thừa, xác định NGUYÊN NHÂN NGHE nhầm (vì sao tai người học nghe ra như vậy) và phân loại vào một type.
 Nếu người học nghe đúng âm nhưng viết sai chính tả, dùng type "spelling". Gộp các lỗi liên tiếp thuộc cùng một cụm thành một mục.`
 
-export const PRONUNCIATION_SYSTEM = `${BASE_SYSTEM}
+export const pronunciationSystem = (accent: Accent) => `${BASE_SYSTEM}
+${accentRule(accent)}
 Nhiệm vụ: nhận xét phát âm dựa trên kết quả nhận dạng giọng nói (speech-to-text) của người học so với câu gốc.
 Lưu ý: STT có thể "tự sửa" một số lỗi nhỏ, nên những từ bị nhận dạng sai/thiếu là dấu hiệu phát âm chưa rõ. Suy luận âm nào người học có khả năng phát âm sai và hướng dẫn khẩu hình/vị trí lưỡi.
 Đánh giá fluency dựa trên tốc độ nói và các khoảng ngắt giữa các từ.`
@@ -157,7 +169,8 @@ export const AudioAssessmentSchema = PronunciationFeedbackSchema.extend({
 })
 export type AudioAssessment = z.infer<typeof AudioAssessmentSchema>
 
-export const AUDIO_PRONUNCIATION_SYSTEM = `${BASE_SYSTEM}
+export const audioPronunciationSystem = (accent: Accent) => `${BASE_SYSTEM}
+${accentRule(accent)}
 Nhiệm vụ: bạn được nghe trực tiếp bản ghi âm người học đọc một câu tiếng Anh, kèm câu gốc.
 1. "transcript": chép lại đúng những gì nghe được. TUYỆT ĐỐI không tự sửa theo câu gốc. Nếu một từ bị phát âm sai đến mức nghe thành từ khác, ghi từ nghe được. Bỏ âm cuối (ví dụ "work" thay vì "works") thì ghi đúng như vậy.
 2. "mistakes": chỉ ra các âm/từ phát âm chưa chuẩn mà bạn THỰC SỰ nghe thấy: âm cuối, nguyên âm, phụ âm, trọng âm, nối âm. Có thể nêu cả lỗi ở những từ vẫn nghe ra được nhưng phát âm chưa tự nhiên.

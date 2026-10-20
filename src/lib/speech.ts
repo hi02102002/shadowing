@@ -1,33 +1,15 @@
 export type Accent = 'uk' | 'us'
 
 const LANG: Record<Accent, string> = { uk: 'en-GB', us: 'en-US' }
-const STORAGE_KEY = 'tts-accent'
-
-/** Giọng đọc mặc định: Anh-Anh, trừ khi người dùng đã chọn khác */
-export function getAccent(): Accent {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === 'us' ? 'us' : 'uk'
-  } catch {
-    return 'uk'
-  }
-}
-
-export function setAccent(accent: Accent) {
-  try {
-    localStorage.setItem(STORAGE_KEY, accent)
-  } catch {
-    /* private mode */
-  }
-}
 
 /** Đọc từ bằng giọng TTS của trình duyệt, dùng khi muốn nghe phát âm "chuẩn từ điển" */
 export function speak(
   text: string,
-  opts: { accent?: Accent; rate?: number } = {},
+  /** giọng chuẩn lấy từ Cài đặt (useAccent) */
+  opts: { accent: Accent; rate?: number },
 ) {
   if (!canSpeak()) return false
-  const accent = opts.accent ?? getAccent()
-  const lang = LANG[accent]
+  const lang = LANG[opts.accent]
   const synth = window.speechSynthesis
   synth.cancel()
   const u = new SpeechSynthesisUtterance(text)

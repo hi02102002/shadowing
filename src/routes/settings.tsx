@@ -23,6 +23,7 @@ import { settingsQuery } from '#/lib/queries'
 import { downloadWhisperModel, whisperStatus } from '#/server/fns/captions'
 import { saveSettings, testLlm } from '#/server/fns/settings'
 import type { PublicSettings } from '#/server/fns/settings'
+import { ACCENT_DEPENDENT_KEYS } from '#/hooks/use-accent'
 
 export const Route = createFileRoute('/settings')({
   loader: ({ context }) => context.queryClient.ensureQueryData(settingsQuery()),
@@ -85,6 +86,23 @@ const ENGINES = [
   desc: string
 }>
 
+const ACCENT_OPTIONS = [
+  {
+    value: 'us',
+    label: 'Giọng Mỹ (US)',
+    desc: 'General American: /ˈwɑːtɚ/, phát âm rõ âm r cuối.',
+  },
+  {
+    value: 'uk',
+    label: 'Giọng Anh (UK)',
+    desc: 'British RP: /ˈwɔːtə/, không phát âm r cuối âm tiết.',
+  },
+] as const satisfies ReadonlyArray<{
+  value: PublicSettings['accent']
+  label: string
+  desc: string
+}>
+
 const CAPTION_ENGINES = [
   {
     value: 'local',
@@ -124,6 +142,7 @@ function SettingsPage() {
     mutationFn: (values: PublicSettings) => saveSettings({ data: values }),
     onSuccess: (fresh) => {
       queryClient.setQueryData(settingsQuery().queryKey, fresh)
+      for (const queryKey of ACCENT_DEPENDENT_KEYS) void queryClient.invalidateQueries({ queryKey })
       form.reset(fresh)
     },
   })
@@ -285,6 +304,43 @@ function SettingsPage() {
             {(field) => (
               <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
                 {ENGINES.map((e) => (
+                  <label
+                    key={e.value}
+                    className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors ${
+                      field.state.value === e.value
+                        ? 'border-primary bg-accent/50'
+                        : 'hover:bg-muted'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-medium">
+                      <input
+                        type="radio"
+                        name={field.name}
+                        value={e.value}
+                        checked={field.state.value === e.value}
+                        onChange={() => field.handleChange(e.value)}
+                      />
+                      {e.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {e.desc}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+          <legend className="px-1 text-sm font-semibold">Giọng chuẩn</legend>
+          <p className="text-xs text-muted-foreground">
+            Áp dụng cho cả app: phiên âm IPA dưới câu, giọng đọc mẫu khi tra từ, cách AI chấm và nhận xét phát âm.
+          </p>
+          <form.Field name="accent">
+            {(field) => (
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                {ACCENT_OPTIONS.map((e) => (
                   <label
                     key={e.value}
                     className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors ${

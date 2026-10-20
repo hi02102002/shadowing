@@ -5,8 +5,8 @@ import { AudioLines, Lightbulb, Loader2, Volume2, X } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { playerActions } from '#/lib/player-store'
-import { canSpeak, getAccent, setAccent, speak } from '#/lib/speech'
-import type { Accent } from '#/lib/speech'
+import { useAccent } from '#/hooks/use-accent'
+import { canSpeak, speak } from '#/lib/speech'
 import { cn } from '#/lib/utils'
 import { lookupWord } from '#/server/fns/dictionary'
 
@@ -30,12 +30,8 @@ export function WordLookupCard({
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  // thẻ chỉ render phía client sau khi người dùng bấm chuột phải nên đọc localStorage trực tiếp được
-  const [accent, setAccentState] = useState<Accent>(getAccent)
-  const chooseAccent = (a: Accent) => {
-    setAccentState(a)
-    setAccent(a)
-  }
+  // đổi UK/US ở đây là đổi giọng chuẩn của cả app
+  const [accent, chooseAccent] = useAccent()
   const [pos, setPos] = useState<{ top: number; left: number }>({
     top: target.rect.bottom + GAP,
     left: target.rect.left,
