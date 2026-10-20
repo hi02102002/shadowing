@@ -74,3 +74,21 @@ describe('segmentWords', () => {
     expect(segs.map((s) => s.text).join(' ').toLowerCase()).toBe(long.toLowerCase())
   })
 })
+
+describe('segmentWords — phụ đề có dấu câu', () => {
+  it('ngừng lấy hơi giữa câu không cắt câu', () => {
+    const text =
+      'Welcome back. We upload a new English video every single day to help you improve faster and feel more confident when you speak. Let us start.'
+    const segs = segmentWords(timed(text, { 18: 1200 }))
+    expect(segs.find((s) => s.text.includes('faster'))?.text).toContain('faster and feel')
+  })
+
+  it('không cắt giữa chuỗi liệt kê, đoạn nối tiếp giữ chữ thường', () => {
+    const text =
+      'This is a complete advanced English speaking practice experience designed to help you sound fluent, confident, and expressive when you communicate with others every day. Good.'
+    const segs = segmentWords(timed(text), { maxMs: 6000 })
+    const joined = segs.map((s) => s.text)
+    expect(joined.some((t) => /^and expressive/i.test(t))).toBe(false)
+    expect(joined.slice(1, -1).every((t) => /^[a-z]/.test(t))).toBe(true)
+  })
+})
