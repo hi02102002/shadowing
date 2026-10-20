@@ -21,6 +21,7 @@ jobs:
           - os: ubuntu-latest
             files: |
               desktop/dist/*.AppImage
+              desktop/dist/*.deb
               desktop/dist/latest-linux.yml
           - os: windows-latest
             files: |

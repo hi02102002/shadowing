@@ -1,6 +1,8 @@
 // Tự cập nhật từ GitHub Releases.
-// Windows (NSIS) / Linux (AppImage): electron-updater tải ngầm, cài khi khởi động lại hoặc khi thoát app.
+// Windows (NSIS) / Linux (AppImage, deb): electron-updater tải ngầm, cài khi khởi động lại hoặc khi thoát app.
 // macOS: Squirrel.Mac chỉ cập nhật được app đã ký → chỉ báo có bản mới và mở trang tải.
+import fs from 'node:fs'
+import path from 'node:path'
 import { app, dialog, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 
@@ -9,7 +11,17 @@ const { autoUpdater } = electronUpdater
 const REPO = 'hi02102002/shadowing'
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000
 
-const canAutoInstall = process.platform === 'win32' || (process.platform === 'linux' && !!process.env.APPIMAGE)
+// electron-builder ghi resources/package-type cho bản deb; cài bản mới qua pkexec (hỏi mật khẩu)
+const isDeb = () => {
+  try {
+    return fs.readFileSync(path.join(process.resourcesPath, 'package-type'), 'utf8').trim() === 'deb'
+  } catch {
+    return false
+  }
+}
+
+const canAutoInstall =
+  process.platform === 'win32' || (process.platform === 'linux' && (!!process.env.APPIMAGE || isDeb()))
 
 let manual = false
 let downloadedVersion = null

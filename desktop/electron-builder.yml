@@ -39,9 +39,19 @@ nsis:
   allowToChangeInstallationDirectory: true
 
 linux:
-  target: AppImage
+  target:
+    - AppImage
+    - deb
   category: Education
   syncDesktopName: true
+  executableName: shadowing
+  # deb bắt buộc có maintainer (package.json không có email tác giả)
+  maintainer: hi02102002 <hi02102002@users.noreply.github.com>
+
+deb:
+  packageName: shadowing
+  # không dấu cách, giống nsis.artifactName
+  artifactName: ${productName}-${version}-${arch}.${ext}
 
 # electron-updater đọc latest*.yml từ GitHub Releases; workflow `desktop` upload các file này cùng bộ cài
 publish:

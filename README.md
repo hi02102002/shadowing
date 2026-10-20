@@ -92,7 +92,7 @@ pnpm desktop                 # build rồi mở app để thử
 pnpm desktop:dist            # tạo file cài đặt cho hệ điều hành đang dùng → desktop/dist/
 ```
 
-Muốn có đủ `.AppImage` (Linux), `.exe` (Windows) và `.dmg` (macOS), push một tag `v*` lên GitHub, workflow `desktop` sẽ build trên cả 3 hệ điều hành và tạo bản nháp Release.
+Muốn có đủ `.AppImage` / `.deb` (Linux), `.exe` (Windows) và `.dmg` (macOS), push một tag `v*` lên GitHub, workflow `desktop` sẽ build trên cả 3 hệ điều hành và tạo bản nháp Release.
 
 Cách hoạt động:
 
