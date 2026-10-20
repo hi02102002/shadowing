@@ -34,6 +34,21 @@ const isDeb = () => {
   }
 }
 
+/**
+ * Electron bật no_new_privs cho tiến trình app → pkexec (setuid) gọi trực tiếp lỗi
+ * "pkexec must be setuid root" (exit 127). Chạy pkexec qua systemd-run --user để nó
+ * là tiến trình con của systemd user, không kế thừa cờ đó; polkit vẫn hỏi mật khẩu như thường.
+ */
+function runPkexecOutsideApp() {
+  const sudoWithArgs = autoUpdater.sudoWithArgs.bind(autoUpdater)
+  autoUpdater.sudoWithArgs = (installComment) => {
+    const command = sudoWithArgs(installComment)
+    if (!/pkexec/i.test(command[0]) || !autoUpdater.hasCommand('systemd-run')) return command
+    // gộp vào phần tử đầu: electron-updater dò /pkexec/ trên command[0] để quyết định cách bọc lệnh
+    return [`systemd-run --user --wait --pipe --quiet --collect -- ${command[0]}`, ...command.slice(1)]
+  }
+}
+
 const canAutoInstall =
   process.platform === 'win32' || (process.platform === 'linux' && (!!process.env.APPIMAGE || isDeb()))
 
@@ -78,6 +93,7 @@ export function initUpdater() {
     autoUpdater.autoInstallOnAppQuit = false
     // release đang được đánh dấu pre-release (0.0.x) vẫn phải nhận
     autoUpdater.allowPrerelease = true
+    if (isDeb()) runPkexecOutsideApp()
     autoUpdater.on('update-available', (info) =>
       setState({ status: 'available', latestVersion: info.version, releaseUrl: releaseUrl(info.version) }),
     )
