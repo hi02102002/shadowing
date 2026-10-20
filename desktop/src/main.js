@@ -46,9 +46,12 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on('window-all-closed', () => app.quit())
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   quitting = true
-  server?.kill()
+  if (!server) return
+  // chờ server (và yt-dlp/ffmpeg nó sinh ra) tắt hẳn rồi mới thoát, không để lại tiến trình mồ côi
+  event.preventDefault()
+  stopServer().then(() => app.quit())
 })
 
 async function start() {
@@ -131,6 +134,8 @@ function startServer(port) {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
+    // nhóm tiến trình riêng → kill được cả cây con khi thoát
+    detached: process.platform !== 'win32',
   })
   server.stdout.pipe(log)
   server.stderr.pipe(log)
@@ -138,6 +143,33 @@ function startServer(port) {
     server = null
     if (!quitting) fail(new Error(`Server dừng bất thường (code ${code ?? signal}).`))
   })
+}
+
+/** SIGTERM cả cây tiến trình, quá hạn thì SIGKILL; luôn quét sạch tiến trình con còn sót sau khi server thoát */
+function stopServer(timeoutMs = 3000) {
+  const proc = server
+  if (!proc) return Promise.resolve()
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      killTree(proc, 'SIGKILL')
+      resolve()
+    }, timeoutMs)
+    proc.once('exit', () => {
+      clearTimeout(timer)
+      killTree(proc, 'SIGKILL')
+      resolve()
+    })
+    killTree(proc, 'SIGTERM')
+  })
+}
+
+function killTree(proc, signal) {
+  try {
+    if (process.platform === 'win32') execFile('taskkill', ['/pid', String(proc.pid), '/T', '/F'], () => {})
+    else process.kill(-proc.pid, signal)
+  } catch {
+    /* đã tắt */
+  }
 }
 
 async function waitForServer(origin, timeoutMs = 60_000) {
