@@ -8,6 +8,19 @@ import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
 
+/** lỗi cập nhật trước đây chỉ in ra console → ghi thêm vào logs/updater.log để còn tra lại */
+function fileLogger() {
+  const dir = path.join(app.getPath('userData'), 'logs')
+  fs.mkdirSync(dir, { recursive: true })
+  const out = fs.createWriteStream(path.join(dir, 'updater.log'), { flags: 'a' })
+  const write = (level) => (...args) => {
+    const line = args.map((a) => (a instanceof Error ? a.stack : typeof a === 'string' ? a : JSON.stringify(a))).join(' ')
+    out.write(`${new Date().toISOString()} [${level}] ${line}\n`)
+    if (level === 'error') console.error('[updater]', ...args)
+  }
+  return { info: write('info'), warn: write('warn'), error: write('error'), debug: () => {} }
+}
+
 const REPO = 'hi02102002/shadowing'
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000
 
@@ -31,6 +44,7 @@ export function initUpdater() {
   if (!app.isPackaged) return
 
   if (canAutoInstall) {
+    autoUpdater.logger = fileLogger()
     // release đang được đánh dấu pre-release (0.0.x) vẫn phải nhận
     autoUpdater.allowPrerelease = true
     autoUpdater.on('update-downloaded', (info) => {
@@ -41,7 +55,6 @@ export function initUpdater() {
       if (manual) showUpToDate()
     })
     autoUpdater.on('error', (err) => {
-      console.error('[updater]', err)
       if (manual) dialog.showErrorBox('Không kiểm tra được cập nhật', err?.message ?? String(err))
     })
   }
