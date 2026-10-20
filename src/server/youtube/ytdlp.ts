@@ -62,6 +62,20 @@ export async function fetchUrlInfo(url: string, referer?: string): Promise<Video
   return JSON.parse(out) as VideoInfo
 }
 
+export interface SearchEntry {
+  id: string
+  title: string
+  channel?: string
+  duration?: number
+  thumbnails?: { url: string }[]
+}
+
+/** Tìm video YouTube, chỉ lấy thông tin danh sách (không mở từng video) */
+export async function searchVideos(query: string, limit: number): Promise<SearchEntry[]> {
+  const out = await ytdlp(['--flat-playlist', '--dump-single-json', `ytsearch${limit}:${query}`])
+  return ((JSON.parse(out) as { entries?: SearchEntry[] }).entries ?? []).filter((e) => e.id)
+}
+
 /**
  * Tải luồng audio tốt nhất (để tạo phụ đề bằng Whisper khi video không có phụ đề).
  * Không chuyển định dạng ở đây: ffmpeg của app sẽ đọc thẳng file m4a/webm.

@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useForm } from '@tanstack/react-form'
 import {
@@ -16,18 +16,16 @@ import {
   Youtube,
 } from 'lucide-react'
 
-import { CaptionDialog } from '#/components/caption-dialog'
-import type { CaptionDialogState } from '#/components/caption-dialog'
 import { LocalImportDialog } from '#/components/local-import-dialog'
-import type { LocalImportPending } from '#/components/local-import-dialog'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Progress } from '#/components/ui/progress'
+import { useVideoImport } from '#/hooks/use-video-import'
 import { parseVideoSource } from '#/lib/video-source'
 import { statsQuery, videosQuery } from '#/lib/queries'
 import { formatDuration, relativeTime } from '#/lib/format'
-import { deleteVideo, discardUpload, importLocal, importVideo } from '#/server/fns/videos'
-import type { ImportResult, VideoListItem } from '#/server/fns/videos'
+import { deleteVideo } from '#/server/fns/videos'
+import type { VideoListItem } from '#/server/fns/videos'
 
 export const Route = createFileRoute('/')({
   loader: async ({ context }) => {
@@ -105,85 +103,14 @@ function Home() {
   )
 }
 
-type PendingImport = { kind: 'url'; url: string } | LocalImportPending
-
 function ImportForm() {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const [localOpen, setLocalOpen] = useState(false)
-  const [dialog, setDialog] = useState<CaptionDialogState | null>(null)
-  const [pending, setPending] = useState<PendingImport | null>(null)
-
-  const openVideo = useCallback(
-    async (youtubeId: string) => {
-      setDialog(null)
-      setPending(null)
-      await queryClient.invalidateQueries({ queryKey: videosQuery().queryKey })
-      await navigate({ to: '/videos/$videoId', params: { videoId: youtubeId } })
-    },
-    [navigate, queryClient],
-  )
-
-  const handleResult = (res: ImportResult, from: PendingImport) => {
-    if (res.status === 'ready') return void openVideo(res.youtubeId)
-    setPending(from)
-    setDialog(
-      res.status === 'needs-captions'
-        ? {
-            step: 'confirm',
-            title: res.title,
-            durationSec: res.durationSec,
-            estimate: res.estimate,
-          }
-        : {
-            step: 'job',
-            title: from.kind === 'local' ? from.title : 'Video',
-            jobId: res.jobId,
-          },
-    )
-  }
-
-  const mutation = useMutation({
-    mutationFn: (url: string) => importVideo({ data: { url } }),
-    onSuccess: (res, url) => handleResult(res, { kind: 'url', url }),
-  })
-
-  // người dùng đồng ý tạo phụ đề → gọi lại import với generateCaptions
-  const confirm = useMutation({
-    mutationFn: (p: PendingImport) =>
-      p.kind === 'url'
-        ? importVideo({ data: { url: p.url, generateCaptions: true } })
-        : importLocal({
-            data: {
-              uploadId: p.uploadId,
-              title: p.title,
-              generateCaptions: true,
-            },
-          }),
-    onSuccess: (res, p) => {
-      if (res.status === 'job')
-        setDialog({
-          step: 'job',
-          title: dialog?.title ?? 'Video',
-          jobId: res.jobId,
-        })
-      else handleResult(res, p)
-    },
-  })
-
-  const cancel = () => {
-    // bỏ qua ở bước xác nhận: file đã upload không dùng nữa (job tự dọn file của nó)
-    if (dialog?.step === 'confirm' && pending?.kind === 'local') {
-      void discardUpload({ data: { uploadId: pending.uploadId } })
-    }
-    confirm.reset()
-    setDialog(null)
-    setPending(null)
-  }
+  const { importUrl, importing, error, handleResult, dialog } = useVideoImport()
+  const isPending = importing !== null
 
   const form = useForm({
     defaultValues: { url: '' },
-    onSubmit: ({ value }) => mutation.mutate(value.url.trim()),
+    onSubmit: ({ value }) => importUrl(value.url.trim()),
   })
 
   return (
@@ -214,12 +141,12 @@ function ImportForm() {
                   onBlur={field.handleBlur}
                   placeholder="Link YouTube hoặc bài video elllo.org"
                   className="border-0 shadow-none focus-visible:ring-0"
-                  disabled={mutation.isPending}
+                  disabled={isPending}
                   aria-label="Link video"
                 />
-                <Button type="submit" disabled={mutation.isPending}>
-                  {mutation.isPending ? <Loader2 className="animate-spin" /> : null}
-                  {mutation.isPending ? 'Đang xử lý…' : 'Bắt đầu học'}
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? <Loader2 className="animate-spin" /> : null}
+                  {isPending ? 'Đang xử lý…' : 'Bắt đầu học'}
                 </Button>
               </div>
               {field.state.meta.errors.length > 0 && (
@@ -235,20 +162,13 @@ function ImportForm() {
             Chọn file trên máy
           </Button>
         </div>
-        {mutation.isPending && <p className="text-sm text-muted-foreground">Đang lấy thông tin video và phụ đề…</p>}
-        {mutation.error && <p className="text-left text-sm text-destructive">{mutation.error.message}</p>}
+        {isPending && <p className="text-sm text-muted-foreground">Đang lấy thông tin video và phụ đề…</p>}
+        {error && <p className="text-left text-sm text-destructive">{error.message}</p>}
       </form>
 
       {/* ngoài <form>: sự kiện submit của React lan qua portal, form trong dialog sẽ kích hoạt cả form link */}
       <LocalImportDialog open={localOpen} onOpenChange={setLocalOpen} onResult={handleResult} />
-      <CaptionDialog
-        state={dialog}
-        confirming={confirm.isPending}
-        error={confirm.error?.message ?? null}
-        onConfirm={() => pending && confirm.mutate(pending)}
-        onCancel={cancel}
-        onDone={openVideo}
-      />
+      {dialog}
     </>
   )
 }

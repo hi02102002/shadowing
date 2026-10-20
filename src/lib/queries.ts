@@ -1,10 +1,13 @@
 import { queryOptions } from '@tanstack/react-query'
 
+import { listCatalog } from '#/server/fns/catalog.ts'
+import type { CatalogSource } from '#/server/fns/catalog.ts'
 import { dictationHistory } from '#/server/fns/dictation.ts'
 import { pronunciationHistory } from '#/server/fns/pronunciation.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
+import type { Level } from './levels.ts'
 
 export const videosQuery = () =>
   queryOptions({
@@ -44,4 +47,11 @@ export const pronunciationHistoryQuery = (segmentId: number) =>
   queryOptions({
     queryKey: ['pronunciation-history', segmentId],
     queryFn: () => pronunciationHistory({ data: { segmentId } }),
+  })
+
+export const catalogQuery = (source: CatalogSource, level: Level) =>
+  queryOptions({
+    queryKey: ['catalog', source, level],
+    queryFn: () => listCatalog({ data: { source, level } }),
+    staleTime: 60 * 60_000,
   })

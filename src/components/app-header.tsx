@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { AudioLines, BookX, Library, Moon, Settings, Sun } from 'lucide-react'
+import { AudioLines, BookX, Compass, Library, Moon, Settings, Sun } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
 
 const NAV = [
   { to: '/', label: 'Thư viện', icon: Library },
+  { to: '/explore', label: 'Khám phá', icon: Compass },
   { to: '/review', label: 'Sổ lỗi', icon: BookX },
   { to: '/settings', label: 'Cài đặt', icon: Settings },
 ] as const
