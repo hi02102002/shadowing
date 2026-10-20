@@ -25,7 +25,7 @@ import {
   thumbPath,
 } from '../media-store.ts'
 import { parseJson3 } from '../transcript/json3.ts'
-import { segmentWords } from '../transcript/segment.ts'
+import { playbackBounds, segmentWords } from '../transcript/segment.ts'
 import type { SentenceSegment } from '../transcript/segment.ts'
 import { subtitleToJson3 } from '../transcript/vtt.ts'
 import {
@@ -118,7 +118,8 @@ export const getVideo = createServerFn({ method: 'GET' })
 
     return {
       video,
-      segments: segs.map((s) => ({
+      // khoảng phát lấn vào khoảng lặng hai bên để không cụt âm đầu/cuối câu
+      segments: playbackBounds(segs).map((s) => ({
         id: s.id,
         idx: s.idx,
         startMs: s.startMs,

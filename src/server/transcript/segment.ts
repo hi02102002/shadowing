@@ -110,3 +110,24 @@ function tidy(seg: SentenceSegment, sentenceStart: boolean): SentenceSegment {
   const text = seg.text.replace(/\s+([,.!?;:])/g, '$1').trim()
   return { ...seg, text: sentenceStart ? text.charAt(0).toUpperCase() + text.slice(1) : text }
 }
+
+/** lấn sang khoảng lặng trước câu (giữ phụ âm đầu) */
+const LEAD_INTO_SILENCE_MS = 150
+/** lấn sang khoảng lặng sau câu: timing phụ đề hay kết thúc sớm, cắt mất phụ âm cuối kéo dài (/n/ trong "town") */
+const TAIL_INTO_SILENCE_MS = 400
+
+/**
+ * Khoảng phát của từng câu: mở rộng vào khoảng lặng hai bên nhưng không chạm sang câu kề bên.
+ * Câu nối liền nhau (không có khoảng lặng) giữ nguyên.
+ */
+export function playbackBounds<TSeg extends { startMs: number; endMs: number }>(segs: TSeg[]): TSeg[] {
+  return segs.map((seg, i) => {
+    const prevEnd = i > 0 ? segs[i - 1].endMs : 0
+    const nextStart = i + 1 < segs.length ? segs[i + 1].startMs : Infinity
+    return {
+      ...seg,
+      startMs: Math.max(prevEnd, Math.min(seg.startMs, seg.startMs - LEAD_INTO_SILENCE_MS), 0),
+      endMs: Math.max(seg.endMs, Math.min(nextStart, seg.endMs + TAIL_INTO_SILENCE_MS)),
+    }
+  })
+}

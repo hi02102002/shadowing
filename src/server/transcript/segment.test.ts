@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { parseJson3 } from './json3.ts'
-import { segmentWords } from './segment.ts'
+import { playbackBounds, segmentWords } from './segment.ts'
 import type { TimedWord } from './json3.ts'
 
 /** tạo danh sách từ đều nhau 300ms, chèn khoảng lặng sau các index chỉ định */
@@ -90,5 +90,18 @@ describe('segmentWords — phụ đề có dấu câu', () => {
     const joined = segs.map((s) => s.text)
     expect(joined.some((t) => /^and expressive/i.test(t))).toBe(false)
     expect(joined.slice(1, -1).every((t) => /^[a-z]/.test(t))).toBe(true)
+  })
+})
+
+describe('playbackBounds', () => {
+  it('lấn vào khoảng lặng nhưng không chạm câu kề bên', () => {
+    const segs = playbackBounds([
+      { startMs: 20305, endMs: 22393 },
+      { startMs: 22393, endMs: 24585 },
+      { startMs: 25855, endMs: 27995 },
+    ])
+    expect(segs[1]).toEqual({ startMs: 22393, endMs: 24985 })
+    expect(segs[2]).toEqual({ startMs: 25705, endMs: 28395 })
+    expect(segs[0].startMs).toBe(20155)
   })
 })
