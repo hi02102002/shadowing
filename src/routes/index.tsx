@@ -6,7 +6,7 @@ import { Captions, Ear, Flame, Loader2, Mic, PenLine, Sparkles, Trash2, Youtube 
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Progress } from '#/components/ui/progress'
-import { parseYouTubeId } from '#/lib/youtube-id'
+import { parseVideoSource } from '#/lib/video-source'
 import { statsQuery, videosQuery } from '#/lib/queries'
 import { formatDuration, relativeTime } from '#/lib/format'
 import { deleteVideo, importVideo } from '#/server/fns/videos'
@@ -113,8 +113,8 @@ function ImportForm() {
         name="url"
         validators={{
           onChange: ({ value }) =>
-            value.trim() && !parseYouTubeId(value) ? 'Link không đúng định dạng YouTube' : undefined,
-          onSubmit: ({ value }) => (!parseYouTubeId(value) ? 'Hãy dán link YouTube hợp lệ' : undefined),
+            value.trim() && !parseVideoSource(value) ? 'Link không đúng định dạng YouTube hoặc elllo.org' : undefined,
+          onSubmit: ({ value }) => (!parseVideoSource(value) ? 'Hãy dán link YouTube hoặc bài video elllo.org' : undefined),
         }}
       >
         {(field) => (
@@ -125,10 +125,10 @@ function ImportForm() {
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
-                placeholder="https://www.youtube.com/watch?v=…"
+                placeholder="Link YouTube hoặc bài video elllo.org"
                 className="border-0 shadow-none focus-visible:ring-0"
                 disabled={mutation.isPending}
-                aria-label="Link YouTube"
+                aria-label="Link video"
               />
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? <Loader2 className="animate-spin" /> : null}

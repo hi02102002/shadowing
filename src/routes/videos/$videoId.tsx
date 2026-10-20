@@ -10,10 +10,12 @@ import { Ear, FileText, Mic, PenLine } from 'lucide-react'
 import { z } from 'zod'
 
 import { TranscriptList } from '#/components/transcript-list'
+import { VimeoPlayer } from '#/components/vimeo-player'
 import { YouTubePlayer } from '#/components/youtube-player'
 import { playerActions } from '#/lib/player-store'
 import { videoQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
+import { vimeoIdFromKey } from '#/lib/video-source'
 
 const searchSchema = z.object({
   seg: z.number().int().min(0).optional().catch(undefined),
@@ -60,6 +62,7 @@ function VideoLayout() {
   const navigate = useNavigate()
   const pathname = useLocation({ select: (l) => l.pathname })
   const practiceMode = /\/(shadow|dictation|pronounce)$/.exec(pathname)?.[1]
+  const vimeoId = vimeoIdFromKey(videoId)
 
   const onSelect = (idx: number) => {
     if (practiceMode) {
@@ -75,10 +78,17 @@ function VideoLayout() {
   return (
     <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex min-w-0 flex-col gap-4">
-        <YouTubePlayer
-          videoId={videoId}
-          hideCaptions={practiceMode === 'dictation'}
-        />
+        {vimeoId ? (
+          <VimeoPlayer
+            vimeoId={vimeoId}
+            hideCaptions={practiceMode === 'dictation'}
+          />
+        ) : (
+          <YouTubePlayer
+            videoId={videoId}
+            hideCaptions={practiceMode === 'dictation'}
+          />
+        )}
         <div>
           <h1 className="line-clamp-2 text-lg font-semibold leading-snug">
             {data.video.title}

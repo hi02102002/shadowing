@@ -4,10 +4,14 @@ import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
 import { dictationAttempts, pronunciationAttempts, segments, videos } from '#/db/schema.ts'
-import { parseYouTubeId, youtubeThumbnail } from '#/lib/youtube-id.ts'
+import { parseVideoSource, vimeoKey } from '#/lib/video-source.ts'
+import { youtubeThumbnail } from '#/lib/youtube-id.ts'
+import { fetchEllloLesson } from '../elllo/elllo.ts'
 import { parseJson3 } from '../transcript/json3.ts'
 import { segmentWords } from '../transcript/segment.ts'
-import { downloadCaptions, fetchInfo, pickCaptionTrack } from '../youtube/ytdlp.ts'
+import type { SentenceSegment } from '../transcript/segment.ts'
+import { vttToJson3 } from '../transcript/vtt.ts'
+import { downloadCaptions, downloadVtt, fetchInfo, fetchUrlInfo, pickCaptionTrack, vttTrackUrls } from '../youtube/ytdlp.ts'
 
 export const listVideos = createServerFn({ method: 'GET' }).handler(async () => {
   const segCount = db
@@ -107,53 +111,88 @@ export type SegmentView = VideoDetail['segments'][number]
 export const importVideo = createServerFn({ method: 'POST' })
   .validator(z.object({ url: z.string().min(1) }))
   .handler(async ({ data }) => {
-    const youtubeId = parseYouTubeId(data.url)
-    if (!youtubeId) throw new Error('Link YouTube không hợp lệ')
-
-    const existing = db.select().from(videos).where(eq(videos.youtubeId, youtubeId)).get()
-    if (existing) return { youtubeId, existed: true }
-
-    const info = await fetchInfo(youtubeId)
-    const track = pickCaptionTrack(info)
-
-    if (!track) throw new Error('Video này không có phụ đề tiếng Anh. Hãy chọn video khác có phụ đề (CC).')
-
-    const json3 = await downloadCaptions(track.url)
-    const { words } = parseJson3(json3)
-    // phụ đề thủ công có dấu câu → ngưỡng khoảng lặng cao hơn để không cắt vụn câu
-    const sentences = segmentWords(words, track.source === 'manual' ? { pauseMs: 1500 } : {})
-    const captionSource = track.source
-    if (!sentences.length) throw new Error('Không tách được câu nào từ phụ đề')
-
-    db.transaction((tx) => {
-      const video = tx
-        .insert(videos)
-        .values({
-          youtubeId,
-          title: info.title,
-          channel: info.channel ?? null,
-          durationSec: info.duration ? Math.round(info.duration) : null,
-          thumbnail: info.thumbnail ?? youtubeThumbnail(youtubeId),
-          captionSource,
-        })
-        .returning()
-        .get()
-      tx.insert(segments)
-        .values(
-          sentences.map((s, idx) => ({
-            videoId: video.id,
-            idx,
-            startMs: s.startMs,
-            endMs: s.endMs,
-            text: s.text,
-            wordsJson: JSON.stringify(s.words),
-          })),
-        )
-        .run()
-    })
-
-    return { youtubeId, existed: false }
+    const source = parseVideoSource(data.url)
+    if (!source) throw new Error('Link không hợp lệ. Hãy dán link YouTube hoặc bài video trên elllo.org')
+    return source.kind === 'youtube' ? importYouTube(source.id) : importElllo(source.url)
   })
+
+async function importYouTube(youtubeId: string) {
+  const existing = db.select().from(videos).where(eq(videos.youtubeId, youtubeId)).get()
+  if (existing) return { youtubeId, existed: true }
+
+  const info = await fetchInfo(youtubeId)
+  const track = pickCaptionTrack(info)
+
+  if (!track) throw new Error('Video này không có phụ đề tiếng Anh. Hãy chọn video khác có phụ đề (CC).')
+
+  const json3 = await downloadCaptions(track.url)
+  const { words } = parseJson3(json3)
+  // phụ đề thủ công có dấu câu → ngưỡng khoảng lặng cao hơn để không cắt vụn câu
+  const sentences = segmentWords(words, track.source === 'manual' ? { pauseMs: 1500 } : {})
+  if (!sentences.length) throw new Error('Không tách được câu nào từ phụ đề')
+
+  saveVideo(
+    {
+      youtubeId,
+      title: info.title,
+      channel: info.channel ?? null,
+      durationSec: info.duration ? Math.round(info.duration) : null,
+      thumbnail: info.thumbnail ?? youtubeThumbnail(youtubeId),
+      captionSource: track.source,
+    },
+    sentences,
+  )
+  return { youtubeId, existed: false }
+}
+
+/** Bài elllo.org: video Vimeo nhúng trong trang, phụ đề lấy từ Vimeo */
+async function importElllo(pageUrl: string) {
+  const lesson = await fetchEllloLesson(pageUrl)
+  const youtubeId = vimeoKey(lesson.vimeoId)
+
+  const existing = db.select().from(videos).where(eq(videos.youtubeId, youtubeId)).get()
+  if (existing) return { youtubeId, existed: true }
+
+  const info = await fetchUrlInfo(`https://player.vimeo.com/video/${lesson.vimeoId}`, pageUrl)
+  const tracks = vttTrackUrls(info)
+  if (!tracks) throw new Error('Video elllo này chưa có phụ đề tiếng Anh. Hãy chọn bài khác.')
+
+  const { words } = parseJson3(vttToJson3(await downloadVtt(tracks.urls)))
+  // phụ đề Vimeo (kể cả bản tự động) đã có dấu câu
+  const sentences = segmentWords(words, { pauseMs: 1500 })
+  if (!sentences.length) throw new Error('Không tách được câu nào từ phụ đề')
+
+  saveVideo(
+    {
+      youtubeId,
+      title: lesson.title || info.title,
+      channel: 'ELLLO',
+      durationSec: info.duration ? Math.round(info.duration) : null,
+      thumbnail: info.thumbnail ?? null,
+      captionSource: tracks.source,
+    },
+    sentences,
+  )
+  return { youtubeId, existed: false }
+}
+
+function saveVideo(values: typeof videos.$inferInsert, sentences: SentenceSegment[]) {
+  db.transaction((tx) => {
+    const video = tx.insert(videos).values(values).returning().get()
+    tx.insert(segments)
+      .values(
+        sentences.map((s, idx) => ({
+          videoId: video.id,
+          idx,
+          startMs: s.startMs,
+          endMs: s.endMs,
+          text: s.text,
+          wordsJson: JSON.stringify(s.words),
+        })),
+      )
+      .run()
+  })
+}
 
 export const deleteVideo = createServerFn({ method: 'POST' })
   .validator(z.object({ youtubeId: z.string() }))

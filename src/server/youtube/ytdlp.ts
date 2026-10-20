@@ -50,8 +50,35 @@ export function watchUrl(id: string) {
 }
 
 export async function fetchInfo(id: string): Promise<VideoInfo> {
-  const out = await ytdlp(['--skip-download', '--dump-single-json', watchUrl(id)])
+  return fetchUrlInfo(watchUrl(id))
+}
+
+/** `referer`: video Vimeo nhúng chỉ cho phép xem từ trang chứa nó */
+export async function fetchUrlInfo(url: string, referer?: string): Promise<VideoInfo> {
+  const out = await ytdlp(['--skip-download', '--dump-single-json', ...(referer ? ['--referer', referer] : []), url])
   return JSON.parse(out) as VideoInfo
+}
+
+/** Các link phụ đề VTT tiếng Anh (Vimeo: `en`, `en-x-autogen`…), phụ đề thủ công trước */
+export function vttTrackUrls(info: VideoInfo): { urls: string[]; source: 'manual' | 'auto' } | null {
+  const langs = Object.keys(info.subtitles ?? {}).filter((l) => /^en\b/.test(l))
+  // en-x-autogen là phụ đề máy của Vimeo
+  langs.sort((a, b) => Number(a.includes('autogen')) - Number(b.includes('autogen')))
+  const lang = langs[0]
+  if (!lang) return null
+  const urls = info.subtitles![lang].filter((t) => t.ext === 'vtt').map((t) => t.url)
+  return urls.length ? { urls, source: lang.includes('autogen') ? 'auto' : 'manual' } : null
+}
+
+/** Tải file VTT đầu tiên tải được (bỏ qua playlist HLS `#EXTM3U`) */
+export async function downloadVtt(urls: string[]): Promise<string> {
+  for (const url of urls) {
+    const res = await fetch(url).catch(() => null)
+    if (!res?.ok) continue
+    const text = await res.text()
+    if (text.trimStart().startsWith('WEBVTT')) return text
+  }
+  throw new Error('Không tải được phụ đề của video')
 }
 
 const isEnglish = (lang: string) => /^en(-[A-Za-z]+)?$/.test(lang)
