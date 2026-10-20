@@ -44,6 +44,8 @@ linux:
     - deb
   category: Education
   syncDesktopName: true
+  # đủ các cỡ của theme hicolor (pnpm icon), chỉ có 1024px thì menu ứng dụng không hiện icon
+  icon: resources/icons
   executableName: shadowing
   # deb bắt buộc có maintainer (package.json không có email tác giả)
   maintainer: hi02102002 <hi02102002@users.noreply.github.com>

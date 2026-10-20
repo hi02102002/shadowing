@@ -1,5 +1,6 @@
 // Render resources/icon.svg → resources/icon.png (1024px) bằng Chromium của Electron.
 // electron-builder sinh .icns / .ico từ file PNG này.
+// Linux cần thêm resources/icons/<n>x<n>.png: theme hicolor không có cỡ 1024 → menu ứng dụng không thấy icon.
 //
 //   pnpm icon
 import { spawn } from 'node:child_process'
@@ -12,6 +13,8 @@ const self = fileURLToPath(import.meta.url)
 const resourcesDir = path.resolve(path.dirname(self), '../resources')
 const svgPath = path.join(resourcesDir, 'icon.svg')
 const pngPath = path.join(resourcesDir, 'icon.png')
+const linuxIconsDir = path.join(resourcesDir, 'icons')
+const LINUX_SIZES = [16, 24, 32, 48, 64, 128, 256, 512]
 
 if (process.versions.electron) {
   const { app, BrowserWindow } = await import('electron')
@@ -61,6 +64,14 @@ async function render(BrowserWindow) {
       if (attempt >= 10) throw err
     }
   }
-  fs.writeFileSync(pngPath, image.resize({ width: SIZE, height: SIZE }).toPNG())
+  image = image.resize({ width: SIZE, height: SIZE })
+  fs.writeFileSync(pngPath, image.toPNG())
   console.log(`Đã tạo ${path.relative(process.cwd(), pngPath)}`)
+
+  fs.mkdirSync(linuxIconsDir, { recursive: true })
+  for (const size of LINUX_SIZES) {
+    const out = path.join(linuxIconsDir, `${size}x${size}.png`)
+    fs.writeFileSync(out, image.resize({ width: size, height: size, quality: 'best' }).toPNG())
+  }
+  console.log(`Đã tạo ${path.relative(process.cwd(), linuxIconsDir)}/ (${LINUX_SIZES.join(', ')}px)`)
 }
