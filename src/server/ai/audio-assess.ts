@@ -134,5 +134,20 @@ export async function assessWithAudioLlm(
     }
   ).choices?.[0]?.message?.content
   if (!content) throw new Error('Model không trả về nội dung')
-  return AudioAssessmentSchema.parse(extractJson(content))
+
+  let json: unknown
+  try {
+    json = extractJson(content)
+  } catch {
+    // một số proxy không chuyển được input_audio nhưng vẫn trả HTTP 200 kèm lời báo lỗi dạng chữ,
+    // vd. "Images are not supported by this model or could not be processed…"
+    const reply = content.trim().slice(0, 160)
+    if (/not supported|unsupported|could not be processed|cannot (process|hear)/i.test(content)) {
+      throw new Error(
+        `Model "${cfg.llmModel}" không nhận audio qua endpoint này (trả lời: "${reply}"). Dùng model/provider nghe được audio, hoặc đổi "Chấm phát âm bằng" sang Whisper (STT) trong Cài đặt.`,
+      )
+    }
+    throw new Error(`Model không trả về JSON: "${reply}"`)
+  }
+  return AudioAssessmentSchema.parse(json)
 }
