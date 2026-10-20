@@ -1,17 +1,43 @@
+import { randomUUID } from 'node:crypto'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
 import { asc, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
 import { dictationAttempts, pronunciationAttempts, segments, videos } from '#/db/schema.ts'
-import { parseVideoSource, vimeoKey } from '#/lib/video-source.ts'
+import { isLocalKey, localKey, localThumbUrl, parseVideoSource, vimeoKey } from '#/lib/video-source.ts'
 import { youtubeThumbnail } from '#/lib/youtube-id.ts'
+import { estimateCaptioning, generateCaptionWords, MAX_CAPTION_SEC } from '../captions.ts'
+import type { CaptionEstimate } from '../captions.ts'
 import { fetchEllloLesson } from '../elllo/elllo.ts'
+import { startJob } from '../jobs.ts'
+import { makeThumbnail, probeMedia } from '../media.ts'
+import type { MediaInfo } from '../media.ts'
+import {
+  findUpload,
+  jobsDir,
+  mediaDir,
+  moveUploadToMedia,
+  removeMedia,
+  removeUpload,
+  thumbPath,
+} from '../media-store.ts'
 import { parseJson3 } from '../transcript/json3.ts'
 import { segmentWords } from '../transcript/segment.ts'
 import type { SentenceSegment } from '../transcript/segment.ts'
-import { vttToJson3 } from '../transcript/vtt.ts'
-import { downloadCaptions, downloadVtt, fetchInfo, fetchUrlInfo, pickCaptionTrack, vttTrackUrls } from '../youtube/ytdlp.ts'
+import { subtitleToJson3 } from '../transcript/vtt.ts'
+import {
+  downloadAudio,
+  downloadCaptions,
+  downloadVtt,
+  fetchInfo,
+  fetchUrlInfo,
+  pickCaptionTrack,
+  vttTrackUrls,
+  watchUrl,
+} from '../youtube/ytdlp.ts'
 
 export const listVideos = createServerFn({ method: 'GET' }).handler(async () => {
   const segCount = db
@@ -108,22 +134,39 @@ export const getVideo = createServerFn({ method: 'GET' })
 export type VideoDetail = Awaited<ReturnType<typeof getVideo>>
 export type SegmentView = VideoDetail['segments'][number]
 
+export type ImportResult =
+  | { status: 'ready'; youtubeId: string; existed: boolean }
+  /** không có phụ đề: client hỏi người dùng có muốn tạo bằng Whisper không (kèm ước tính) */
+  | { status: 'needs-captions'; title: string; durationSec: number; estimate: CaptionEstimate }
+  /** đang tạo phụ đề nền, hỏi tiến độ bằng captionJobStatus */
+  | { status: 'job'; jobId: string }
+
 export const importVideo = createServerFn({ method: 'POST' })
-  .validator(z.object({ url: z.string().min(1) }))
-  .handler(async ({ data }) => {
+  .validator(z.object({ url: z.string().min(1), generateCaptions: z.boolean().optional() }))
+  .handler(async ({ data }): Promise<ImportResult> => {
     const source = parseVideoSource(data.url)
     if (!source) throw new Error('Link không hợp lệ. Hãy dán link YouTube hoặc bài video trên elllo.org')
-    return source.kind === 'youtube' ? importYouTube(source.id) : importElllo(source.url)
+    const generate = data.generateCaptions ?? false
+    return source.kind === 'youtube' ? importYouTube(source.id, generate) : importElllo(source.url, generate)
   })
 
-async function importYouTube(youtubeId: string) {
+async function importYouTube(youtubeId: string, generate: boolean): Promise<ImportResult> {
   const existing = db.select().from(videos).where(eq(videos.youtubeId, youtubeId)).get()
-  if (existing) return { youtubeId, existed: true }
+  if (existing) return { status: 'ready', youtubeId, existed: true }
 
   const info = await fetchInfo(youtubeId)
+  const values = {
+    youtubeId,
+    title: info.title,
+    channel: info.channel ?? null,
+    durationSec: info.duration ? Math.round(info.duration) : null,
+    thumbnail: info.thumbnail ?? youtubeThumbnail(youtubeId),
+  }
   const track = pickCaptionTrack(info)
 
-  if (!track) throw new Error('Video này không có phụ đề tiếng Anh. Hãy chọn video khác có phụ đề (CC).')
+  if (!track) {
+    return captionFromAudio(values, generate, (dir, signal) => downloadAudio(watchUrl(youtubeId), dir, { signal }))
+  }
 
   const json3 = await downloadCaptions(track.url)
   const { words } = parseJson3(json3)
@@ -131,50 +174,180 @@ async function importYouTube(youtubeId: string) {
   const sentences = segmentWords(words, track.source === 'manual' ? { pauseMs: 1500 } : {})
   if (!sentences.length) throw new Error('Không tách được câu nào từ phụ đề')
 
-  saveVideo(
-    {
-      youtubeId,
-      title: info.title,
-      channel: info.channel ?? null,
-      durationSec: info.duration ? Math.round(info.duration) : null,
-      thumbnail: info.thumbnail ?? youtubeThumbnail(youtubeId),
-      captionSource: track.source,
-    },
-    sentences,
-  )
-  return { youtubeId, existed: false }
+  saveVideo({ ...values, captionSource: track.source }, sentences)
+  return { status: 'ready', youtubeId, existed: false }
 }
 
 /** Bài elllo.org: video Vimeo nhúng trong trang, phụ đề lấy từ Vimeo */
-async function importElllo(pageUrl: string) {
+async function importElllo(pageUrl: string, generate: boolean): Promise<ImportResult> {
   const lesson = await fetchEllloLesson(pageUrl)
   const youtubeId = vimeoKey(lesson.vimeoId)
 
   const existing = db.select().from(videos).where(eq(videos.youtubeId, youtubeId)).get()
-  if (existing) return { youtubeId, existed: true }
+  if (existing) return { status: 'ready', youtubeId, existed: true }
 
-  const info = await fetchUrlInfo(`https://player.vimeo.com/video/${lesson.vimeoId}`, pageUrl)
+  const playerUrl = `https://player.vimeo.com/video/${lesson.vimeoId}`
+  const info = await fetchUrlInfo(playerUrl, pageUrl)
+  const values = {
+    youtubeId,
+    title: lesson.title || info.title,
+    channel: 'ELLLO',
+    durationSec: info.duration ? Math.round(info.duration) : null,
+    thumbnail: info.thumbnail ?? null,
+  }
   const tracks = vttTrackUrls(info)
-  if (!tracks) throw new Error('Video elllo này chưa có phụ đề tiếng Anh. Hãy chọn bài khác.')
 
-  const { words } = parseJson3(vttToJson3(await downloadVtt(tracks.urls)))
+  if (!tracks) {
+    return captionFromAudio(values, generate, (dir, signal) =>
+      downloadAudio(playerUrl, dir, { referer: pageUrl, signal }),
+    )
+  }
+
+  const { words } = parseJson3(subtitleToJson3(await downloadVtt(tracks.urls)))
   // phụ đề Vimeo (kể cả bản tự động) đã có dấu câu
   const sentences = segmentWords(words, { pauseMs: 1500 })
   if (!sentences.length) throw new Error('Không tách được câu nào từ phụ đề')
 
-  saveVideo(
-    {
-      youtubeId,
-      title: lesson.title || info.title,
-      channel: 'ELLLO',
-      durationSec: info.duration ? Math.round(info.duration) : null,
-      thumbnail: info.thumbnail ?? null,
-      captionSource: tracks.source,
-    },
-    sentences,
-  )
-  return { youtubeId, existed: false }
+  saveVideo({ ...values, captionSource: tracks.source }, sentences)
+  return { status: 'ready', youtubeId, existed: false }
 }
+
+type VideoValues = Omit<typeof videos.$inferInsert, 'captionSource'>
+
+/**
+ * Video online không có phụ đề: lần đầu trả ước tính để client hỏi lại người dùng,
+ * khi được đồng ý thì tải audio và tạo phụ đề bằng Whisper trong một job nền.
+ */
+function captionFromAudio(
+  values: VideoValues,
+  generate: boolean,
+  fetchAudio: (dir: string, signal: AbortSignal) => Promise<string>,
+): ImportResult {
+  const durationSec = values.durationSec ?? 0
+  if (durationSec > MAX_CAPTION_SEC) {
+    throw new Error('Video không có phụ đề và dài hơn 3 giờ, không tạo phụ đề tự động được.')
+  }
+  if (!generate) {
+    return { status: 'needs-captions', title: values.title, durationSec, estimate: estimateCaptioning(durationSec) }
+  }
+
+  const workDir = path.join(jobsDir(), randomUUID())
+  const jobId = startJob(
+    values.title,
+    async ({ signal, report }) => {
+      report({ stage: 'downloading-audio', progress: 0 })
+      const audio = await fetchAudio(workDir, signal)
+      const { durationSec: realSec } = await probeMedia(audio)
+      const words = await generateCaptionWords(audio, { durationSec: realSec, workDir, signal, onProgress: report })
+      const sentences = segmentWords(words, { pauseMs: 1500 })
+      if (!sentences.length) throw new Error('Whisper không nhận ra lời nói nào trong video')
+      signal.throwIfAborted()
+      // người dùng có thể đã import cùng video trong lúc chờ
+      if (!db.select().from(videos).where(eq(videos.youtubeId, values.youtubeId)).get()) {
+        saveVideo({ ...values, durationSec: values.durationSec ?? Math.round(realSec), captionSource: 'whisper' }, sentences)
+      }
+      return { youtubeId: values.youtubeId }
+    },
+    () => fs.rm(workDir, { recursive: true, force: true }),
+  )
+  return { status: 'job', jobId }
+}
+
+export const importLocal = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      uploadId: z.string().min(1),
+      title: z.string().trim().min(1).max(300),
+      /** nội dung file .srt/.vtt (client đọc sẵn) */
+      subtitle: z.string().max(5 * 1024 * 1024).optional(),
+      generateCaptions: z.boolean().optional(),
+    }),
+  )
+  .handler(async ({ data }): Promise<ImportResult> => {
+    const upload = await findUpload(data.uploadId)
+    if (!upload) throw new Error('File tải lên đã hết hạn, hãy chọn lại file.')
+
+    let media: MediaInfo
+    try {
+      media = await probeMedia(upload)
+    } catch (err) {
+      await fs.rm(upload, { force: true })
+      throw err
+    }
+
+    const youtubeId = localKey(randomUUID())
+    const values: VideoValues = {
+      youtubeId,
+      title: data.title,
+      channel: 'File trên máy',
+      durationSec: Math.round(media.durationSec),
+      thumbnail: media.hasVideo ? localThumbUrl(youtubeId) : null,
+    }
+
+    /** chuyển file vào thư mục media, tạo thumbnail rồi lưu video */
+    const finish = async (sentences: SentenceSegment[], captionSource: 'file' | 'whisper') => {
+      const mediaPath = await moveUploadToMedia(upload, youtubeId)
+      if (media.hasVideo) {
+        await makeThumbnail(path.join(mediaDir(), mediaPath), thumbPath(youtubeId), media.durationSec).catch((err) => {
+          console.warn('[thumbnail]', err)
+          values.thumbnail = null
+        })
+      }
+      saveVideo({ ...values, mediaPath, captionSource }, sentences)
+    }
+
+    if (data.subtitle?.trim()) {
+      const { words } = parseJson3(subtitleToJson3(data.subtitle))
+      const sentences = segmentWords(words, { pauseMs: 1500 })
+      if (!sentences.length) throw new Error('Không đọc được phụ đề. Hãy chọn file .srt hoặc .vtt hợp lệ.')
+      await finish(sentences, 'file')
+      return { status: 'ready', youtubeId, existed: false }
+    }
+
+    if (media.durationSec > MAX_CAPTION_SEC) {
+      throw new Error('File dài hơn 3 giờ, không tạo phụ đề tự động được. Hãy chọn kèm file phụ đề.')
+    }
+    if (!data.generateCaptions) {
+      return {
+        status: 'needs-captions',
+        title: data.title,
+        durationSec: media.durationSec,
+        estimate: estimateCaptioning(media.durationSec),
+      }
+    }
+
+    const workDir = path.join(jobsDir(), randomUUID())
+    const jobId = startJob(
+      data.title,
+      async ({ signal, report }) => {
+        const words = await generateCaptionWords(upload, {
+          durationSec: media.durationSec,
+          workDir,
+          signal,
+          onProgress: report,
+        })
+        const sentences = segmentWords(words, { pauseMs: 1500 })
+        if (!sentences.length) throw new Error('Whisper không nhận ra lời nói nào trong file')
+        signal.throwIfAborted()
+        await finish(sentences, 'whisper')
+        return { youtubeId }
+      },
+      async () => {
+        await fs.rm(workDir, { recursive: true, force: true })
+        // job lỗi/bị huỷ: file upload không còn dùng được nữa (thành công thì đã được chuyển đi)
+        await fs.rm(upload, { force: true })
+      },
+    )
+    return { status: 'job', jobId }
+  })
+
+/** Người dùng bỏ qua bước tạo phụ đề → xoá file đã upload */
+export const discardUpload = createServerFn({ method: 'POST' })
+  .validator(z.object({ uploadId: z.string() }))
+  .handler(async ({ data }) => {
+    await removeUpload(data.uploadId)
+    return { ok: true }
+  })
 
 function saveVideo(values: typeof videos.$inferInsert, sentences: SentenceSegment[]) {
   db.transaction((tx) => {
@@ -197,6 +370,8 @@ function saveVideo(values: typeof videos.$inferInsert, sentences: SentenceSegmen
 export const deleteVideo = createServerFn({ method: 'POST' })
   .validator(z.object({ youtubeId: z.string() }))
   .handler(async ({ data }) => {
+    const video = db.select().from(videos).where(eq(videos.youtubeId, data.youtubeId)).get()
     db.delete(videos).where(eq(videos.youtubeId, data.youtubeId)).run()
+    if (video && isLocalKey(video.youtubeId)) await removeMedia(video.youtubeId, video.mediaPath)
     return { ok: true }
   })

@@ -12,7 +12,8 @@
     "prepare-web": "node scripts/prepare-web.mjs",
     "icon": "node scripts/render-icon.mjs",
     "start": "node scripts/prepare-web.mjs && node scripts/start.mjs",
-    "dist": "node scripts/prepare-web.mjs && electron-builder"
+    "dist": "node scripts/prepare-web.mjs && node scripts/build-whisper.mjs && electron-builder",
+    "whisper": "node scripts/build-whisper.mjs"
   },
   "dependencies": {
     "electron-updater": "6.8.9",

@@ -57,6 +57,12 @@ jobs:
         shell: bash
         run: npm pkg set version="${GITHUB_REF_NAME#v}"
 
+      # whisper-cli build mất vài phút → cache theo nội dung script (đã chứa phiên bản + cờ build)
+      - uses: actions/cache@v4
+        with:
+          path: desktop/build/whisper
+          key: whisper-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('desktop/scripts/build-whisper.mjs') }}
+
       - name: Build desktop
         working-directory: desktop
         run: |

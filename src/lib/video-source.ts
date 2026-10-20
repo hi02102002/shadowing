@@ -39,3 +39,15 @@ export const vimeoKey = (id: string) => `${VIMEO_PREFIX}${id}`
 export function vimeoIdFromKey(key: string): string | null {
   return key.startsWith(VIMEO_PREFIX) ? key.slice(VIMEO_PREFIX.length) : null
 }
+
+/** File người dùng tải lên được lưu với khoá `local-<uuid>`, file nằm trong DATA_DIR/media */
+const LOCAL_PREFIX = 'local-'
+const LOCAL_KEY_RE = /^local-[\w-]{8,64}$/
+
+export const localKey = (id: string) => `${LOCAL_PREFIX}${id}`
+
+/** Chỉ nhận khoá đúng định dạng: khoá được ghép vào đường dẫn file khi phục vụ media */
+export const isLocalKey = (key: string) => LOCAL_KEY_RE.test(key)
+
+export const localMediaUrl = (key: string) => `/api/media/${key}`
+export const localThumbUrl = (key: string) => `/api/media/${key}?thumb=1`

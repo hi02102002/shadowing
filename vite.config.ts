@@ -11,7 +11,11 @@ const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [
     devtools(),
-    nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+    nitro({
+      rollupConfig: { external: [/^@sentry\//] },
+      // route Nitro thuần (không qua TanStack), xem giải thích trong file
+      routes: { '/api/media/:key': './src/server/media-route.ts' },
+    }),
     tailwindcss(),
     tanstackStart(),
     viteReact(),

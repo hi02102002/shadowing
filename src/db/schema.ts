@@ -13,8 +13,10 @@ export const videos = sqliteTable(
     channel: text(),
     durationSec: integer('duration_sec'),
     thumbnail: text(),
-    /** manual | auto */
+    /** manual | auto | file (phụ đề người dùng tải lên) | whisper (tự tạo bằng Whisper) */
     captionSource: text('caption_source').notNull(),
+    /** file local: tên file trong DATA_DIR/media, null với YouTube/Vimeo */
+    mediaPath: text('media_path'),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('videos_youtube_id_idx').on(t.youtubeId)],

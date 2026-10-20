@@ -1,16 +1,33 @@
+import { useCallback, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useForm } from '@tanstack/react-form'
-import { Captions, Ear, Flame, Loader2, Mic, PenLine, Sparkles, Trash2, Youtube } from 'lucide-react'
+import {
+  AudioLines,
+  Captions,
+  Ear,
+  Flame,
+  FolderOpen,
+  Loader2,
+  Mic,
+  PenLine,
+  Sparkles,
+  Trash2,
+  Youtube,
+} from 'lucide-react'
 
+import { CaptionDialog } from '#/components/caption-dialog'
+import type { CaptionDialogState } from '#/components/caption-dialog'
+import { LocalImportDialog } from '#/components/local-import-dialog'
+import type { LocalImportPending } from '#/components/local-import-dialog'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Progress } from '#/components/ui/progress'
 import { parseVideoSource } from '#/lib/video-source'
 import { statsQuery, videosQuery } from '#/lib/queries'
 import { formatDuration, relativeTime } from '#/lib/format'
-import { deleteVideo, importVideo } from '#/server/fns/videos'
-import type { VideoListItem } from '#/server/fns/videos'
+import { deleteVideo, discardUpload, importLocal, importVideo } from '#/server/fns/videos'
+import type { ImportResult, VideoListItem } from '#/server/fns/videos'
 
 export const Route = createFileRoute('/')({
   loader: async ({ context }) => {
@@ -25,6 +42,8 @@ export const Route = createFileRoute('/')({
 const CAPTION_LABEL: Record<string, string> = {
   manual: 'Phụ đề chuẩn',
   auto: 'Phụ đề tự động',
+  file: 'Phụ đề từ file',
+  whisper: 'Phụ đề Whisper',
 }
 
 function Home() {
@@ -37,8 +56,8 @@ function Home() {
         <div className="flex flex-col gap-3">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Luyện nghe nói từ bất kỳ video YouTube</h1>
           <p className="mx-auto max-w-2xl text-muted-foreground">
-            Dán link, app tự tách video thành từng câu để bạn <b>shadowing</b>, <b>nghe chép chính tả</b> và{' '}
-            <b>luyện phát âm</b>. AI chỉ ra vì sao bạn nghe nhầm và cách sửa.
+            Dán link hoặc chọn file audio/video trên máy, app tự tách thành từng câu để bạn <b>shadowing</b>,{' '}
+            <b>nghe chép chính tả</b> và <b>luyện phát âm</b>. AI chỉ ra vì sao bạn nghe nhầm và cách sửa.
           </p>
         </div>
         <ImportForm />
@@ -71,7 +90,8 @@ function Home() {
         <h2 className="text-lg font-semibold">Thư viện của bạn</h2>
         {videos.length === 0 ? (
           <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
-            Chưa có video nào. Dán một link YouTube ở trên để bắt đầu. Gợi ý: TED Talks, podcast, vlog có phụ đề tiếng Anh.
+            Chưa có video nào. Dán một link YouTube hoặc chọn file trên máy để bắt đầu. Gợi ý: TED Talks, podcast, vlog
+            tiếng Anh. Video không có phụ đề sẽ được tạo phụ đề bằng Whisper.
           </div>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -85,16 +105,81 @@ function Home() {
   )
 }
 
+type PendingImport = { kind: 'url'; url: string } | LocalImportPending
+
 function ImportForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: (url: string) => importVideo({ data: { url } }),
-    onSuccess: async ({ youtubeId }) => {
+  const [localOpen, setLocalOpen] = useState(false)
+  const [dialog, setDialog] = useState<CaptionDialogState | null>(null)
+  const [pending, setPending] = useState<PendingImport | null>(null)
+
+  const openVideo = useCallback(
+    async (youtubeId: string) => {
+      setDialog(null)
+      setPending(null)
       await queryClient.invalidateQueries({ queryKey: videosQuery().queryKey })
       await navigate({ to: '/videos/$videoId', params: { videoId: youtubeId } })
     },
+    [navigate, queryClient],
+  )
+
+  const handleResult = (res: ImportResult, from: PendingImport) => {
+    if (res.status === 'ready') return void openVideo(res.youtubeId)
+    setPending(from)
+    setDialog(
+      res.status === 'needs-captions'
+        ? {
+            step: 'confirm',
+            title: res.title,
+            durationSec: res.durationSec,
+            estimate: res.estimate,
+          }
+        : {
+            step: 'job',
+            title: from.kind === 'local' ? from.title : 'Video',
+            jobId: res.jobId,
+          },
+    )
+  }
+
+  const mutation = useMutation({
+    mutationFn: (url: string) => importVideo({ data: { url } }),
+    onSuccess: (res, url) => handleResult(res, { kind: 'url', url }),
   })
+
+  // người dùng đồng ý tạo phụ đề → gọi lại import với generateCaptions
+  const confirm = useMutation({
+    mutationFn: (p: PendingImport) =>
+      p.kind === 'url'
+        ? importVideo({ data: { url: p.url, generateCaptions: true } })
+        : importLocal({
+            data: {
+              uploadId: p.uploadId,
+              title: p.title,
+              generateCaptions: true,
+            },
+          }),
+    onSuccess: (res, p) => {
+      if (res.status === 'job')
+        setDialog({
+          step: 'job',
+          title: dialog?.title ?? 'Video',
+          jobId: res.jobId,
+        })
+      else handleResult(res, p)
+    },
+  })
+
+  const cancel = () => {
+    // bỏ qua ở bước xác nhận: file đã upload không dùng nữa (job tự dọn file của nó)
+    if (dialog?.step === 'confirm' && pending?.kind === 'local') {
+      void discardUpload({ data: { uploadId: pending.uploadId } })
+    }
+    confirm.reset()
+    setDialog(null)
+    setPending(null)
+  }
 
   const form = useForm({
     defaultValues: { url: '' },
@@ -102,52 +187,69 @@ function ImportForm() {
   })
 
   return (
-    <form
-      className="flex w-full max-w-2xl flex-col gap-2"
-      onSubmit={(e) => {
-        e.preventDefault()
-        void form.handleSubmit()
-      }}
-    >
-      <form.Field
-        name="url"
-        validators={{
-          onChange: ({ value }) =>
-            value.trim() && !parseVideoSource(value) ? 'Link không đúng định dạng YouTube hoặc elllo.org' : undefined,
-          onSubmit: ({ value }) => (!parseVideoSource(value) ? 'Hãy dán link YouTube hoặc bài video elllo.org' : undefined),
+    <>
+      <form
+        className="flex w-full max-w-2xl flex-col gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void form.handleSubmit()
         }}
       >
-        {(field) => (
-          <>
-            <div className="flex gap-2 rounded-xl border bg-card p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring/40">
-              <Youtube className="ml-2 size-5 shrink-0 self-center text-rec" />
-              <Input
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-                placeholder="Link YouTube hoặc bài video elllo.org"
-                className="border-0 shadow-none focus-visible:ring-0"
-                disabled={mutation.isPending}
-                aria-label="Link video"
-              />
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? <Loader2 className="animate-spin" /> : null}
-                {mutation.isPending ? 'Đang xử lý…' : 'Bắt đầu học'}
-              </Button>
-            </div>
-            {field.state.meta.errors.length > 0 && (
-              <p className="text-left text-sm text-destructive">{field.state.meta.errors.join(', ')}</p>
-            )}
-          </>
-        )}
-      </form.Field>
-      {mutation.isPending && (
-        <p className="text-sm text-muted-foreground">
-          Đang lấy phụ đề và tách câu… (chỉ hỗ trợ video có phụ đề tiếng Anh)
-        </p>
-      )}
-      {mutation.error && <p className="text-left text-sm text-destructive">{mutation.error.message}</p>}
-    </form>
+        <form.Field
+          name="url"
+          validators={{
+            onChange: ({ value }) =>
+              value.trim() && !parseVideoSource(value) ? 'Link không đúng định dạng YouTube hoặc elllo.org' : undefined,
+            onSubmit: ({ value }) =>
+              !parseVideoSource(value) ? 'Hãy dán link YouTube hoặc bài video elllo.org' : undefined,
+          }}
+        >
+          {(field) => (
+            <>
+              <div className="flex gap-2 rounded-xl border bg-card p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring/40">
+                <Youtube className="ml-2 size-5 shrink-0 self-center text-rec" />
+                <Input
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  placeholder="Link YouTube hoặc bài video elllo.org"
+                  className="border-0 shadow-none focus-visible:ring-0"
+                  disabled={mutation.isPending}
+                  aria-label="Link video"
+                />
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? <Loader2 className="animate-spin" /> : null}
+                  {mutation.isPending ? 'Đang xử lý…' : 'Bắt đầu học'}
+                </Button>
+              </div>
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-left text-sm text-destructive">{field.state.meta.errors.join(', ')}</p>
+              )}
+            </>
+          )}
+        </form.Field>
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <span>hoặc</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => setLocalOpen(true)}>
+            <FolderOpen />
+            Chọn file trên máy
+          </Button>
+        </div>
+        {mutation.isPending && <p className="text-sm text-muted-foreground">Đang lấy thông tin video và phụ đề…</p>}
+        {mutation.error && <p className="text-left text-sm text-destructive">{mutation.error.message}</p>}
+      </form>
+
+      {/* ngoài <form>: sự kiện submit của React lan qua portal, form trong dialog sẽ kích hoạt cả form link */}
+      <LocalImportDialog open={localOpen} onOpenChange={setLocalOpen} onResult={handleResult} />
+      <CaptionDialog
+        state={dialog}
+        confirming={confirm.isPending}
+        error={confirm.error?.message ?? null}
+        onConfirm={() => pending && confirm.mutate(pending)}
+        onCancel={cancel}
+        onDone={openVideo}
+      />
+    </>
   )
 }
 
@@ -163,8 +265,10 @@ function VideoCard({ video }: { video: VideoListItem }) {
     <li className="group relative flex flex-col overflow-hidden rounded-xl border bg-card transition-shadow hover:shadow-md">
       <Link to="/videos/$videoId" params={{ videoId: video.youtubeId }} className="text-foreground no-underline">
         <div className="relative aspect-video bg-muted">
-          {video.thumbnail && (
+          {video.thumbnail ? (
             <img src={video.thumbnail} alt="" loading="lazy" className="size-full object-cover" />
+          ) : (
+            <AudioLines className="absolute inset-0 m-auto size-12 text-muted-foreground/40" />
           )}
           {video.durationSec && (
             <span className="absolute bottom-2 right-2 rounded bg-black/75 px-1.5 py-0.5 font-mono text-xs text-white">

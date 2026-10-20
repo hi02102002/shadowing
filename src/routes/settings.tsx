@@ -1,16 +1,26 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
 import { useForm } from '@tanstack/react-form'
-import { CheckCircle2, Loader2, PlugZap, Save, XCircle } from 'lucide-react'
+import {
+  CheckCircle2,
+  Download,
+  Loader2,
+  PlugZap,
+  Save,
+  XCircle,
+} from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Progress } from '#/components/ui/progress'
 import { settingsQuery } from '#/lib/queries'
+import { downloadWhisperModel, whisperStatus } from '#/server/fns/captions'
 import { saveSettings, testLlm } from '#/server/fns/settings'
 import type { PublicSettings } from '#/server/fns/settings'
 
@@ -71,6 +81,23 @@ const ENGINES = [
   },
 ] as const satisfies ReadonlyArray<{
   value: PublicSettings['pronunciationEngine']
+  label: string
+  desc: string
+}>
+
+const CAPTION_ENGINES = [
+  {
+    value: 'local',
+    label: 'Whisper trên máy (khuyên dùng)',
+    desc: 'whisper.cpp chạy ngay trên máy: miễn phí, audio không rời khỏi máy. Lần đầu cần tải model.',
+  },
+  {
+    value: 'api',
+    label: 'Speech-to-Text API',
+    desc: 'Dùng cấu hình STT bên dưới. Nhanh trên máy yếu nhưng tính phí theo phút audio.',
+  },
+] as const satisfies ReadonlyArray<{
+  value: PublicSettings['captionEngine']
   label: string
   desc: string
 }>
@@ -286,16 +313,58 @@ function SettingsPage() {
           </form.Field>
         </fieldset>
 
-        <form.Subscribe selector={(s) => s.values.pronunciationEngine}>
-          {(engine) => (
+        <fieldset className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+          <legend className="px-1 text-sm font-semibold">
+            Tạo phụ đề cho video không có phụ đề
+          </legend>
+          <form.Field name="captionEngine">
+            {(field) => (
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                {CAPTION_ENGINES.map((e) => (
+                  <label
+                    key={e.value}
+                    className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors ${
+                      field.state.value === e.value
+                        ? 'border-primary bg-accent/50'
+                        : 'hover:bg-muted'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-medium">
+                      <input
+                        type="radio"
+                        name={field.name}
+                        value={e.value}
+                        checked={field.state.value === e.value}
+                        onChange={() => field.handleChange(e.value)}
+                      />
+                      {e.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {e.desc}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </form.Field>
+          <WhisperModelStatus />
+        </fieldset>
+
+        <form.Subscribe
+          selector={(s) =>
+            s.values.pronunciationEngine === 'stt' ||
+            s.values.captionEngine === 'api'
+          }
+        >
+          {(used) => (
             <fieldset
-              className={`flex flex-col gap-4 rounded-xl border bg-card p-5 ${engine === 'stt' ? '' : 'opacity-60'}`}
+              className={`flex flex-col gap-4 rounded-xl border bg-card p-5 ${used ? '' : 'opacity-60'}`}
             >
               <legend className="px-1 text-sm font-semibold">
                 Speech-to-Text{' '}
-                {engine === 'stt'
+                {used
                   ? ''
-                  : '(không dùng khi model AI nghe trực tiếp)'}
+                  : '(chỉ dùng khi chấm phát âm bằng Whisper hoặc tạo phụ đề qua API)'}
               </legend>
               <div className="flex flex-wrap gap-2">
                 {STT_PRESETS.map((p) => (
@@ -382,6 +451,62 @@ function SettingsPage() {
           )}
         </form.Subscribe>
       </form>
+    </div>
+  )
+}
+
+/** Trạng thái whisper.cpp + model: tải model trước để lần tạo phụ đề đầu tiên không phải chờ */
+function WhisperModelStatus() {
+  const queryClient = useQueryClient()
+  const { data: status } = useQuery({
+    queryKey: ['whisper-status'],
+    queryFn: () => whisperStatus(),
+    refetchInterval: (q) => (q.state.data?.model === 'downloading' ? 1000 : false),
+  })
+  const download = useMutation({
+    mutationFn: () => downloadWhisperModel(),
+    onSuccess: (fresh) => queryClient.setQueryData(['whisper-status'], fresh),
+  })
+  if (!status) return null
+
+  const mb = Math.round(status.modelBytes / 1024 ** 2)
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+      {!status.binary && (
+        <p className="flex items-center gap-1.5 text-destructive">
+          <XCircle className="size-4 shrink-0" />
+          Không tìm thấy whisper-cli trên máy chủ. Cài whisper.cpp và đặt WHISPER_CPP_PATH, hoặc dùng STT API.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <span>
+          Model <b>{status.modelName}</b> ({mb} MB):{' '}
+          {status.model === 'ready'
+            ? 'đã có trên máy'
+            : status.model === 'downloading'
+              ? `đang tải ${Math.round(status.progress * 100)}%`
+              : 'chưa tải'}
+        </span>
+        {status.model === 'ready' && <CheckCircle2 className="size-4 text-ok" />}
+        {status.model === 'missing' && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => download.mutate()}
+            disabled={download.isPending}
+          >
+            <Download />
+            Tải model
+          </Button>
+        )}
+      </div>
+      {status.model === 'downloading' && (
+        <Progress value={status.progress * 100} className="h-1.5" />
+      )}
+      {status.error && status.model !== 'downloading' && (
+        <span className="text-xs text-destructive">{status.error}</span>
+      )}
     </div>
   )
 }

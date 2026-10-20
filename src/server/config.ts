@@ -5,6 +5,8 @@ import { settings } from '#/db/schema.ts'
 export const LLM_PROVIDERS = ['openai', 'anthropic', 'gemini', 'ollama', 'openai-compatible'] as const
 /** llm-audio: model LLM nghe trực tiếp bản ghi âm · stt: Whisper rồi LLM đọc chữ */
 export const PRONUNCIATION_ENGINES = ['llm-audio', 'stt'] as const
+/** Tạo phụ đề cho video không có sẵn: local = whisper.cpp trên máy · api = STT API ở trên (tốn phí) */
+export const CAPTION_ENGINES = ['local', 'api'] as const
 
 export const AppConfigSchema = z.object({
   llmProvider: z.enum(LLM_PROVIDERS),
@@ -15,6 +17,7 @@ export const AppConfigSchema = z.object({
   sttApiKey: z.string(),
   sttModel: z.string().min(1),
   pronunciationEngine: z.enum(PRONUNCIATION_ENGINES),
+  captionEngine: z.enum(CAPTION_ENGINES),
 })
 export type AppConfig = z.infer<typeof AppConfigSchema>
 
@@ -31,6 +34,7 @@ function fromEnv(): AppConfig {
     sttApiKey: e.STT_API_KEY ?? e.OPENAI_API_KEY ?? '',
     sttModel: e.STT_MODEL ?? 'whisper-1',
     pronunciationEngine: e.PRONUNCIATION_ENGINE === 'stt' ? 'stt' : 'llm-audio',
+    captionEngine: e.CAPTION_ENGINE === 'api' ? 'api' : 'local',
   }
 }
 

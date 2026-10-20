@@ -15,4 +15,6 @@ bin
 Dockerfile
 docker-compose.yml
 .dockerignore
-desktop
+# chỉ cần script build whisper.cpp từ thư mục app desktop
+desktop/*
+!desktop/scripts

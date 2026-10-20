@@ -9,15 +9,18 @@ function toMs(t: string) {
   return ((Number(h) * 60 + Number(min)) * 60 + Number(s)) * 1000 + Number(ms)
 }
 
-const stripTags = (s: string) => s.replace(/<[^>]+>/g, '')
+// thẻ HTML (<i>, <c>…) và thẻ định vị kiểu ASS trong SRT ({\an8})
+const stripTags = (s: string) => s.replace(/<[^>]+>/g, '').replace(/\{\\[^}]*\}/g, '')
 
 /**
- * Chuyển WebVTT sang dạng json3 (mỗi cue là một event, không có timing từng từ)
+ * Chuyển phụ đề WebVTT hoặc SRT sang dạng json3 (mỗi cue là một event, không có timing từng từ)
  * để dùng chung parseJson3 → timing từng từ được chia theo số ký tự.
+ * Hai định dạng chỉ khác dấu phân cách mili giây (`.` / `,`) và header, cả hai đều được nhận.
  */
-export function vttToJson3(vtt: string): Json3 {
+export function subtitleToJson3(input: string): Json3 {
   const events: NonNullable<Json3['events']> = []
-  for (const block of vtt.replace(/\r/g, '').split(/\n{2,}/)) {
+  const body = input.replace(/^\uFEFF/, '').replace(/\r/g, '')
+  for (const block of body.split(/\n{2,}/)) {
     const lines = block.split('\n')
     const timeIdx = lines.findIndex((l) => l.includes('-->'))
     if (timeIdx < 0) continue

@@ -9,13 +9,14 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { Ear, FileText, Mic, PenLine } from 'lucide-react'
 import { z } from 'zod'
 
+import { LocalPlayer } from '#/components/local-player'
 import { TranscriptList } from '#/components/transcript-list'
 import { VimeoPlayer } from '#/components/vimeo-player'
 import { YouTubePlayer } from '#/components/youtube-player'
 import { playerActions } from '#/lib/player-store'
 import { videoQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
-import { vimeoIdFromKey } from '#/lib/video-source'
+import { isLocalKey, vimeoIdFromKey } from '#/lib/video-source'
 
 const searchSchema = z.object({
   seg: z.number().int().min(0).optional().catch(undefined),
@@ -78,7 +79,12 @@ function VideoLayout() {
   return (
     <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex min-w-0 flex-col gap-4">
-        {vimeoId ? (
+        {isLocalKey(videoId) ? (
+          <LocalPlayer
+            mediaKey={videoId}
+            hideCaptions={practiceMode === 'dictation'}
+          />
+        ) : vimeoId ? (
           <VimeoPlayer
             vimeoId={vimeoId}
             hideCaptions={practiceMode === 'dictation'}

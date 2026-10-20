@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
 import { Route as VideosVideoIdIndexRouteImport } from './routes/videos/$videoId/index'
 import { Route as VideosVideoIdDictationRouteImport } from './routes/videos/$videoId/dictation'
@@ -31,6 +32,11 @@ const ReviewRoute = ReviewRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUploadsRoute = ApiUploadsRouteImport.update({
+  id: '/api/uploads',
+  path: '/api/uploads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VideosVideoIdRoute = VideosVideoIdRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/api/uploads': typeof ApiUploadsRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/api/uploads': typeof ApiUploadsRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/api/uploads': typeof ApiUploadsRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/review'
     | '/settings'
+    | '/api/uploads'
     | '/videos/$videoId'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/'
     | '/review'
     | '/settings'
+    | '/api/uploads'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/review'
     | '/settings'
+    | '/api/uploads'
     | '/videos/$videoId'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -125,6 +137,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
+  ApiUploadsRoute: typeof ApiUploadsRoute
   VideosVideoIdRoute: typeof VideosVideoIdRouteWithChildren
 }
 
@@ -149,6 +162,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/uploads': {
+      id: '/api/uploads'
+      path: '/api/uploads'
+      fullPath: '/api/uploads'
+      preLoaderRoute: typeof ApiUploadsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/videos/$videoId': {
@@ -211,6 +231,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
+  ApiUploadsRoute: ApiUploadsRoute,
   VideosVideoIdRoute: VideosVideoIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport

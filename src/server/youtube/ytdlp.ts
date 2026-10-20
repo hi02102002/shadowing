@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
@@ -11,14 +12,16 @@ const YTDLP = process.env.YTDLP_PATH || (existsSync('bin/yt-dlp') ? path.resolve
 // app desktop không có `node` trong PATH → trỏ thẳng tới runtime, vd. "node:/path/to/Shadowing"
 const JS_RUNTIME = process.env.YTDLP_JS_RUNTIME || 'node'
 
-async function ytdlp(args: string[], timeout = 120_000) {
+async function ytdlp(args: string[], timeout = 120_000, signal?: AbortSignal) {
   try {
     const { stdout } = await exec(YTDLP, ['--js-runtimes', JS_RUNTIME, '--no-warnings', ...args], {
       timeout,
       maxBuffer: 64 * 1024 * 1024,
+      signal,
     })
     return stdout
   } catch (err: any) {
+    if (err?.name === 'AbortError') throw err
     const msg = String(err?.stderr || err?.message || err)
     if (err?.code === 'ENOENT') throw new Error('Không tìm thấy yt-dlp. Cài yt-dlp hoặc đặt YTDLP_PATH.')
     if (/Private video|Video unavailable|This video is not available/i.test(msg)) {
@@ -57,6 +60,32 @@ export async function fetchInfo(id: string): Promise<VideoInfo> {
 export async function fetchUrlInfo(url: string, referer?: string): Promise<VideoInfo> {
   const out = await ytdlp(['--skip-download', '--dump-single-json', ...(referer ? ['--referer', referer] : []), url])
   return JSON.parse(out) as VideoInfo
+}
+
+/**
+ * Tải luồng audio tốt nhất (để tạo phụ đề bằng Whisper khi video không có phụ đề).
+ * Không chuyển định dạng ở đây: ffmpeg của app sẽ đọc thẳng file m4a/webm.
+ */
+export async function downloadAudio(
+  url: string,
+  dir: string,
+  opts: { referer?: string; signal?: AbortSignal } = {},
+): Promise<string> {
+  await fs.mkdir(dir, { recursive: true })
+  await ytdlp(
+    [
+      '-f', 'bestaudio/best',
+      '--no-playlist',
+      '-o', path.join(dir, 'source.%(ext)s'),
+      ...(opts.referer ? ['--referer', opts.referer] : []),
+      url,
+    ],
+    15 * 60_000,
+    opts.signal,
+  )
+  const name = (await fs.readdir(dir)).find((f) => f.startsWith('source.') && !f.endsWith('.part'))
+  if (!name) throw new Error('Không tải được audio của video')
+  return path.join(dir, name)
 }
 
 /** Các link phụ đề VTT tiếng Anh (Vimeo: `en`, `en-x-autogen`…), phụ đề thủ công trước */

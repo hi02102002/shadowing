@@ -19,6 +19,14 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 COPY . .
 RUN pnpm build
 
+# ---------- whisper.cpp: tạo phụ đề cho video không có sẵn ----------
+FROM node:24-bookworm-slim AS whisper
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git cmake make g++ ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+COPY desktop/scripts/build-whisper.mjs /src/scripts/
+RUN node /src/scripts/build-whisper.mjs /out
+
 # ---------- runtime ----------
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
@@ -40,6 +48,7 @@ RUN apt-get update \
 
 COPY --from=build /app/.output ./.output
 COPY --from=build /app/drizzle ./drizzle
+COPY --from=whisper /out/whisper-cli /app/bin/whisper-cli
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
@@ -52,6 +61,7 @@ ENV NODE_ENV=production \
     DATABASE_URL=/app/data/app.db \
     DATA_DIR=/app/data \
     YTDLP_PATH=/app/bin/yt-dlp \
+    WHISPER_CPP_PATH=/app/bin/whisper-cli \
     YTDLP_AUTO_UPDATE=1
 
 USER node

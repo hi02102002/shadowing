@@ -27,6 +27,11 @@ const ytdlpPath = path.join(binDir, process.platform === 'win32' ? 'yt-dlp.exe' 
 // dev: desktop/build/web · đóng gói: <resources>/web
 const webDir = app.isPackaged ? path.join(process.resourcesPath, 'web') : path.join(app.getAppPath(), 'build/web')
 const ffmpegPath = ffmpegStatic?.replace('app.asar', 'app.asar.unpacked')
+// whisper.cpp tạo phụ đề cho video không có sẵn (build bằng scripts/build-whisper.mjs)
+const whisperPath = path.join(
+  app.isPackaged ? path.join(process.resourcesPath, 'whisper') : path.join(app.getAppPath(), 'build/whisper'),
+  process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli',
+)
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let server = null
@@ -131,6 +136,7 @@ function startServer(port) {
       // yt-dlp cần JS runtime; dùng lại Electron ở chế độ node (biến ELECTRON_RUN_AS_NODE được kế thừa)
       YTDLP_JS_RUNTIME: `node:${process.execPath}`,
       ...(ffmpegPath ? { FFMPEG_PATH: ffmpegPath } : {}),
+      ...(fs.existsSync(whisperPath) ? { WHISPER_CPP_PATH: whisperPath } : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,

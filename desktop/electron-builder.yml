@@ -22,6 +22,11 @@ asarUnpack:
 extraResources:
   - from: build/web
     to: web
+  # whisper-cli (scripts/build-whisper.mjs), model tải lúc dùng lần đầu vào thư mục dữ liệu
+  - from: build/whisper
+    to: whisper
+    filter:
+      - whisper-cli*
 
 mac:
   target: dmg

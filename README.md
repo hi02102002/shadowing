@@ -1,13 +1,13 @@
 # Shadowing: luyện nghe nói tiếng Anh từ YouTube
 
-Dán link YouTube bất kỳ, app sẽ tự lấy phụ đề và tách thành từng câu để luyện:
+Dán link YouTube (hoặc bài video elllo.org), hay chọn file audio/video trên máy, app sẽ lấy phụ đề và tách thành từng câu để luyện:
 
 - **Shadowing**: nghe và nói đuổi theo, chữ chạy kiểu karaoke theo timing từng từ, có chế độ không nhìn chữ, lặp câu và chỉnh tốc độ 0.5–1.25×.
 - **Nghe chép chính tả**: gõ lại câu vừa nghe. App chấm từng từ (đúng / sai / thiếu / thừa) và hiểu được contraction, số viết bằng chữ, dấu nháy cong. AI giải thích bằng tiếng Việt vì sao bạn nghe nhầm (weak form, nối âm, nuốt âm…).
 - **Luyện phát âm**: ghi âm rồi chấm độ chính xác, độ đầy đủ, độ trôi chảy và tốc độ nói, kèm nhận xét IPA, mẹo khẩu hình và bài tập. Mặc định **model AI nghe trực tiếp bản ghi** (Gemini, gpt-audio…), nghe ra cả lỗi âm cuối và trọng âm mà Whisper hay bỏ qua. Có thể đổi sang Whisper (STT) trong Cài đặt.
 - **Sổ lỗi**: mọi lỗi được gom theo từ và loại lỗi, xếp theo số lần sai, có nút để luyện lại đúng câu chứa lỗi.
 
-App chỉ nhận video có phụ đề tiếng Anh (phụ đề chuẩn hoặc tự động). Video không có phụ đề sẽ bị từ chối khi nhập.
+Phụ đề lấy theo thứ tự: phụ đề tiếng Anh có sẵn của video (chuẩn hoặc tự động) → file `.srt`/`.vtt` bạn chọn kèm file local → tự tạo bằng **Whisper**. Trước khi tạo, app hiện ước tính thời gian (Whisper trên máy, miễn phí) hoặc chi phí (STT API) và chỉ chạy khi bạn đồng ý.
 
 ## Stack (TanStack)
 
@@ -40,6 +40,12 @@ mkdir -p bin && curl -L -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/
 
 cp .env.example .env   # điền API key, hoặc nhập ở trang /settings
 pnpm dev
+```
+
+Tạo phụ đề trên máy cho video không có phụ đề cần **whisper.cpp** và cmake + trình biên dịch C++. Script build `whisper-cli` vào `./bin` (app tự dùng nếu có). Model `small.en` (~250 MB) được tải ở lần dùng đầu tiên vào `data/models/`, hoặc bấm **Tải model** trong Cài đặt.
+
+```bash
+node desktop/scripts/build-whisper.mjs bin
 ```
 
 Database `data/app.db` được tạo và migrate tự động khi khởi động.
@@ -99,6 +105,7 @@ Cách hoạt động:
 - Server TanStack Start chạy bằng chính binary Electron (`ELECTRON_RUN_AS_NODE`) ở `127.0.0.1:47821`, cửa sổ app mở trang đó.
 - `better-sqlite3` được thay bằng bản dựng sẵn cho Electron (`desktop/scripts/prepare-web.mjs`). Chỉ dùng phiên bản Electron mà better-sqlite3 có prebuild.
 - ffmpeg đi kèm app (`ffmpeg-static`). yt-dlp được tải về lần mở đầu tiên và tự cập nhật mỗi lần mở.
+- `whisper-cli` (whisper.cpp) được build cùng lúc tạo file cài đặt (`desktop/scripts/build-whisper.mjs`, cần cmake) và đóng gói vào `resources/whisper`. Model Whisper tải lúc dùng lần đầu vào thư mục dữ liệu.
 - Icon gốc là `desktop/resources/icon.svg`. Sửa xong chạy `pnpm --dir desktop icon` để render lại `icon.png` (1024px), electron-builder tự sinh `.ico` / `.icns` từ đó.
 - Dữ liệu nằm trong thư mục người dùng (`~/.config/Shadowing/data`, `%APPDATA%\Shadowing\data`, `~/Library/Application Support/Shadowing/data`). Menu **Tệp** có lối tắt mở thư mục dữ liệu và log.
 
@@ -112,6 +119,7 @@ Có thể dùng bất kỳ provider nào; vào **Cài đặt** để đổi (gi�
 |---|---|
 | Phân tích lỗi (LLM) | OpenAI, Anthropic, Gemini, Ollama (local), hoặc mọi API tương thích OpenAI (OpenRouter, Groq, LM Studio, vLLM…) |
 | Chấm phát âm (mặc định) | Chính model LLM ở trên nếu nó nghe được audio: mọi model Gemini, `gpt-audio`/`gpt-4o-audio`, hoặc proxy OpenAI-compatible có hỗ trợ `input_audio`. Claude và Ollama không nghe được |
+| Tạo phụ đề (video không có phụ đề) | Mặc định whisper.cpp chạy trên máy (model `small.en`, miễn phí). Hoặc dùng Speech-to-Text API bên dưới, tính phí theo phút audio |
 | Speech-to-Text (tuỳ chọn, chế độ Whisper) | Bất kỳ endpoint `/audio/transcriptions` chuẩn OpenAI có `verbose_json` + timestamp từng từ: OpenAI `whisper-1`, Groq `whisper-large-v3-turbo`, hoặc speaches / faster-whisper-server chạy local |
 
 Model phải hỗ trợ structured output (JSON schema). Ở chế độ AI nghe trực tiếp, bản ghi được chuyển sang WAV 16kHz bằng **ffmpeg** (cần cài sẵn) rồi gửi qua `/chat/completions` dạng `input_audio`.
@@ -126,7 +134,7 @@ Trong ô chép chính tả: `Enter` để nộp / sang câu tiếp, `Ctrl+Space`
 ```bash
 pnpm dev            # dev server
 pnpm build && node .output/server/index.mjs   # production
-npx vitest run      # unit test (align, tách câu, parse json3, parse link)
+npx vitest run      # unit test (align, tách câu, parse json3/srt/vtt, kết quả Whisper, parse link)
 pnpm db:generate    # tạo migration sau khi sửa src/db/schema.ts
 ```
 
@@ -140,8 +148,14 @@ src/
     ai/provider.ts        # factory adapter TanStack AI theo cấu hình
     ai/prompts.ts         # prompt + zod schema kết quả (tiếng Việt)
     stt.ts                # speech-to-text
+    captions.ts           # tạo phụ đề bằng Whisper (whisper.cpp hoặc API) + ước tính trước khi chạy
+    whisper-local.ts      # chạy whisper-cli, tải model
+    jobs.ts               # job tạo phụ đề chạy nền
+    media.ts              # ffmpeg: đọc thời lượng, tách audio, thumbnail
+    media-store.ts        # file upload / media trong DATA_DIR
+    media-route.ts        # GET /api/media/:key (route Nitro, hỗ trợ Range)
     youtube/ytdlp.ts      # metadata, chọn track phụ đề, tải audio
-    transcript/           # parse json3, tách câu
+    transcript/           # parse json3/srt/vtt, kết quả Whisper, tách câu
   lib/align.ts            # căn chỉnh Levenshtein từng từ (dùng chung client/server)
   lib/player-store.ts     # TanStack Store cho YouTube player
   components/, hooks/
@@ -151,4 +165,4 @@ src/
 
 - Khi shadowing nên **đeo tai nghe**, nếu không micro sẽ thu cả tiếng video và điểm sẽ không chính xác.
 - STT (Whisper) đôi khi "tự sửa" lỗi phát âm nhỏ, nên điểm phát âm phản ánh mức độ máy hiểu được bạn chứ không chấm theo từng âm vị.
-- Bản ghi âm lưu ở `data/recordings/`.
+- Bản ghi âm lưu ở `data/recordings/`, file audio/video tải lên ở `data/media/`.
