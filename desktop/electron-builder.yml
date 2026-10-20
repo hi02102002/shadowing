@@ -1,0 +1,42 @@
+appId: com.github.hi02102002.shadowing
+productName: Shadowing
+copyright: Copyright © hi02102002
+
+directories:
+  output: dist
+  buildResources: resources
+
+# resources/icon.png (1024px, vẽ từ icon.svg) → electron-builder tự sinh .icns / .ico
+files:
+  - src/**/*
+  - resources/icon.png
+  - package.json
+
+# app desktop không có module native, better-sqlite3 nằm trong server đã build sẵn (extraResources)
+npmRebuild: false
+
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+
+# server TanStack Start (.output) + migration, chạy ngoài asar vì cần cwd thật
+extraResources:
+  - from: build/web
+    to: web
+
+mac:
+  target: dmg
+  category: public.app-category.education
+  extendInfo:
+    NSMicrophoneUsageDescription: Shadowing cần micro để ghi âm và chấm phát âm.
+
+win:
+  target: nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  target: AppImage
+  category: Education
+  syncDesktopName: true

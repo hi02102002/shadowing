@@ -10,6 +10,8 @@
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",
+    "desktop": "pnpm build && pnpm --dir desktop start",
+    "desktop:dist": "pnpm build && pnpm --dir desktop dist",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",

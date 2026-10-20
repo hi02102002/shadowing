@@ -8,10 +8,12 @@ import type { Json3 } from '../transcript/json3.ts'
 const exec = promisify(execFile)
 
 const YTDLP = process.env.YTDLP_PATH || (existsSync('bin/yt-dlp') ? path.resolve('bin/yt-dlp') : 'yt-dlp')
+// app desktop không có `node` trong PATH → trỏ thẳng tới runtime, vd. "node:/path/to/Shadowing"
+const JS_RUNTIME = process.env.YTDLP_JS_RUNTIME || 'node'
 
 async function ytdlp(args: string[], timeout = 120_000) {
   try {
-    const { stdout } = await exec(YTDLP, ['--js-runtimes', 'node', '--no-warnings', ...args], {
+    const { stdout } = await exec(YTDLP, ['--js-runtimes', JS_RUNTIME, '--no-warnings', ...args], {
       timeout,
       maxBuffer: 64 * 1024 * 1024,
     })

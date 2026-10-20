@@ -17,3 +17,7 @@ data/
 bin/
 .env
 .env.local
+
+# app desktop (Electron)
+desktop/build/
+desktop/dist/

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- logo trong app-header: AudioLines (lucide) trên nền primary oklch(0.45 0.13 262) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#426ec2" />
+      <stop offset="1" stop-color="#1c3e81" />
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)" />
+  <g transform="translate(224 224) scale(24)" fill="none" stroke="#f6f9fc" stroke-width="2" stroke-linecap="round">
+    <path d="M2 10v3" />
+    <path d="M6 6v11" />
+    <path d="M10 3v18" />
+    <path d="M14 8v7" />
+    <path d="M18 5v13" />
+    <path d="M22 10v3" />
+  </g>
+</svg>

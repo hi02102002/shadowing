@@ -1,0 +1,62 @@
+# Build app desktop cho Linux / Windows / macOS.
+# Chạy khi push tag v* (vd. v0.1.0) hoặc bấm "Run workflow" trên GitHub.
+# Tag → tạo bản nháp GitHub Release kèm file cài đặt; chạy tay → tải ở mục Artifacts của run.
+name: desktop
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            files: desktop/dist/*.AppImage
+          - os: windows-latest
+            files: desktop/dist/*.exe
+          - os: macos-latest
+            files: desktop/dist/*.dmg
+    runs-on: ${{ matrix.os }}
+    env:
+      # chưa có chứng chỉ ký → build bản không ký
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Build desktop
+        working-directory: desktop
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm dist --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shadowing-${{ matrix.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: ${{ matrix.files }}

@@ -1,0 +1,8 @@
+# Workspace riêng: dependency của app web không bị đóng gói vào app.asar
+# electron-builder cần node_modules dạng phẳng
+nodeLinker: hoisted
+
+allowBuilds:
+  electron: true
+  ffmpeg-static: true
+  electron-winstaller: false

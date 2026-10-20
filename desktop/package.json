@@ -1,0 +1,25 @@
+{
+  "name": "shadowing-desktop",
+  "productName": "Shadowing",
+  "desktopName": "shadowing.desktop",
+  "version": "0.1.0",
+  "description": "Luyện nghe nói tiếng Anh từ YouTube",
+  "author": "hi02102002",
+  "private": true,
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "prepare-web": "node scripts/prepare-web.mjs",
+    "icon": "node scripts/render-icon.mjs",
+    "start": "node scripts/prepare-web.mjs && node scripts/start.mjs",
+    "dist": "node scripts/prepare-web.mjs && electron-builder"
+  },
+  "dependencies": {
+    "ffmpeg-static": "5.3.0"
+  },
+  "devDependencies": {
+    "electron": "42.11.15",
+    "electron-builder": "26.15.3",
+    "prebuild-install": "7.1.3"
+  }
+}

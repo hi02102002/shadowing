@@ -48,6 +48,17 @@ Database `data/app.db` được tạo và migrate tự động khi khởi độn
 
 Image đã có sẵn node, ffmpeg và yt-dlp. yt-dlp tự cập nhật mỗi lần container khởi động; tắt bằng `YTDLP_AUTO_UPDATE=0`.
 
+Cách nhanh nhất là dùng script:
+
+```bash
+./install.sh                # tạo .env nếu chưa có, build, chạy và chờ app sẵn sàng
+./install.sh --port 8080    # đổi cổng (ghi vào .env)
+./uninstall.sh              # xoá container + image, giữ dữ liệu
+./uninstall.sh --purge      # xoá luôn dữ liệu (có hỏi xác nhận)
+```
+
+Hoặc chạy thủ công:
+
 ```bash
 cp .env.example .env      # tuỳ chọn: điền key, hoặc cấu hình sau ở /settings
 docker compose up -d --build
@@ -70,6 +81,28 @@ Không dùng compose:
 docker build -t shadowing .
 docker run -d -p 3000:3000 -v shadowing-data:/app/data --env-file .env shadowing
 ```
+
+## App desktop (không cần Docker)
+
+Đóng gói thành app Electron: người dùng tải file cài đặt, mở là chạy, không cần cài Node, yt-dlp hay ffmpeg.
+
+```bash
+pnpm --dir desktop install   # lần đầu
+pnpm desktop                 # build rồi mở app để thử
+pnpm desktop:dist            # tạo file cài đặt cho hệ điều hành đang dùng → desktop/dist/
+```
+
+Muốn có đủ `.AppImage` (Linux), `.exe` (Windows) và `.dmg` (macOS), push một tag `v*` lên GitHub, workflow `desktop` sẽ build trên cả 3 hệ điều hành và tạo bản nháp Release.
+
+Cách hoạt động:
+
+- Server TanStack Start chạy bằng chính binary Electron (`ELECTRON_RUN_AS_NODE`) ở `127.0.0.1:47821`, cửa sổ app mở trang đó.
+- `better-sqlite3` được thay bằng bản dựng sẵn cho Electron (`desktop/scripts/prepare-web.mjs`). Chỉ dùng phiên bản Electron mà better-sqlite3 có prebuild.
+- ffmpeg đi kèm app (`ffmpeg-static`). yt-dlp được tải về lần mở đầu tiên và tự cập nhật mỗi lần mở.
+- Icon gốc là `desktop/resources/icon.svg`. Sửa xong chạy `pnpm --dir desktop icon` để render lại `icon.png` (1024px), electron-builder tự sinh `.ico` / `.icns` từ đó.
+- Dữ liệu nằm trong thư mục người dùng (`~/.config/Shadowing/data`, `%APPDATA%\Shadowing\data`, `~/Library/Application Support/Shadowing/data`). Menu **Tệp** có lối tắt mở thư mục dữ liệu và log.
+
+App chưa được ký: macOS cần chuột phải → **Open** ở lần mở đầu, Windows SmartScreen cần bấm **More info → Run anyway**.
 
 ## Cấu hình AI
 
