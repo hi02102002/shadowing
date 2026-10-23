@@ -4,6 +4,7 @@ import { openaiCompatibleText } from '@tanstack/ai-openai/compatible'
 import { createAnthropicChat } from '@tanstack/ai-anthropic'
 import { createGeminiChat } from '@tanstack/ai-gemini'
 import { createOllamaChat } from '@tanstack/ai-ollama'
+import { toJSONSchema, ZodError } from 'zod'
 import type { z } from 'zod'
 
 import { getConfig } from '../config.ts'
@@ -18,23 +19,63 @@ export function textAdapter(cfg: AppConfig = getConfig()) {
   const baseURL = cfg.llmBaseUrl || undefined
   switch (cfg.llmProvider) {
     case 'openai':
-      return createOpenaiChat(model, requireKey(cfg), baseURL ? { baseURL } : undefined)
+      return createOpenaiChat(
+        model,
+        requireKey(cfg),
+        baseURL ? { baseURL } : undefined,
+      )
     case 'anthropic':
-      return createAnthropicChat(model, requireKey(cfg), baseURL ? ({ baseURL } as any) : undefined)
+      return createAnthropicChat(
+        model,
+        requireKey(cfg),
+        baseURL ? ({ baseURL } as any) : undefined,
+      )
     case 'gemini':
       return createGeminiChat(model, requireKey(cfg))
     case 'ollama':
-      return createOllamaChat(cfg.llmModel, { baseURL: baseURL ?? 'http://localhost:11434' })
+      return createOllamaChat(cfg.llmModel, {
+        baseURL: baseURL ?? 'http://localhost:11434',
+      })
     case 'openai-compatible':
-      if (!baseURL) throw new Error('Cần nhập Base URL cho provider OpenAI-compatible')
-      return openaiCompatibleText(cfg.llmModel, { baseURL, apiKey: cfg.llmApiKey || 'none' })
+      if (!baseURL)
+        throw new Error('Cần nhập Base URL cho provider OpenAI-compatible')
+      return openaiCompatibleText(cfg.llmModel, {
+        baseURL,
+        apiKey: cfg.llmApiKey || 'none',
+      })
   }
 }
 
 function requireKey(cfg: AppConfig) {
-  if (!cfg.llmApiKey) throw new Error(`Chưa cấu hình API key cho ${cfg.llmProvider}. Vào trang Cài đặt để nhập.`)
+  if (!cfg.llmApiKey)
+    throw new Error(
+      `Chưa cấu hình API key cho ${cfg.llmProvider}. Vào trang Cài đặt để nhập.`,
+    )
   return cfg.llmApiKey
 }
+
+/** Bỏ ```json … ``` và lời dẫn mà một số model vẫn bọc quanh JSON */
+export function extractJson(text: string): unknown {
+  const trimmed = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+  return JSON.parse(
+    start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed,
+  )
+}
+
+/** dặn trả JSON ngay trong system prompt, cho provider không hỗ trợ (hoặc lặng lẽ bỏ qua) structured output */
+export const jsonInstruction = (system: string, schema: z.ZodType) =>
+  `${system}\n\nChỉ trả về một object JSON đúng schema sau, không markdown, không kèm chữ nào khác:\n${JSON.stringify(toJSONSchema(schema))}`
+
+/** lỗi do model không trả đúng JSON (đáng hỏi lại), khác lỗi mạng / API key */
+const isOutputError = (err: unknown) =>
+  err instanceof ZodError ||
+  err instanceof SyntaxError ||
+  (err instanceof Error && /structured output|JSON/i.test(err.message))
 
 /** Gọi LLM và nhận về object đã validate theo zod schema */
 export async function structured<T extends z.ZodType>(opts: {
@@ -43,17 +84,41 @@ export async function structured<T extends z.ZodType>(opts: {
   schema: T
   cfg?: AppConfig
 }): Promise<z.infer<T>> {
-  const result = await chat({
-    adapter: textAdapter(opts.cfg) as any,
-    systemPrompts: [opts.system],
-    messages: [{ role: 'user', content: opts.prompt }],
-    outputSchema: opts.schema,
-  })
-  return opts.schema.parse(result)
+  const adapter = textAdapter(opts.cfg) as any
+  const messages = [{ role: 'user' as const, content: opts.prompt }]
+  try {
+    const result = await chat({
+      adapter,
+      systemPrompts: [opts.system],
+      messages,
+      outputSchema: opts.schema,
+    })
+    return opts.schema.parse(result)
+  } catch (err) {
+    // một số provider / proxy nhận structured output nhưng model vẫn trả markdown → dặn JSON trong prompt và hỏi lại
+    if (!isOutputError(err)) throw err
+    const { text } = await chat({
+      adapter,
+      systemPrompts: [jsonInstruction(opts.system, opts.schema)],
+      messages,
+      stream: false,
+    })
+    try {
+      return opts.schema.parse(extractJson(text))
+    } catch {
+      throw new Error(
+        `Model không trả về JSON đúng cấu trúc: "${text.trim().slice(0, 160)}"`,
+      )
+    }
+  }
 }
 
 /** Stream văn bản thuần (dùng cho test kết nối, gợi ý tự do) */
-export async function* streamText(opts: { system: string; prompt: string; cfg?: AppConfig }) {
+export async function* streamText(opts: {
+  system: string
+  prompt: string
+  cfg?: AppConfig
+}) {
   const stream = chat({
     adapter: textAdapter(opts.cfg) as any,
     systemPrompts: [opts.system],
@@ -61,7 +126,9 @@ export async function* streamText(opts: { system: string; prompt: string; cfg?: 
     stream: true,
   })
   for await (const chunk of stream as AsyncIterable<any>) {
-    if (chunk.type === 'TEXT_MESSAGE_CONTENT' && chunk.delta) yield chunk.delta as string
-    else if (chunk.type === 'content' && chunk.delta) yield chunk.delta as string
+    if (chunk.type === 'TEXT_MESSAGE_CONTENT' && chunk.delta)
+      yield chunk.delta as string
+    else if (chunk.type === 'content' && chunk.delta)
+      yield chunk.delta as string
   }
 }

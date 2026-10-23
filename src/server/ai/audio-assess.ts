@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { getConfig } from '../config.ts'
 import type { AppConfig } from '../config.ts'
+import { extractJson, jsonInstruction } from './provider.ts'
 import {
   AudioAssessmentSchema,
   audioPronunciationPrompt,
@@ -34,19 +35,6 @@ function resolveEndpoint(cfg: AppConfig) {
         `Provider ${cfg.llmProvider} không nghe được audio. Chọn Gemini / OpenAI-compatible, hoặc đổi "Chấm phát âm bằng" sang Whisper (STT) trong Cài đặt.`,
       )
   }
-}
-
-/** Bỏ ```json … ``` mà một số model vẫn bọc quanh JSON */
-function extractJson(text: string): unknown {
-  const trimmed = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-  const start = trimmed.indexOf('{')
-  const end = trimmed.lastIndexOf('}')
-  return JSON.parse(
-    start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed,
-  )
 }
 
 async function post(
@@ -92,7 +80,7 @@ export async function assessWithAudioLlm(
   ]
   const schema = z.toJSONSchema(AudioAssessmentSchema)
 
-  let res = await post(url, cfg.llmApiKey, {
+  const res = await post(url, cfg.llmApiKey, {
     model: cfg.llmModel,
     messages,
     response_format: {
@@ -106,13 +94,50 @@ export async function assessWithAudioLlm(
     res.status === 400 &&
     /response_format|json_schema|schema/i.test(res.text)
   ) {
-    messages[0] = {
-      role: 'system',
-      content: `${audioPronunciationSystem(cfg.accent)}\n\nChỉ trả về một object JSON đúng schema sau, không kèm chữ nào khác:\n${JSON.stringify(schema)}`,
-    }
-    res = await post(url, cfg.llmApiKey, { model: cfg.llmModel, messages })
+    return parseReply(
+      await post(url, cfg.llmApiKey, jsonInPrompt(messages, cfg)),
+      cfg,
+    )
   }
 
+  try {
+    return parseReply(res, cfg)
+  } catch (err) {
+    // một số proxy nhận response_format nhưng lặng lẽ bỏ qua → model trả markdown; dặn JSON trong prompt và hỏi lại
+    if (!(err instanceof NotJsonError)) throw err
+    return parseReply(
+      await post(url, cfg.llmApiKey, jsonInPrompt(messages, cfg)),
+      cfg,
+    )
+  }
+}
+
+class NotJsonError extends Error {}
+
+/** cùng câu hỏi nhưng không dùng response_format: schema nằm trong system prompt */
+function jsonInPrompt(
+  messages: Array<{ role: string; content: unknown }>,
+  cfg: AppConfig,
+) {
+  return {
+    model: cfg.llmModel,
+    messages: [
+      {
+        role: 'system',
+        content: jsonInstruction(
+          audioPronunciationSystem(cfg.accent),
+          AudioAssessmentSchema,
+        ),
+      },
+      ...messages.slice(1),
+    ],
+  }
+}
+
+function parseReply(
+  res: Awaited<ReturnType<typeof post>>,
+  cfg: AppConfig,
+): AudioAssessment {
   if (!res.ok) {
     if (res.status === 401 || res.status === 403)
       throw new Error(
@@ -142,12 +167,19 @@ export async function assessWithAudioLlm(
     // một số proxy không chuyển được input_audio nhưng vẫn trả HTTP 200 kèm lời báo lỗi dạng chữ,
     // vd. "Images are not supported by this model or could not be processed…"
     const reply = content.trim().slice(0, 160)
-    if (/not supported|unsupported|could not be processed|cannot (process|hear)/i.test(content)) {
+    if (
+      /not supported|unsupported|could not be processed|cannot (process|hear)/i.test(
+        content,
+      )
+    ) {
       throw new Error(
         `Model "${cfg.llmModel}" không nhận audio qua endpoint này (trả lời: "${reply}"). Dùng model/provider nghe được audio, hoặc đổi "Chấm phát âm bằng" sang Whisper (STT) trong Cài đặt.`,
       )
     }
-    throw new Error(`Model không trả về JSON: "${reply}"`)
+    throw new NotJsonError(`Model không trả về JSON: "${reply}"`)
   }
-  return AudioAssessmentSchema.parse(json)
+  const parsed = AudioAssessmentSchema.safeParse(json)
+  if (!parsed.success)
+    throw new NotJsonError('Model trả về JSON sai cấu trúc, hãy thử lại')
+  return parsed.data
 }
