@@ -11,10 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExploreRouteImport } from './routes/explore'
-import { Route as IpaRouteImport } from './routes/ipa'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
+import { Route as IpaIndexRouteImport } from './routes/ipa/index'
+import { Route as IpaSoundIdRouteImport } from './routes/ipa/$soundId'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
 import { Route as VideosVideoIdIndexRouteImport } from './routes/videos/$videoId/index'
 import { Route as VideosVideoIdDictationRouteImport } from './routes/videos/$videoId/dictation'
@@ -31,11 +32,6 @@ const ExploreRoute = ExploreRouteImport.update({
   path: '/explore',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IpaRoute = IpaRouteImport.update({
-  id: '/ipa',
-  path: '/ipa',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
@@ -49,6 +45,16 @@ const SettingsRoute = SettingsRouteImport.update({
 const ApiUploadsRoute = ApiUploadsRouteImport.update({
   id: '/api/uploads',
   path: '/api/uploads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IpaIndexRoute = IpaIndexRouteImport.update({
+  id: '/ipa/',
+  path: '/ipa/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IpaSoundIdRoute = IpaSoundIdRouteImport.update({
+  id: '/ipa/$soundId',
+  path: '/ipa/$soundId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VideosVideoIdRoute = VideosVideoIdRouteImport.update({
@@ -80,11 +86,12 @@ const VideosVideoIdShadowRoute = VideosVideoIdShadowRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
-  '/ipa': typeof IpaRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
+  '/ipa/': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
@@ -93,10 +100,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
-  '/ipa': typeof IpaRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/ipa/$soundId': typeof IpaSoundIdRoute
+  '/ipa': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
@@ -106,11 +114,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
-  '/ipa': typeof IpaRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
+  '/ipa/': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
@@ -121,11 +130,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/explore'
-    | '/ipa'
     | '/review'
     | '/settings'
     | '/api/uploads'
+    | '/ipa/$soundId'
     | '/videos/$videoId'
+    | '/ipa/'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
@@ -134,10 +144,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/explore'
-    | '/ipa'
     | '/review'
     | '/settings'
     | '/api/uploads'
+    | '/ipa/$soundId'
+    | '/ipa'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
@@ -146,11 +157,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/explore'
-    | '/ipa'
     | '/review'
     | '/settings'
     | '/api/uploads'
+    | '/ipa/$soundId'
     | '/videos/$videoId'
+    | '/ipa/'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
@@ -160,11 +172,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ExploreRoute: typeof ExploreRoute
-  IpaRoute: typeof IpaRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
+  IpaSoundIdRoute: typeof IpaSoundIdRoute
   VideosVideoIdRoute: typeof VideosVideoIdRouteWithChildren
+  IpaIndexRoute: typeof IpaIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -181,13 +194,6 @@ declare module '@tanstack/react-router' {
       path: '/explore'
       fullPath: '/explore'
       preLoaderRoute: typeof ExploreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ipa': {
-      id: '/ipa'
-      path: '/ipa'
-      fullPath: '/ipa'
-      preLoaderRoute: typeof IpaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -209,6 +215,20 @@ declare module '@tanstack/react-router' {
       path: '/api/uploads'
       fullPath: '/api/uploads'
       preLoaderRoute: typeof ApiUploadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ipa/': {
+      id: '/ipa/'
+      path: '/ipa'
+      fullPath: '/ipa/'
+      preLoaderRoute: typeof IpaIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ipa/$soundId': {
+      id: '/ipa/$soundId'
+      path: '/ipa/$soundId'
+      fullPath: '/ipa/$soundId'
+      preLoaderRoute: typeof IpaSoundIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/videos/$videoId': {
@@ -270,11 +290,12 @@ const VideosVideoIdRouteWithChildren = VideosVideoIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ExploreRoute: ExploreRoute,
-  IpaRoute: IpaRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
+  IpaSoundIdRoute: IpaSoundIdRoute,
   VideosVideoIdRoute: VideosVideoIdRouteWithChildren,
+  IpaIndexRoute: IpaIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

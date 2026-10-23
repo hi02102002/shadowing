@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   CheckCircle2,
   ChevronRight,
@@ -10,22 +9,24 @@ import {
   XCircle,
 } from 'lucide-react'
 
+import {
+  AccentSwitch,
+  MarkedWord,
+  shuffle,
+  useAccentSounds,
+  useWordsIpa,
+} from '#/components/ipa-shared'
+import type { IpaMap } from '#/components/ipa-shared'
 import { Button } from '#/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { useAccent } from '#/hooks/use-app-settings'
-import {
-  exampleWord,
-  GROUP_LABEL,
-  IPA_SOUNDS,
-  splitExample,
-} from '#/lib/ipa-sounds'
+import { exampleWord, GROUP_LABEL, IPA_SOUNDS } from '#/lib/ipa-sounds'
 import type { IpaSound, SoundGroup } from '#/lib/ipa-sounds'
 import type { Accent } from '#/lib/speech'
 import { speak } from '#/lib/speech'
 import { cn } from '#/lib/utils'
-import { wordsIpa } from '#/server/fns/dictionary'
 
-export const Route = createFileRoute('/ipa')({
+export const Route = createFileRoute('/ipa/')({
   head: () => ({ meta: [{ title: 'Luyện IPA · Shadowing' }] }),
   component: IpaPage,
 })
@@ -35,30 +36,10 @@ const ALL_WORDS = [
   ...new Set(IPA_SOUNDS.flatMap((s) => s.examples.map(exampleWord))),
 ]
 
-/** phiên âm mọi từ ví dụ trong một lần gọi; key 'ipa' → tự tải lại khi đổi giọng */
-function useExampleIpa() {
-  const { data } = useQuery({
-    queryKey: ['ipa', 'chart'],
-    queryFn: () => wordsIpa({ data: { words: ALL_WORDS } }),
-    staleTime: Infinity,
-  })
-  return useMemo(
-    () =>
-      data
-        ? new Map(ALL_WORDS.map((w, i) => [w, data[i]] as const))
-        : undefined,
-    [data],
-  )
-}
-
 function IpaPage() {
-  const [accent, chooseAccent] = useAccent()
-  const ipa = useExampleIpa()
-  // âm chỉ có ở giọng kia (vd. /ɒ/ với giọng Mỹ) thì ẩn đi
-  const sounds = useMemo(
-    () => IPA_SOUNDS.filter((s) => !s.only || s.only === accent),
-    [accent],
-  )
+  const [accent] = useAccent()
+  const ipa = useWordsIpa('chart', ALL_WORDS)
+  const sounds = useAccentSounds()
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
@@ -69,25 +50,11 @@ function IpaPage() {
             Luyện IPA
           </h1>
           <p className="text-sm text-muted-foreground">
-            Bấm vào từng âm để nghe từ ví dụ và mẹo phát âm, rồi sang tab Luyện
-            nghe để kiểm tra tai mình.
+            Bấm vào từng âm để xem cách đặt miệng, lỗi hay gặp, cặp âm dễ nhầm
+            và tự ghi âm. Sang tab Luyện nghe để kiểm tra tai mình.
           </p>
         </div>
-        <div className="flex rounded-lg border p-0.5 text-sm">
-          {(['us', 'uk'] as const).map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => chooseAccent(a)}
-              className={cn(
-                'rounded-md px-3 py-1 text-muted-foreground transition-colors',
-                accent === a && 'bg-primary text-primary-foreground',
-              )}
-            >
-              {a === 'us' ? 'Giọng Mỹ' : 'Giọng Anh'}
-            </button>
-          ))}
-        </div>
+        <AccentSwitch />
       </header>
 
       <Tabs defaultValue="chart">
@@ -96,7 +63,7 @@ function IpaPage() {
           <TabsTrigger value="quiz">Luyện nghe</TabsTrigger>
         </TabsList>
         <TabsContent value="chart" className="mt-2">
-          <SoundChart sounds={sounds} accent={accent} ipa={ipa} />
+          <SoundChart sounds={sounds} accent={accent} />
         </TabsContent>
         <TabsContent value="quiz" className="mt-2">
           <ListeningQuiz sounds={sounds} accent={accent} ipa={ipa} />
@@ -106,109 +73,43 @@ function IpaPage() {
   )
 }
 
-type IpaMap = Map<string, string | null> | undefined
-
 function SoundChart({
   sounds,
   accent,
-  ipa,
 }: {
   sounds: IpaSound[]
   accent: Accent
-  ipa: IpaMap
 }) {
-  const [selectedId, setSelectedId] = useState(sounds[0].id)
-  const selected = sounds.find((s) => s.id === selectedId) ?? sounds[0]
-
-  const select = (s: IpaSound) => {
-    setSelectedId(s.id)
-    speak(exampleWord(s.examples[0]), { accent })
-  }
-
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-      <div className="flex flex-col gap-5">
-        {GROUPS.map((group) => (
-          <section key={group}>
-            <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
-              {GROUP_LABEL[group]}
-            </h2>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-              {sounds
-                .filter((s) => s.group === group)
-                .map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => select(s)}
-                    className={cn(
-                      'flex flex-col items-center gap-0.5 rounded-lg border bg-card px-2 py-2.5 transition-colors hover:border-primary/60 hover:bg-muted',
-                      s.id === selected.id &&
-                        'border-primary bg-primary/10 hover:bg-primary/10',
-                    )}
-                  >
-                    <span className="ipa text-xl font-medium">
-                      /{s.symbol[accent]}/
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {exampleWord(s.examples[0])}
-                    </span>
-                  </button>
-                ))}
-            </div>
-          </section>
-        ))}
-      </div>
-
-      <aside className="h-fit rounded-xl border bg-card p-5 lg:sticky lg:top-20">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="ipa text-4xl font-semibold text-primary">
-            /{selected.symbol[accent]}/
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {GROUP_LABEL[selected.group]}
-          </span>
-        </div>
-        <p className="mt-3 text-sm">{selected.tip}</p>
-        <ul className="mt-4 flex flex-col gap-1.5">
-          {selected.examples.map((ex) => {
-            const word = exampleWord(ex)
-            return (
-              <li key={ex}>
-                <button
-                  type="button"
-                  onClick={() => speak(word, { accent })}
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+    <div className="flex flex-col gap-5">
+      {GROUPS.map((group) => (
+        <section key={group}>
+          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
+            {GROUP_LABEL[group]}
+          </h2>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9">
+            {sounds
+              .filter((s) => s.group === group)
+              .map((s) => (
+                <Link
+                  key={s.id}
+                  to="/ipa/$soundId"
+                  params={{ soundId: s.id }}
+                  className="group flex flex-col items-center gap-1 rounded-lg border bg-card px-2 py-3 text-foreground no-underline transition-colors hover:border-primary/60 hover:bg-muted"
                 >
-                  <Volume2 className="size-4 shrink-0 text-muted-foreground" />
-                  <MarkedWord example={ex} className="w-24" />
-                  <span className="ipa text-sm text-muted-foreground">
-                    {ipa?.get(word) ? `/${ipa.get(word)}/` : ''}
+                  <span className="ipa text-2xl font-medium group-hover:text-primary">
+                    /{s.symbol[accent]}/
                   </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </aside>
+                  <MarkedWord
+                    example={s.examples[0]}
+                    className="text-xs font-normal text-muted-foreground"
+                  />
+                </Link>
+              ))}
+          </div>
+        </section>
+      ))}
     </div>
-  )
-}
-
-function MarkedWord({
-  example,
-  className,
-}: {
-  example: string
-  className?: string
-}) {
-  const { before, mark, after } = splitExample(example)
-  return (
-    <span className={cn('font-medium', className)}>
-      {before}
-      <span className="text-primary underline underline-offset-4">{mark}</span>
-      {after}
-    </span>
   )
 }
 
@@ -216,15 +117,6 @@ interface Question {
   sound: IpaSound
   example: string
   options: IpaSound[]
-}
-
-const shuffle = <T,>(xs: T[]) => {
-  const a = [...xs]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
 }
 
 /**

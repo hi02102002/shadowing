@@ -119,6 +119,50 @@ async function transcribeOnDevice(wav: Buffer): Promise<SttWord[]> {
   }
 }
 
+/** Nhận dạng bản ghi bằng engine đã chọn; llm-audio trả kèm nhận xét trong cùng lần gọi */
+async function hearRecording(
+  audio: File,
+  raw: Buffer,
+  reference: string,
+  choice: PronunciationEngine | 'auto',
+  cfg: AppConfig,
+) {
+  let transcript: string
+  let words: SttWord[] = []
+  let feedback: PronunciationFeedback | null = null
+  let spokenSec = 0
+
+  const engine = choice === 'auto' ? autoEngine(cfg) : choice
+  const unavailable = engineUnavailable(engine, cfg)
+  if (unavailable) throw new Error(unavailable)
+
+  if (engine === 'llm-audio') {
+    // model nghe trực tiếp: chữ nghe được + nhận xét trong một lần gọi
+    const { wav, durationMs } = await toWav16k(raw)
+    if (durationMs < 400) throw new Error('Bản ghi quá ngắn, hãy nói lại')
+    const { transcript: text, ...rest } = await assessWithAudioLlm(
+      wav,
+      reference,
+      cfg,
+    )
+    transcript = text.trim()
+    feedback = rest
+    spokenSec = durationMs / 1000
+  } else if (engine === 'local') {
+    const { wav, durationMs } = await toWav16k(raw)
+    if (durationMs < 400) throw new Error('Bản ghi quá ngắn, hãy nói lại')
+    words = await transcribeOnDevice(wav)
+    transcript = words.map((w) => w.word).join(' ')
+    spokenSec = words.length ? words[words.length - 1].end - words[0].start : 0
+  } else {
+    const stt = await transcribe(audio, { cfg })
+    transcript = stt.text.trim()
+    words = stt.words
+    spokenSec = words.length ? words[words.length - 1].end - words[0].start : 0
+  }
+  return { engine, transcript, words, feedback, spokenSec }
+}
+
 interface StoredWords {
   stt: SttWord[]
   pauses: Array<{ after: string; ms: number }>
@@ -154,44 +198,16 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
     const cfg = getConfig()
     const raw = Buffer.from(await data.audio.arrayBuffer())
 
-    let transcript: string
-    let words: SttWord[] = []
-    let feedback: PronunciationFeedback | null = null
-    let spokenSec = 0
-
-    const engine = data.engine === 'auto' ? autoEngine(cfg) : data.engine
-    const unavailable = engineUnavailable(engine, cfg)
-    if (unavailable) throw new Error(unavailable)
-
-    if (engine === 'llm-audio') {
-      // model nghe trực tiếp: chữ nghe được + nhận xét trong một lần gọi
-      const { wav, durationMs } = await toWav16k(raw)
-      if (durationMs < 400) throw new Error('Bản ghi quá ngắn, hãy nói lại')
-      const { transcript: heard, ...rest } = await assessWithAudioLlm(
-        wav,
-        seg.text,
-        cfg,
-      )
-      transcript = heard.trim()
-      // tắt tự phân tích: chỉ lấy chữ nghe được; bấm "Nhờ AI phân tích" sẽ phân tích lại và ghi Sổ lỗi
-      feedback = cfg.aiAnalysis === 'on' ? rest : null
-      spokenSec = durationMs / 1000
-    } else if (engine === 'local') {
-      const { wav, durationMs } = await toWav16k(raw)
-      if (durationMs < 400) throw new Error('Bản ghi quá ngắn, hãy nói lại')
-      words = await transcribeOnDevice(wav)
-      transcript = words.map((w) => w.word).join(' ')
-      spokenSec = words.length
-        ? words[words.length - 1].end - words[0].start
-        : 0
-    } else {
-      const stt = await transcribe(data.audio, { cfg })
-      transcript = stt.text.trim()
-      words = stt.words
-      spokenSec = words.length
-        ? words[words.length - 1].end - words[0].start
-        : 0
-    }
+    const heard = await hearRecording(
+      data.audio,
+      raw,
+      seg.text,
+      data.engine,
+      cfg,
+    )
+    const { engine, transcript, words, spokenSec } = heard
+    // tắt tự phân tích: chỉ lấy chữ nghe được; bấm "Nhờ AI phân tích" sẽ phân tích lại và ghi Sổ lỗi
+    const feedback = cfg.aiAnalysis === 'on' ? heard.feedback : null
 
     const result = alignWords(seg.text, transcript)
     const missing = result.tokens.filter((t) => t.op === 'missing').length
@@ -267,6 +283,35 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
 export type PronunciationResult = Awaited<
   ReturnType<typeof assessPronunciation>
 >
+
+/** Chấm từ / câu luyện âm ở trang IPA: không gắn với video nên không lưu lại */
+export const assessDrill = createServerFn({ method: 'POST' })
+  .validator((form: FormData) => {
+    if (!(form instanceof FormData)) throw new Error('Dữ liệu không hợp lệ')
+    const audio = form.get('audio')
+    if (!(audio instanceof File) || audio.size === 0)
+      throw new Error('Thiếu file ghi âm')
+    if (audio.size > MAX_AUDIO_BYTES)
+      throw new Error('File ghi âm quá lớn (tối đa 10MB)')
+    return {
+      audio,
+      text: z.string().trim().min(1).max(200).parse(form.get('text')),
+    }
+  })
+  .handler(async ({ data }) => {
+    const cfg = getConfig()
+    const raw = Buffer.from(await data.audio.arrayBuffer())
+    const heard = await hearRecording(data.audio, raw, data.text, 'auto', cfg)
+    const result = alignWords(data.text, heard.transcript)
+    return {
+      transcript: heard.transcript,
+      accuracy: result.score,
+      tokens: result.tokens,
+      feedback: heard.feedback,
+    }
+  })
+
+export type DrillResult = Awaited<ReturnType<typeof assessDrill>>
 
 export const pronunciationFeedback = createServerFn({ method: 'POST' })
   .validator(z.object({ attemptId: z.number().int() }))
