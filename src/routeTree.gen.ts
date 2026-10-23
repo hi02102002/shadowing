@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExploreRouteImport } from './routes/explore'
+import { Route as IpaRouteImport } from './routes/ipa'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const ExploreRoute = ExploreRouteImport.update({
   id: '/explore',
   path: '/explore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IpaRoute = IpaRouteImport.update({
+  id: '/ipa',
+  path: '/ipa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -74,6 +80,7 @@ const VideosVideoIdShadowRoute = VideosVideoIdShadowRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
+  '/ipa': typeof IpaRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/api/uploads': typeof ApiUploadsRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
+  '/ipa': typeof IpaRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/api/uploads': typeof ApiUploadsRoute
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
+  '/ipa': typeof IpaRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/api/uploads': typeof ApiUploadsRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/explore'
+    | '/ipa'
     | '/review'
     | '/settings'
     | '/api/uploads'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/explore'
+    | '/ipa'
     | '/review'
     | '/settings'
     | '/api/uploads'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/explore'
+    | '/ipa'
     | '/review'
     | '/settings'
     | '/api/uploads'
@@ -148,6 +160,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ExploreRoute: typeof ExploreRoute
+  IpaRoute: typeof IpaRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/explore'
       fullPath: '/explore'
       preLoaderRoute: typeof ExploreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ipa': {
+      id: '/ipa'
+      path: '/ipa'
+      fullPath: '/ipa'
+      preLoaderRoute: typeof IpaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -250,6 +270,7 @@ const VideosVideoIdRouteWithChildren = VideosVideoIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ExploreRoute: ExploreRoute,
+  IpaRoute: IpaRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
