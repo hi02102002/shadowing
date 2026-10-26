@@ -524,6 +524,9 @@ function VideoCard({ id }: { id: string }) {
   )
 }
 
+/** bỏ dấu câu và chữ hoa để "Peas." khớp "peas" */
+const normalizeWord = (w: string) => w.toLowerCase().replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, '')
+
 function RecordDrill({
   detail,
   accent,
@@ -542,6 +545,15 @@ function RecordDrill({
   const [text, setText] = useState(targets[0])
   const [result, setResult] = useState<DrillResult | null>(null)
 
+  // phiên âm từng từ của câu đang luyện, hiện dưới kết quả chấm
+  const words = useMemo(() => text.split(/\s+/).filter(Boolean), [text])
+  const ipa = useWordsIpa(`drill:${text}`, words)
+  const ipaOf = useMemo(() => {
+    const byWord = new Map<string, string | null>()
+    ipa?.forEach((v, w) => byWord.set(normalizeWord(w), v))
+    return (w: string) => byWord.get(normalizeWord(w))
+  }, [ipa])
+
   const assess = useMutation({
     mutationFn: (blob: Blob) => {
       const form = new FormData()
@@ -557,17 +569,32 @@ function RecordDrill({
     onSuccess: setResult,
   })
 
+  // bản ghi gần nhất để nghe lại giọng mình, so với giọng mẫu
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
+  useEffect(
+    () => () => {
+      if (recordingUrl) URL.revokeObjectURL(recordingUrl)
+    },
+    [recordingUrl],
+  )
+  const playRecording = () => {
+    if (recordingUrl) void new Audio(recordingUrl).play()
+  }
+
   const recorder = useRecorder({
     maxMs: 20_000,
     onStop: (blob) => {
       // bản ghi quá ngắn thường là bấm nhầm
-      if (blob.size > 2_000) assess.mutate(blob)
+      if (blob.size <= 2_000) return
+      setRecordingUrl(URL.createObjectURL(blob))
+      assess.mutate(blob)
     },
   })
 
   const pick = (t: string) => {
     setText(t)
     setResult(null)
+    setRecordingUrl(null)
     assess.reset()
   }
 
@@ -632,8 +659,16 @@ function RecordDrill({
           <div className="flex items-center gap-4">
             <ScoreRing value={result.accuracy} label="Chính xác" />
             <div className="min-w-0 flex-1">
-              <DiffView tokens={result.tokens} className="text-base" />
+              <DiffView tokens={result.tokens} ipa={ipaOf} className="text-base" />
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={playRecording} disabled={!recordingUrl}>
+              <Mic /> Nghe lại giọng bạn
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => speak(text, { accent })}>
+              <Volume2 /> Nghe mẫu
+            </Button>
           </div>
           <DiffLegend />
           <p className="text-sm">

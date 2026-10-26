@@ -16,34 +16,46 @@ const LABEL: Record<AlignToken['op'], string> = {
   extra: 'Thừa',
 }
 
-/** Hiển thị câu gốc với từng từ được tô màu theo kết quả căn chỉnh */
-export function DiffView({ tokens, className }: { tokens: AlignToken[]; className?: string }) {
+/** Hiển thị câu gốc với từng từ được tô màu theo kết quả căn chỉnh; có `ipa` thì hiện phiên âm dưới từng từ của câu gốc */
+export function DiffView({
+  tokens,
+  className,
+  ipa,
+}: {
+  tokens: AlignToken[]
+  className?: string
+  ipa?: (word: string) => string | null | undefined
+}) {
   return (
-    <p className={cn('flex flex-wrap gap-x-1.5 gap-y-2 text-lg leading-relaxed', className)}>
+    <p className={cn('flex flex-wrap gap-x-1.5 gap-y-2 text-lg leading-relaxed', ipa && 'items-start gap-y-3', className)}>
       {tokens.map((t, i) => {
         const text = t.op === 'extra' ? t.hyp : t.ref
-        if (t.op === 'correct') {
-          return (
-            <span key={i} className={STYLE.correct}>
-              {text}
-            </span>
+        const phonetic = ipa && t.op !== 'extra' ? ipa(t.ref) : null
+        const word =
+          t.op === 'correct' ? (
+            <span className={STYLE.correct}>{text}</span>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={cn('cursor-help rounded px-1', STYLE[t.op])}>{text}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {t.op === 'wrong' && (
+                  <>
+                    Bạn: <b>{t.hyp}</b> → đúng: <b>{t.ref}</b>
+                  </>
+                )}
+                {t.op === 'missing' && <>Bạn bỏ sót từ này</>}
+                {t.op === 'extra' && <>Từ thừa, câu gốc không có</>}
+              </TooltipContent>
+            </Tooltip>
           )
-        }
+        if (!ipa) return <span key={i}>{word}</span>
         return (
-          <Tooltip key={i}>
-            <TooltipTrigger asChild>
-              <span className={cn('cursor-help rounded px-1', STYLE[t.op])}>{text}</span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {t.op === 'wrong' && (
-                <>
-                  Bạn: <b>{t.hyp}</b> → đúng: <b>{t.ref}</b>
-                </>
-              )}
-              {t.op === 'missing' && <>Bạn bỏ sót từ này</>}
-              {t.op === 'extra' && <>Từ thừa, câu gốc không có</>}
-            </TooltipContent>
-          </Tooltip>
+          <span key={i} className="inline-flex flex-col items-center">
+            {word}
+            <span className="ipa text-xs leading-tight text-muted-foreground">{phonetic ? `/${phonetic}/` : '\u00a0'}</span>
+          </span>
         )
       })}
     </p>
