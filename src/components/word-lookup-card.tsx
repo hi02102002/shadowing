@@ -1,8 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { AudioLines, ExternalLink, Lightbulb, Loader2, Volume2, X } from 'lucide-react'
+import {
+  AudioLines,
+  ExternalLink,
+  Lightbulb,
+  Loader2,
+  Volume2,
+  X,
+} from 'lucide-react'
 
+import { SaveToDeck } from '#/components/save-to-deck'
 import { Button } from '#/components/ui/button'
 import { playerActions } from '#/lib/player-store'
 import { useAccent } from '#/hooks/use-app-settings'
@@ -14,6 +22,7 @@ import type { DictEntry } from '#/server/dunno'
 export interface LookupTarget {
   text: string
   sentence: string
+  segmentId: number
   startMs: number
   endMs: number
   /** vị trí của từ trên màn hình để đặt thẻ ngay dưới/trên nó */
@@ -33,7 +42,7 @@ export function WordLookupCard({
   const ref = useRef<HTMLDivElement>(null)
   // đổi UK/US ở đây là đổi giọng chuẩn của cả app
   const [accent, chooseAccent] = useAccent()
-  const [pos, setPos] = useState<{ top: number; left: number }>({
+  const [pos, setPos] = useState<{ top: number; left: number; maxHeight?: number }>({
     top: target.rect.bottom + GAP,
     left: target.rect.left,
   })
@@ -54,33 +63,40 @@ export function WordLookupCard({
     retry: false,
   })
 
-  // giữ thẻ trong viewport: lật lên trên nếu bên dưới không đủ chỗ
+  // giữ thẻ trong viewport: ưu tiên bên dưới, lật lên trên nếu chỉ trên đủ chỗ;
+  // hai bên đều không đủ → đặt ở bên rộng hơn và giới hạn chiều cao để cuộn bên trong
   useLayoutEffect(() => {
-    const h = ref.current?.offsetHeight ?? 240
+    // scrollHeight: chiều cao thật của nội dung, kể cả khi đang bị giới hạn maxHeight
+    const h = ref.current?.scrollHeight ?? 240
     const vw = window.innerWidth
     const vh = window.innerHeight
     const width = Math.min(WIDTH, vw - GAP * 2)
     const left = Math.min(Math.max(GAP, target.rect.left), vw - width - GAP)
-    const below = target.rect.bottom + GAP
-    const top =
-      below + h > vh - GAP && target.rect.top - GAP - h > GAP
-        ? target.rect.top - GAP - h
-        : below
-    setPos({ top, left })
+    const spaceBelow = vh - target.rect.bottom - GAP * 2
+    const spaceAbove = target.rect.top - GAP * 2
+    if (h <= spaceBelow || spaceBelow >= spaceAbove) {
+      setPos({ top: target.rect.bottom + GAP, left, maxHeight: spaceBelow })
+    } else {
+      const height = Math.min(h, spaceAbove)
+      setPos({ top: target.rect.top - GAP - height, left, maxHeight: spaceAbove })
+    }
   }, [target, query.status, dictQuery.status])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     const onDown = (e: MouseEvent) =>
       ref.current && !ref.current.contains(e.target as Node) && onClose()
+    // cuộn trang thì đóng, cuộn nội dung bên trong thẻ thì không
+    const onScroll = (e: Event) =>
+      ref.current && !ref.current.contains(e.target as Node) && onClose()
     window.addEventListener('keydown', onKey)
     window.addEventListener('mousedown', onDown)
-    window.addEventListener('scroll', onClose, true)
+    window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', onClose)
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('mousedown', onDown)
-      window.removeEventListener('scroll', onClose, true)
+      window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onClose)
     }
   }, [onClose])
@@ -96,9 +112,10 @@ export function WordLookupCard({
       ref={ref}
       role="dialog"
       aria-label={`Tra từ: ${target.text}`}
-      className="fixed z-50 flex max-h-[70vh] flex-col overflow-y-auto rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95"
+      className="fixed z-50 flex flex-col overflow-y-auto overscroll-contain rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95"
       style={{
         top: pos.top,
+        maxHeight: pos.maxHeight,
         left: pos.left,
         width: `min(${WIDTH}px, calc(100vw - ${GAP * 2}px))`,
       }}
@@ -136,6 +153,14 @@ export function WordLookupCard({
           <AudioLines />
           Nghe trong video
         </Button>
+        <SaveToDeck
+          text={target.text}
+          sentence={target.sentence}
+          segmentId={target.segmentId}
+          startMs={target.startMs}
+          endMs={target.endMs}
+          disabled={query.isPending}
+        />
         {canSpeak() && (
           <div className="flex items-center gap-1">
             <Button

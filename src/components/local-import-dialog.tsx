@@ -18,10 +18,15 @@ import { importLocal } from '#/server/fns/videos'
 import type { ImportResult } from '#/server/fns/videos'
 
 /** Tải file lên theo luồng (raw body) để có tiến độ và không giới hạn bởi FormData */
-function uploadFile(file: File, onProgress: (fraction: number) => void, signal: AbortSignal): Promise<string> {
+export function uploadFile(
+  file: File,
+  onProgress: (fraction: number) => void,
+  signal: AbortSignal,
+  url = '/api/uploads',
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/uploads')
+    xhr.open('POST', url)
     xhr.setRequestHeader('content-type', file.type || 'application/octet-stream')
     xhr.setRequestHeader('x-filename', encodeURIComponent(file.name))
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total)

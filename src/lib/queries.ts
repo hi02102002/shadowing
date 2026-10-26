@@ -7,6 +7,7 @@ import {
   pronunciationEngines,
   pronunciationHistory,
 } from '#/server/fns/pronunciation.ts'
+import { listCards, listDecks, studyQueue } from '#/server/fns/flashcards.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
@@ -70,4 +71,25 @@ export const pronunciationEnginesQuery = () =>
   queryOptions({
     queryKey: ['pronunciation-engines'],
     queryFn: () => pronunciationEngines(),
+  })
+
+export const decksQuery = () =>
+  queryOptions({
+    queryKey: ['decks'],
+    queryFn: () => listDecks(),
+  })
+
+export const cardsQuery = (deckId: number) =>
+  queryOptions({
+    queryKey: ['cards', deckId],
+    queryFn: () => listCards({ data: { deckId } }),
+  })
+
+export const studyQueueQuery = (deckId?: number) =>
+  queryOptions({
+    queryKey: ['study-queue', deckId ?? 'all'],
+    queryFn: () => studyQueue({ data: { deckId } }),
+    // hàng đợi chỉ lấy một lần mỗi phiên học, không tự refetch làm nhảy thẻ
+    staleTime: Infinity,
+    gcTime: 0,
   })

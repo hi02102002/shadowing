@@ -117,3 +117,74 @@ export const lookups = sqliteTable('lookups', {
   json: text().notNull(),
   createdAt: createdAt(),
 })
+
+/** Bộ thẻ từ vựng: transcript (lưu từ khi tra trong video) | anki (import từ .apkg) */
+export const decks = sqliteTable('decks', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  name: text().notNull(),
+  source: text().notNull(),
+  createdAt: createdAt(),
+})
+
+/** Thẻ học kiểu Anki, lịch ôn tính bằng FSRS (src/server/srs.ts) */
+export const cards = sqliteTable(
+  'cards',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    deckId: integer('deck_id')
+      .notNull()
+      .references(() => decks.id, { onDelete: 'cascade' }),
+    front: text().notNull(),
+    back: text().notNull(),
+    ipa: text(),
+    example: text(),
+    extra: text(),
+    /** tên file trong DATA_DIR/card-media (audio import từ Anki) */
+    audioFile: text('audio_file'),
+    // ngữ cảnh khi lưu từ transcript
+    segmentId: integer('segment_id').references(() => segments.id, { onDelete: 'set null' }),
+    sentence: text(),
+    clipStartMs: integer('clip_start_ms'),
+    clipEndMs: integer('clip_end_ms'),
+    ankiGuid: text('anki_guid'),
+    // trạng thái FSRS
+    due: integer({ mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    stability: real().notNull().default(0),
+    difficulty: real().notNull().default(0),
+    elapsedDays: integer('elapsed_days').notNull().default(0),
+    scheduledDays: integer('scheduled_days').notNull().default(0),
+    learningSteps: integer('learning_steps').notNull().default(0),
+    reps: integer().notNull().default(0),
+    lapses: integer().notNull().default(0),
+    /** 0 New | 1 Learning | 2 Review | 3 Relearning */
+    state: integer().notNull().default(0),
+    lastReview: integer('last_review', { mode: 'timestamp' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('cards_deck_due_idx').on(t.deckId, t.due),
+    uniqueIndex('cards_deck_guid_idx').on(t.deckId, t.ankiGuid),
+    index('cards_front_idx').on(t.front),
+  ],
+)
+
+export const reviewLogs = sqliteTable(
+  'review_logs',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    cardId: integer('card_id')
+      .notNull()
+      .references(() => cards.id, { onDelete: 'cascade' }),
+    rating: integer().notNull(),
+    state: integer().notNull(),
+    due: integer({ mode: 'timestamp' }).notNull(),
+    stability: real().notNull(),
+    difficulty: real().notNull(),
+    elapsedDays: integer('elapsed_days').notNull(),
+    reviewedAt: integer('reviewed_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  },
+  (t) => [index('review_logs_card_idx').on(t.cardId)],
+)
+
+export type Deck = typeof decks.$inferSelect
+export type Card = typeof cards.$inferSelect

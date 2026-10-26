@@ -4,37 +4,14 @@ import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
 import { lookups, segments } from '#/db/schema.ts'
-import { LOOKUP_SYSTEM, LookupSchema, lookupPrompt } from '../ai/prompts.ts'
-import type { Lookup } from '../ai/prompts.ts'
-import { structured } from '../ai/provider.ts'
-import { getConfig, hasLlm } from '../config.ts'
-import { dunnoLookup } from '../dunno.ts'
-import type { DictEntry } from '../dunno.ts'
+import { getConfig } from '../config.ts'
 import { wordsToIpa } from '../ipa.ts'
+import { contextLookup, dictionaryLookup } from '../lookup.ts'
 import { googleTranslateLines } from '../translate.ts'
 
-const cleanWord = (text: string) =>
-  text.replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, '')
-
-/** Tra từ điển Anh–Việt (dunno.ai, không cần AI); null khi không có từ này */
 export const dictionaryEntry = createServerFn({ method: 'POST' })
   .validator(z.object({ text: z.string().trim().min(1).max(80) }))
-  .handler(async ({ data }): Promise<DictEntry | null> => {
-    const text = cleanWord(data.text).toLowerCase()
-    if (!text) throw new Error('Không có từ để tra')
-    const key = `dunno|${text}`
-
-    const cached = db.select().from(lookups).where(eq(lookups.key, key)).get()
-    if (cached) return JSON.parse(cached.json) as DictEntry | null
-
-    const entry = await dunnoLookup(text)
-    const json = JSON.stringify(entry)
-    db.insert(lookups)
-      .values({ key, json })
-      .onConflictDoUpdate({ target: lookups.key, set: { json } })
-      .run()
-    return entry
-  })
+  .handler(async ({ data }) => dictionaryLookup(data.text))
 
 export const lookupWord = createServerFn({ method: 'POST' })
   .validator(
@@ -43,34 +20,7 @@ export const lookupWord = createServerFn({ method: 'POST' })
       sentence: z.string().max(600),
     }),
   )
-  .handler(async ({ data }): Promise<Lookup | null> => {
-    const text = cleanWord(data.text)
-    if (!text) throw new Error('Không có từ để tra')
-    const key = `${text.toLowerCase()}|${data.sentence.trim().toLowerCase()}`
-
-    const cached = db.select().from(lookups).where(eq(lookups.key, key)).get()
-    if (cached) {
-      const parsed = LookupSchema.safeParse(JSON.parse(cached.json))
-      if (parsed.success) return parsed.data
-    }
-
-    // chưa cấu hình AI: thẻ tra từ chỉ dùng từ điển (dictionaryEntry)
-    if (!hasLlm(getConfig())) return null
-
-    const result = await structured({
-      system: LOOKUP_SYSTEM,
-      prompt: lookupPrompt(text, data.sentence),
-      schema: LookupSchema,
-    })
-    db.insert(lookups)
-      .values({ key, json: JSON.stringify(result) })
-      .onConflictDoUpdate({
-        target: lookups.key,
-        set: { json: JSON.stringify(result) },
-      })
-      .run()
-    return result
-  })
+  .handler(async ({ data }) => contextLookup(data.text, data.sentence))
 
 /** Phiên âm IPA cho từng từ trong câu (từ điển CMU, không cần AI) */
 export const wordsIpa = createServerFn({ method: 'POST' })

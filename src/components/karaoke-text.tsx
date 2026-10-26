@@ -104,6 +104,7 @@ export function KaraokeText({
     setLookup({
       text: r.text,
       sentence: segment.text,
+      segmentId: segment.id,
       startMs: r.startMs,
       endMs: r.endMs,
       rect: { top: rect.top, bottom: rect.bottom, left: rect.left },

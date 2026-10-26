@@ -16,7 +16,7 @@ import { videos } from '#/db/schema.ts'
 import { isLocalKey } from '#/lib/video-source.ts'
 import { mediaDir, thumbPath } from './media-store.ts'
 
-const MIME: Record<string, string> = {
+export const MIME: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.m4v': 'video/mp4',
   '.mov': 'video/quicktime',

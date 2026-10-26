@@ -13,7 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiAnkiUploadsRouteImport } from './routes/api/anki-uploads'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
+import { Route as FlashcardsIndexRouteImport } from './routes/flashcards/index'
+import { Route as FlashcardsStudyRouteImport } from './routes/flashcards/study'
 import { Route as IpaIndexRouteImport } from './routes/ipa/index'
 import { Route as IpaSoundIdRouteImport } from './routes/ipa/$soundId'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
@@ -42,9 +45,24 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAnkiUploadsRoute = ApiAnkiUploadsRouteImport.update({
+  id: '/api/anki-uploads',
+  path: '/api/anki-uploads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiUploadsRoute = ApiUploadsRouteImport.update({
   id: '/api/uploads',
   path: '/api/uploads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FlashcardsIndexRoute = FlashcardsIndexRouteImport.update({
+  id: '/flashcards/',
+  path: '/flashcards/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FlashcardsStudyRoute = FlashcardsStudyRouteImport.update({
+  id: '/flashcards/study',
+  path: '/flashcards/study',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IpaIndexRoute = IpaIndexRouteImport.update({
@@ -88,9 +106,12 @@ export interface FileRoutesByFullPath {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/flashcards/study': typeof FlashcardsStudyRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
+  '/flashcards/': typeof FlashcardsIndexRoute
   '/ipa/': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -102,8 +123,11 @@ export interface FileRoutesByTo {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/flashcards/study': typeof FlashcardsStudyRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
+  '/flashcards': typeof FlashcardsIndexRoute
   '/ipa': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -116,9 +140,12 @@ export interface FileRoutesById {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/flashcards/study': typeof FlashcardsStudyRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
+  '/flashcards/': typeof FlashcardsIndexRoute
   '/ipa/': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -132,9 +159,12 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/api/anki-uploads'
     | '/api/uploads'
+    | '/flashcards/study'
     | '/ipa/$soundId'
     | '/videos/$videoId'
+    | '/flashcards/'
     | '/ipa/'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -146,8 +176,11 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/api/anki-uploads'
     | '/api/uploads'
+    | '/flashcards/study'
     | '/ipa/$soundId'
+    | '/flashcards'
     | '/ipa'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -159,9 +192,12 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/api/anki-uploads'
     | '/api/uploads'
+    | '/flashcards/study'
     | '/ipa/$soundId'
     | '/videos/$videoId'
+    | '/flashcards/'
     | '/ipa/'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -174,9 +210,12 @@ export interface RootRouteChildren {
   ExploreRoute: typeof ExploreRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
+  ApiAnkiUploadsRoute: typeof ApiAnkiUploadsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
+  FlashcardsStudyRoute: typeof FlashcardsStudyRoute
   IpaSoundIdRoute: typeof IpaSoundIdRoute
   VideosVideoIdRoute: typeof VideosVideoIdRouteWithChildren
+  FlashcardsIndexRoute: typeof FlashcardsIndexRoute
   IpaIndexRoute: typeof IpaIndexRoute
 }
 
@@ -210,11 +249,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/anki-uploads': {
+      id: '/api/anki-uploads'
+      path: '/api/anki-uploads'
+      fullPath: '/api/anki-uploads'
+      preLoaderRoute: typeof ApiAnkiUploadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/uploads': {
       id: '/api/uploads'
       path: '/api/uploads'
       fullPath: '/api/uploads'
       preLoaderRoute: typeof ApiUploadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/flashcards/': {
+      id: '/flashcards/'
+      path: '/flashcards'
+      fullPath: '/flashcards/'
+      preLoaderRoute: typeof FlashcardsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/flashcards/study': {
+      id: '/flashcards/study'
+      path: '/flashcards/study'
+      fullPath: '/flashcards/study'
+      preLoaderRoute: typeof FlashcardsStudyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ipa/': {
@@ -292,9 +352,12 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreRoute: ExploreRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
+  ApiAnkiUploadsRoute: ApiAnkiUploadsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
+  FlashcardsStudyRoute: FlashcardsStudyRoute,
   IpaSoundIdRoute: IpaSoundIdRoute,
   VideosVideoIdRoute: VideosVideoIdRouteWithChildren,
+  FlashcardsIndexRoute: FlashcardsIndexRoute,
   IpaIndexRoute: IpaIndexRoute,
 }
 export const routeTree = rootRouteImport

@@ -16,6 +16,7 @@ const config = defineConfig({
       // route Nitro thuần (không qua TanStack), xem giải thích trong file
       routes: {
         '/api/media/:key': './src/server/media-route.ts',
+        '/api/card-media/:file': './src/server/card-media-route.ts',
         '/api/tts': './src/server/tts-route.ts',
       },
     }),

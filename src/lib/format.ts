@@ -29,3 +29,22 @@ export function scoreTone(score: number | null | undefined) {
   if (score >= 60) return 'miss' as const
   return 'bad' as const
 }
+
+/** "1 phút", "10 phút", "3 ngày"… hiện trên nút chấm điểm */
+export function formatInterval(ms: number) {
+  const min = Math.max(1, Math.round(ms / 60_000))
+  if (min < 60) return `${min} phút`
+  const h = Math.round(min / 60)
+  if (h < 24) return `${h} giờ`
+  const d = Math.round(h / 24)
+  if (d < 30) return `${d} ngày`
+  const mo = Math.round(d / 30)
+  if (mo < 12) return `${mo} tháng`
+  return `${Math.round(d / 365)} năm`
+}
+
+/** hạn ôn của thẻ: "đến hạn" hoặc "sau 3 ngày" */
+export function dueLabel(due: Date | number | string) {
+  const ms = new Date(due).getTime() - Date.now()
+  return ms <= 0 ? 'đến hạn' : `sau ${formatInterval(ms)}`
+}

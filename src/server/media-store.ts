@@ -14,6 +14,8 @@ const dataDir = () => path.resolve(process.env.DATA_DIR ?? 'data')
 export const mediaDir = () => path.join(dataDir(), 'media')
 const uploadsDir = () => path.join(dataDir(), 'uploads')
 export const jobsDir = () => path.join(dataDir(), 'jobs')
+/** audio của thẻ từ vựng (import từ Anki) */
+export const cardMediaDir = () => path.join(dataDir(), 'card-media')
 
 const UPLOAD_ID_RE = /^[0-9a-f-]{36}$/
 
