@@ -350,8 +350,8 @@ export const pronunciationFeedback = createServerFn({ method: 'POST' })
 
 export const pronunciationHistory = createServerFn({ method: 'GET' })
   .validator(z.object({ segmentId: z.number().int() }))
-  .handler(async ({ data }) =>
-    db
+  .handler(async ({ data }) => {
+    const rows = db
       .select({
         id: pronunciationAttempts.id,
         mode: pronunciationAttempts.mode,
@@ -359,14 +359,37 @@ export const pronunciationHistory = createServerFn({ method: 'GET' })
         accuracy: pronunciationAttempts.accuracy,
         completeness: pronunciationAttempts.completeness,
         wpm: pronunciationAttempts.wpm,
+        wordsJson: pronunciationAttempts.wordsJson,
+        aiJson: pronunciationAttempts.aiJson,
         createdAt: pronunciationAttempts.createdAt,
       })
       .from(pronunciationAttempts)
       .where(eq(pronunciationAttempts.segmentId, data.segmentId))
       .orderBy(desc(pronunciationAttempts.createdAt))
       .limit(10)
-      .all(),
-  )
+      .all()
+    // chỉ gửi các từ sai/thiếu/thừa và lỗi AI đã nhận xét, để xem lại sai ở đâu
+    return rows.map(({ wordsJson, aiJson, ...a }) => ({
+      ...a,
+      errors: parseJson<StoredWords>(wordsJson)?.tokens.filter((t) => t.op !== 'correct') ?? [],
+      mistakes:
+        parseJson<PronunciationFeedback>(aiJson)?.mistakes.map((m) => ({
+          word: m.word,
+          heard: m.heard,
+          type: m.type,
+          explanation: m.explanation,
+        })) ?? [],
+    }))
+  })
+
+function parseJson<T>(json: string | null): T | null {
+  if (!json) return null
+  try {
+    return JSON.parse(json) as T
+  } catch {
+    return null
+  }
+}
 
 export type PronunciationEngines = Awaited<
   ReturnType<typeof pronunciationEngines>

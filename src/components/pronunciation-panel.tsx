@@ -16,6 +16,8 @@ import { playerActions, playerStore } from '#/lib/player-store'
 import { pronunciationEnginesQuery, pronunciationHistoryQuery, videoQuery } from '#/lib/queries'
 import { relativeTime, scoreTone } from '#/lib/format'
 import { cn } from '#/lib/utils'
+import type { AlignToken } from '#/lib/align'
+import { mistakeLabel } from '#/server/ai/prompts'
 import { assessPronunciation, pronunciationFeedback } from '#/server/fns/pronunciation'
 import type {
   PronunciationEngine,
@@ -296,26 +298,57 @@ function PronunciationHistory({ segmentId }: { segmentId: number }) {
   return (
     <details className="rounded-xl border bg-card p-3 text-sm">
       <summary className="cursor-pointer select-none text-muted-foreground">Lịch sử luyện câu này ({data.length})</summary>
-      <ul className="mt-2 flex flex-col gap-1.5">
+      <ul className="mt-2 flex flex-col divide-y">
         {data.map((a) => (
-          <li key={a.id} className="flex items-center gap-3">
-            <span
-              className={cn(
-                'w-10 rounded text-center font-mono text-xs',
-                scoreTone(a.accuracy) === 'ok' && 'bg-ok-soft text-ok',
-                scoreTone(a.accuracy) === 'miss' && 'bg-miss-soft text-miss',
-                scoreTone(a.accuracy) === 'bad' && 'bg-bad-soft text-bad',
+          <li key={a.id} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-3">
+              <span
+                className={cn(
+                  'w-10 shrink-0 rounded text-center font-mono text-xs',
+                  scoreTone(a.accuracy) === 'ok' && 'bg-ok-soft text-ok',
+                  scoreTone(a.accuracy) === 'miss' && 'bg-miss-soft text-miss',
+                  scoreTone(a.accuracy) === 'bad' && 'bg-bad-soft text-bad',
+                )}
+              >
+                {Math.round(a.accuracy)}
+              </span>
+              <span className="flex-1 truncate italic text-muted-foreground">{a.transcript}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {a.mode === 'shadow' ? <Play className="inline size-3" /> : null} {relativeTime(a.createdAt)}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 pl-13 text-xs">
+              {a.errors.length === 0 ? (
+                <span className="text-ok">Không sai từ nào</span>
+              ) : (
+                a.errors.map((t) => <ErrorChip key={`${t.refIndex}:${t.hypIndex}`} token={t} />)
               )}
-            >
-              {Math.round(a.accuracy)}
-            </span>
-            <span className="flex-1 truncate italic text-muted-foreground">{a.transcript}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {a.mode === 'shadow' ? <Play className="inline size-3" /> : null} {relativeTime(a.createdAt)}
-            </span>
+            </div>
+            {a.mistakes.length > 0 && (
+              <ul className="flex flex-col gap-0.5 pl-13 text-xs text-muted-foreground">
+                {a.mistakes.map((m) => (
+                  <li key={`${m.word}:${m.type}`}>
+                    <b className="text-foreground">{m.word}</b>
+                    {m.heard && <> (bạn nói “{m.heard}”)</>} · {mistakeLabel(m.type)}: {m.explanation}
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>
     </details>
   )
+}
+
+function ErrorChip({ token: t }: { token: AlignToken }) {
+  if (t.op === 'wrong')
+    return (
+      <span className="rounded bg-bad-soft px-1.5 py-0.5 text-bad">
+        <s>{t.hyp}</s> → <b>{t.ref}</b>
+      </span>
+    )
+  if (t.op === 'missing')
+    return <span className="rounded border border-dashed border-miss/60 bg-miss-soft px-1.5 py-0.5 text-miss">thiếu: {t.ref}</span>
+  return <span className="rounded bg-extra-soft px-1.5 py-0.5 text-extra">thừa: {t.hyp}</span>
 }
