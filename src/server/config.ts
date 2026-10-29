@@ -7,6 +7,8 @@ export const LLM_PROVIDERS = ['openai', 'anthropic', 'gemini', 'ollama', 'openai
 export const PRONUNCIATION_ENGINES = ['llm-audio', 'stt'] as const
 /** Tạo phụ đề cho video không có sẵn: local = whisper.cpp trên máy · api = STT API ở trên (tốn phí) */
 export const CAPTION_ENGINES = ['local', 'api'] as const
+/** model whisper.cpp chạy trên máy (chi tiết file trong whisper-local.ts) */
+export const WHISPER_MODELS = ['large-v3-turbo', 'small.en'] as const
 /** giọng dùng cho phiên âm IPA */
 export const ACCENTS = ['us', 'uk'] as const
 /** off: không tự gọi AI phân tích lỗi sau mỗi lần chấm, chỉ khi người dùng bấm */
@@ -22,6 +24,7 @@ export const AppConfigSchema = z.object({
   sttModel: z.string().min(1),
   pronunciationEngine: z.enum(PRONUNCIATION_ENGINES),
   captionEngine: z.enum(CAPTION_ENGINES),
+  whisperModel: z.enum(WHISPER_MODELS),
   accent: z.enum(ACCENTS),
   aiAnalysis: z.enum(AI_ANALYSIS),
   /** thẻ từ: số từ mới tối đa mỗi ngày (mặc định như Anki) */
@@ -32,6 +35,7 @@ export const AppConfigSchema = z.object({
   wordsPerGroup: z.coerce.number().int().min(5).max(200),
 })
 export type AppConfig = z.infer<typeof AppConfigSchema>
+export type WhisperModel = (typeof WHISPER_MODELS)[number]
 
 function fromEnv(): AppConfig {
   const e = process.env
@@ -47,6 +51,7 @@ function fromEnv(): AppConfig {
     sttModel: e.STT_MODEL ?? 'whisper-1',
     pronunciationEngine: e.PRONUNCIATION_ENGINE === 'stt' ? 'stt' : 'llm-audio',
     captionEngine: e.CAPTION_ENGINE === 'api' ? 'api' : 'local',
+    whisperModel: e.WHISPER_MODEL === 'small.en' ? 'small.en' : 'large-v3-turbo',
     accent: e.ACCENT === 'uk' ? 'uk' : 'us',
     aiAnalysis: e.AI_ANALYSIS === 'off' ? 'off' : 'on',
     newPerDay: 20,

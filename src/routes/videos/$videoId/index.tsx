@@ -1,6 +1,6 @@
 import { createFileRoute, getRouteApi, Link } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Ear, Keyboard, Mic, PenLine } from 'lucide-react'
+import { BookA, Ear, Keyboard, Mic, PenLine } from 'lucide-react'
 
 import { videoQuery } from '#/lib/queries'
 
@@ -36,6 +36,12 @@ function Overview() {
       title: 'Luyện phát âm',
       desc: 'Nghe xong nhắc lại, máy nhận dạng giọng bạn để tìm từ phát âm chưa chuẩn kèm IPA và mẹo sửa.',
     },
+    {
+      to: '/videos/$videoId/vocab' as const,
+      icon: BookA,
+      title: 'Từ vựng',
+      desc: 'Từ mới trong bài theo cấp A1–C2 và cụm từ, nghe đúng câu trong video rồi gõ lại từ, lưu thẻ để ôn.',
+    },
   ]
 
   return (
@@ -44,7 +50,7 @@ function Overview() {
         Bấm vào một câu trong transcript để phát từ câu đó. Đã luyện <b className="text-foreground">{done}</b>/
         {data.segments.length} câu. Chọn chế độ luyện:
       </p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {cards.map(({ to, icon: Icon, title, desc }) => (
           <Link
             key={to}

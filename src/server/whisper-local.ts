@@ -8,12 +8,29 @@ import path from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
-export const LOCAL_MODEL = {
-  name: 'small.en',
-  file: 'ggml-small.en-q8_0.bin',
-  url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q8_0.bin',
-  bytes: 264_477_561,
-  sha256: '67a179f608ea6114bd3fdb9060e762b588a3fb3bd00c4387971be4d177958067',
+import { getConfig } from './config.ts'
+import type { WhisperModel } from './config.ts'
+
+/** file ggml của whisper.cpp; large-v3-turbo nén q5_0: gần bằng large-v3, nhanh hơn nhiều nhờ decoder 4 lớp */
+export const LOCAL_MODELS = {
+  'large-v3-turbo': {
+    file: 'ggml-large-v3-turbo-q5_0.bin',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin',
+    bytes: 574_041_195,
+    sha256: '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2',
+  },
+  'small.en': {
+    file: 'ggml-small.en-q8_0.bin',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q8_0.bin',
+    bytes: 264_477_561,
+    sha256: '67a179f608ea6114bd3fdb9060e762b588a3fb3bd00c4387971be4d177958067',
+  },
+} satisfies Record<WhisperModel, { file: string; url: string; bytes: number; sha256: string }>
+
+/** model đang chọn trong Cài đặt */
+const currentModel = () => {
+  const name = getConfig().whisperModel
+  return { name, ...LOCAL_MODELS[name] }
 }
 
 const exe = process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli'
@@ -26,38 +43,45 @@ export function whisperBinary(): string | null {
   return existsSync(local) ? local : null
 }
 
-const modelPath = () => path.resolve(process.env.DATA_DIR ?? 'data', 'models', LOCAL_MODEL.file)
+const modelPath = (file = currentModel().file) => path.resolve(process.env.DATA_DIR ?? 'data', 'models', file)
 
-let download: { promise: Promise<void>; received: number } | null = null
+/** mỗi lúc chỉ tải một model; đổi model giữa chừng thì lượt tải cũ vẫn chạy cho xong */
+let download: { name: WhisperModel; promise: Promise<void>; received: number } | null = null
 let downloadError: string | null = null
 
 export type ModelState = 'missing' | 'downloading' | 'ready'
 
 export function whisperLocalStatus() {
-  const model: ModelState = download ? 'downloading' : existsSync(modelPath()) ? 'ready' : 'missing'
+  const model = currentModel()
+  const downloading = download?.name === model.name
+  const state: ModelState = downloading ? 'downloading' : existsSync(modelPath()) ? 'ready' : 'missing'
   return {
     binary: whisperBinary() !== null,
-    model,
-    modelName: LOCAL_MODEL.name,
-    modelBytes: LOCAL_MODEL.bytes,
+    model: state,
+    modelName: model.name,
+    modelBytes: model.bytes,
     /** 0–1 khi đang tải */
-    progress: download ? download.received / LOCAL_MODEL.bytes : model === 'ready' ? 1 : 0,
+    progress: downloading ? download!.received / model.bytes : state === 'ready' ? 1 : 0,
     error: downloadError,
   }
 }
 
 /** Tải model (chỉ một lượt tải dù gọi nhiều lần), kiểm tra SHA-256 rồi mới đổi tên thành file thật */
 export function ensureModel(): Promise<void> {
-  if (existsSync(modelPath())) return Promise.resolve()
-  if (download) return download.promise
+  const model = currentModel()
+  if (existsSync(modelPath(model.file))) return Promise.resolve()
+  if (download) {
+    if (download.name === model.name) return download.promise
+    return Promise.reject(new Error(`Đang tải model Whisper ${download.name}, đợi tải xong rồi thử lại`))
+  }
 
-  const state = { received: 0, promise: Promise.resolve() }
+  const state = { name: model.name, received: 0, promise: Promise.resolve() }
   state.promise = (async () => {
-    const dest = modelPath()
+    const dest = modelPath(model.file)
     const tmp = `${dest}.download`
     await fs.mkdir(path.dirname(dest), { recursive: true })
     try {
-      const res = await fetch(LOCAL_MODEL.url)
+      const res = await fetch(model.url)
       if (!res.ok || !res.body) throw new Error(`Không tải được model Whisper (HTTP ${res.status})`)
       const hash = createHash('sha256')
       const meter = new Transform({
@@ -68,7 +92,7 @@ export function ensureModel(): Promise<void> {
         },
       })
       await pipeline(Readable.fromWeb(res.body as any), meter, createWriteStream(tmp))
-      if (hash.digest('hex') !== LOCAL_MODEL.sha256) throw new Error('Model Whisper tải về bị lỗi, hãy thử lại')
+      if (hash.digest('hex') !== model.sha256) throw new Error('Model Whisper tải về bị lỗi, hãy thử lại')
       await fs.rename(tmp, dest)
       downloadError = null
     } catch (err) {

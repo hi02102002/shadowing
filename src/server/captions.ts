@@ -6,30 +6,33 @@ import { eq } from 'drizzle-orm'
 import { db } from '#/db/index.ts'
 import { settings } from '#/db/schema.ts'
 import { getConfig } from './config.ts'
-import type { AppConfig } from './config.ts'
+import type { AppConfig, WhisperModel } from './config.ts'
 import { extractAudioChunks, toWav16kFile } from './media.ts'
 import { transcribe } from './stt.ts'
 import type { TimedWord } from './transcript/json3.ts'
 import { fromSttResults, fromWhisperCppJson } from './transcript/whisper.ts'
-import { LOCAL_MODEL, transcribeLocal, whisperLocalStatus } from './whisper-local.ts'
+import { transcribeLocal, whisperLocalStatus } from './whisper-local.ts'
 
 /** Giới hạn để tránh chạy hàng giờ (local) hoặc hoá đơn bất ngờ (API) */
 export const MAX_CAPTION_SEC = 3 * 3600
 
 /** Tỉ lệ thời gian xử lý / thời lượng audio của whisper.cpp, đo lại sau mỗi lần chạy */
-const RTF_KEY = 'whisperLocalRtf'
-const DEFAULT_RTF = 0.3
+/** thời gian xử lý / độ dài audio, đo riêng từng model (small.en giữ key cũ) */
+const rtfKey = (model = getConfig().whisperModel) =>
+  model === 'small.en' ? 'whisperLocalRtf' : `whisperLocalRtf:${model}`
+/** ước lượng ban đầu khi chưa đo trên máy này */
+const DEFAULT_RTF: Record<WhisperModel, number> = { 'small.en': 0.3, 'large-v3-turbo': 0.6 }
 
 function localRtf(): number {
-  const row = db.select().from(settings).where(eq(settings.key, RTF_KEY)).get()
+  const row = db.select().from(settings).where(eq(settings.key, rtfKey())).get()
   const v = Number(row?.value)
-  return Number.isFinite(v) && v > 0 ? v : DEFAULT_RTF
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_RTF[getConfig().whisperModel]
 }
 
 function saveLocalRtf(rtf: number) {
   // trung bình trượt để một lần máy bận không làm lệch hẳn ước tính
   const value = String(+(localRtf() * 0.5 + rtf * 0.5).toFixed(3))
-  db.insert(settings).values({ key: RTF_KEY, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run()
+  db.insert(settings).values({ key: rtfKey(), value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run()
 }
 
 /** USD mỗi phút audio theo model; null = không biết giá */
@@ -84,9 +87,9 @@ export function estimateCaptioning(durationSec: number, cfg = getConfig()): Capt
     return {
       engine: 'local',
       minutes,
-      model: LOCAL_MODEL.name,
+      model: status.modelName,
       etaSec: Math.ceil(durationSec * localRtf()),
-      downloadBytes: status.model === 'ready' ? 0 : LOCAL_MODEL.bytes,
+      downloadBytes: status.model === 'ready' ? 0 : status.modelBytes,
       unavailable: status.binary
         ? null
         : 'Không tìm thấy whisper-cli trên máy này. Cài whisper.cpp (đặt WHISPER_CPP_PATH) hoặc đổi sang STT API trong Cài đặt.',

@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronDown, Clapperboard, Keyboard, Layers, Loader2, PartyP
 import { z } from 'zod'
 
 import { CardImage } from '#/components/card-image'
+import { AutoNextSwitch, useAutoNext } from '#/components/letter-typer'
 import { TatoebaCredit, TypingCard } from '#/components/typing-card'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -174,6 +175,7 @@ function CardInfoSections({ info }: { info: CardInfo }) {
 function Study() {
   const { deck, book, mode } = Route.useSearch()
   const typing = mode === 'type'
+  const [autoNext, setAutoNext] = useAutoNext()
   const queryClient = useQueryClient()
   const [accent] = useAccent()
   const { data, isLoading, error } = useQuery(studyQueueQuery(deck, book))
@@ -315,6 +317,7 @@ function Study() {
         <span className="font-mono text-xs text-muted-foreground">
           {done}/{total.current}
         </span>
+        {typing && <AutoNextSwitch on={autoNext} onChange={setAutoNext} />}
         <Button size="sm" variant="outline" asChild>
           <Link
             to="."
@@ -367,6 +370,7 @@ function Study() {
             accent={accent}
             enriching={enriched.isFetching}
             play={play}
+            autoNext={autoNext}
             onDone={rate}
           />
           {review.error && <p className="text-sm text-destructive">{review.error.message}</p>}

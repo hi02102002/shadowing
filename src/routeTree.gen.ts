@@ -26,6 +26,7 @@ import { Route as VideosVideoIdIndexRouteImport } from './routes/videos/$videoId
 import { Route as VideosVideoIdDictationRouteImport } from './routes/videos/$videoId/dictation'
 import { Route as VideosVideoIdPronounceRouteImport } from './routes/videos/$videoId/pronounce'
 import { Route as VideosVideoIdShadowRouteImport } from './routes/videos/$videoId/shadow'
+import { Route as VideosVideoIdVocabRouteImport } from './routes/videos/$videoId/vocab'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -112,6 +113,11 @@ const VideosVideoIdShadowRoute = VideosVideoIdShadowRouteImport.update({
   path: '/shadow',
   getParentRoute: () => VideosVideoIdRoute,
 } as any)
+const VideosVideoIdVocabRoute = VideosVideoIdVocabRouteImport.update({
+  id: '/vocab',
+  path: '/vocab',
+  getParentRoute: () => VideosVideoIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
+  '/videos/$videoId/vocab': typeof VideosVideoIdVocabRoute
   '/videos/$videoId/': typeof VideosVideoIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
+  '/videos/$videoId/vocab': typeof VideosVideoIdVocabRoute
   '/videos/$videoId': typeof VideosVideoIdIndexRoute
 }
 export interface FileRoutesById {
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
+  '/videos/$videoId/vocab': typeof VideosVideoIdVocabRoute
   '/videos/$videoId/': typeof VideosVideoIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
+    | '/videos/$videoId/vocab'
     | '/videos/$videoId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
+    | '/videos/$videoId/vocab'
     | '/videos/$videoId'
   id:
     | '__root__'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
+    | '/videos/$videoId/vocab'
     | '/videos/$videoId/'
   fileRoutesById: FileRoutesById
 }
@@ -366,6 +378,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VideosVideoIdShadowRouteImport
       parentRoute: typeof VideosVideoIdRoute
     }
+    '/videos/$videoId/vocab': {
+      id: '/videos/$videoId/vocab'
+      path: '/vocab'
+      fullPath: '/videos/$videoId/vocab'
+      preLoaderRoute: typeof VideosVideoIdVocabRouteImport
+      parentRoute: typeof VideosVideoIdRoute
+    }
   }
 }
 
@@ -373,6 +392,7 @@ interface VideosVideoIdRouteChildren {
   VideosVideoIdDictationRoute: typeof VideosVideoIdDictationRoute
   VideosVideoIdPronounceRoute: typeof VideosVideoIdPronounceRoute
   VideosVideoIdShadowRoute: typeof VideosVideoIdShadowRoute
+  VideosVideoIdVocabRoute: typeof VideosVideoIdVocabRoute
   VideosVideoIdIndexRoute: typeof VideosVideoIdIndexRoute
 }
 
@@ -380,6 +400,7 @@ const VideosVideoIdRouteChildren: VideosVideoIdRouteChildren = {
   VideosVideoIdDictationRoute: VideosVideoIdDictationRoute,
   VideosVideoIdPronounceRoute: VideosVideoIdPronounceRoute,
   VideosVideoIdShadowRoute: VideosVideoIdShadowRoute,
+  VideosVideoIdVocabRoute: VideosVideoIdVocabRoute,
   VideosVideoIdIndexRoute: VideosVideoIdIndexRoute,
 }
 

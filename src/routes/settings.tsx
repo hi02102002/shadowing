@@ -124,6 +124,23 @@ const CAPTION_ENGINES = [
   desc: string
 }>
 
+const WHISPER_MODELS = [
+  {
+    value: 'large-v3-turbo',
+    label: 'large-v3-turbo (574 MB)',
+    desc: 'Chính xác gần bằng Whisper lớn nhất, nghe tốt giọng nhanh và nhiều tiếng ồn. Chậm hơn small khoảng 2 lần.',
+  },
+  {
+    value: 'small.en',
+    label: 'small.en (265 MB)',
+    desc: 'Nhanh, nhẹ, hợp máy yếu, nhưng hay nghe nhầm từ hơn.',
+  },
+] as const satisfies ReadonlyArray<{
+  value: PublicSettings['whisperModel']
+  label: string
+  desc: string
+}>
+
 const STT_PRESETS = [
   { label: 'OpenAI Whisper', baseUrl: '', model: 'whisper-1' },
   {
@@ -147,6 +164,8 @@ function SettingsPage() {
     onSuccess: (fresh) => {
       queryClient.setQueryData(settingsQuery().queryKey, fresh)
       for (const queryKey of ACCENT_DEPENDENT_KEYS) void queryClient.invalidateQueries({ queryKey })
+      // đổi model Whisper → trạng thái tải model khác
+      void queryClient.invalidateQueries({ queryKey: ['whisper-status'] })
       form.reset(fresh)
     },
   })
@@ -426,6 +445,35 @@ function SettingsPage() {
                     </span>
                   </label>
                 ))}
+              </div>
+            )}
+          </form.Field>
+          <form.Field name="whisperModel">
+            {(field) => (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">Model Whisper trên máy (dùng cả khi chấm phát âm không có AI)</span>
+                <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                  {WHISPER_MODELS.map((m) => (
+                    <label
+                      key={m.value}
+                      className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors ${
+                        field.state.value === m.value ? 'border-primary bg-accent/50' : 'hover:bg-muted'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 font-medium">
+                        <input
+                          type="radio"
+                          name={field.name}
+                          value={m.value}
+                          checked={field.state.value === m.value}
+                          onChange={() => field.handleChange(m.value)}
+                        />
+                        {m.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{m.desc}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
           </form.Field>

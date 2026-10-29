@@ -279,3 +279,33 @@ ${opts.question}
 Đáp án đúng: ${opts.expected}
 Người học trả lời: ${opts.answer || '(bỏ trống)'}`
 }
+
+export const PHRASE_KINDS = ['phrasal verb', 'idiom', 'collocation', 'expression'] as const
+
+export const VideoPhrasesSchema = z.object({
+  phrases: z
+    .array(
+      z.object({
+        phrase: z.string().describe('dạng từ điển của cụm, vd. "pick up", "make a decision", "break the ice"'),
+        kind: z.enum(PHRASE_KINDS),
+        level: z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']).describe('cấp CEFR ước lượng của cụm'),
+        meaningVi: z.string().describe('nghĩa tiếng Việt ngắn gọn, đúng theo ngữ cảnh câu'),
+        segment: z.number().int().describe('số thứ tự [n] của câu chứa cụm'),
+        surface: z
+          .string()
+          .describe('nguyên văn cụm đúng như trong câu đó (giữ dạng chia), vd. "picked you up"'),
+      }),
+    )
+    .describe('tối đa 30 cụm đáng học, theo thứ tự xuất hiện'),
+})
+export type VideoPhrases = z.infer<typeof VideoPhrasesSchema>
+
+export const VIDEO_PHRASES_SYSTEM = `Bạn giúp người Việt học tiếng Anh qua video.
+Từ transcript, liệt kê các CỤM TỪ đáng học: phrasal verb, thành ngữ, collocation, cách nói cố định.
+- Chỉ lấy cụm có thật trong transcript, KHÔNG lấy từ đơn, bỏ cụm quá cơ bản (cấp A1 như "go to", "a lot of").
+- "segment" là số trong ngoặc vuông của câu chứa cụm (lần xuất hiện đầu tiên).
+- "surface" phải chép nguyên văn từ câu đó để có thể tìm thấy bằng so khớp chuỗi.`
+
+export function videoPhrasesPrompt(lines: string) {
+  return `Transcript (mỗi dòng: [số thứ tự] câu):\n${lines}`
+}

@@ -13,6 +13,7 @@ import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
+import { videoPhrases, videoVocab, vocabMeanings } from '#/server/fns/vocab.ts'
 import type { Level } from './levels.ts'
 
 export const videosQuery = () =>
@@ -118,4 +119,30 @@ export const grammarUnitQuery = (unitId: string) =>
   queryOptions({
     queryKey: ['grammar-unit', unitId],
     queryFn: () => getGrammarUnit({ data: { unitId } }),
+  })
+
+export const videoVocabQuery = (youtubeId: string) =>
+  queryOptions({
+    queryKey: ['video-vocab', youtubeId],
+    queryFn: () => videoVocab({ data: { youtubeId } }),
+    staleTime: 60_000,
+  })
+
+/** cụm từ do AI chọn đã cache ở server (không tự gọi AI; bấm nút mới tìm) */
+export const videoPhrasesQuery = (youtubeId: string) =>
+  queryOptions({
+    queryKey: ['video-phrases', youtubeId],
+    queryFn: () => videoPhrases({ data: { youtubeId, generate: false } }),
+    staleTime: Infinity,
+    retry: false,
+  })
+
+/** nghĩa tiếng Việt ngắn cho các từ của video (từ điển đã cache hoặc Google Dịch cả lô) */
+export const vocabMeaningsQuery = (youtubeId: string, words: string[]) =>
+  queryOptions({
+    queryKey: ['vocab-meanings', youtubeId, words.length],
+    queryFn: () => vocabMeanings({ data: { words } }),
+    enabled: words.length > 0,
+    staleTime: Infinity,
+    retry: false,
   })

@@ -3,6 +3,7 @@ import { useHotkey } from '@tanstack/react-hotkeys'
 import { ChevronRight, Eye, Lightbulb, Loader2, Snail, Volume2 } from 'lucide-react'
 
 import { CardImage } from '#/components/card-image'
+import { LetterSlots, useAutoAdvance, useLetterTyper } from '#/components/letter-typer'
 import { DiffView } from '#/components/diff-view'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -13,15 +14,6 @@ import { cn } from '#/lib/utils'
 import type { AlignResult } from '#/lib/align'
 import type { Accent } from '#/lib/speech'
 import type { StudyCard } from '#/server/fns/flashcards'
-
-/** chữ cái/số phải gõ; dấu cách, gạch nối, nháy… tự điền */
-const typeable = (c: string) => /[\p{L}\p{N}]/u.test(c)
-const fold = (c: string) => c.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
-const skipToTypeable = (target: string, from: number) => {
-  let i = from
-  while (i < target.length && !typeable(target[i])) i++
-  return i
-}
 
 /** từ cần gõ: dòng đầu mặt trước, bỏ ghi chú trong ngoặc, vd. "bank (n)" → "bank" */
 export const typingTarget = (front: string) =>
@@ -96,6 +88,8 @@ interface Props {
   /** đang tra nghĩa tiếng Việt / ví dụ cho thẻ sách từ vựng */
   enriching: boolean
   play: (card: StudyCard) => void
+  /** gõ xong (và kiểm tra câu) thì tự sang thẻ tiếp */
+  autoNext: boolean
   /** gõ xong từ (và câu): sai/gợi ý → Khó, xem đáp án → Quên, gõ đúng hết → Nhớ */
   onDone: (rating: TypedRating) => void
 }
@@ -105,40 +99,34 @@ interface Props {
  * gõ xong thì nghe câu ví dụ và gõ lại cả câu (chỉ để luyện, không ảnh hưởng điểm thẻ).
  * Thẻ đổi thì parent đổi `key` để reset trạng thái.
  */
-export function TypingCard({ card, image, accent, enriching, play, onDone }: Props) {
+export function TypingCard({ card, image, accent, enriching, play, autoNext, onDone }: Props) {
   const target = typingTarget(card.front)
-  const [pos, setPos] = useState(() => skipToTypeable(target, 0))
-  const [mistakes, setMistakes] = useState(0)
-  const [hints, setHints] = useState(0)
-  const [gaveUp, setGaveUp] = useState(false)
-  const [wrong, setWrong] = useState<{ at: number; ch: string; n: number } | null>(null)
+  const typer = useLetterTyper(target, {
+    onReplay: () => play(card),
+    onComplete: () => {
+      play(card)
+      setPhase('pending')
+    },
+  })
+  const { mistakes, hints, gaveUp } = typer
   const [phase, setPhase] = useState<'word' | 'pending' | 'sentence' | 'done'>('word')
   const [sentence, setSentence] = useState<ReturnType<typeof pickSentence>>(null)
   const [typed, setTyped] = useState('')
   const [showHint, setShowHint] = useState(false)
   const [result, setResult] = useState<AlignResult | null>(null)
-  const wordInput = useRef<HTMLInputElement>(null)
   const sentenceInput = useRef<HTMLInputElement>(null)
 
   const rating: TypedRating = gaveUp ? 1 : mistakes + hints === 0 ? 3 : 2
 
   useEffect(() => {
     play(card)
-    wordInput.current?.focus()
     // chỉ đọc khi vào thẻ
   }, [])
 
   useEffect(() => {
     if (phase === 'sentence') sentenceInput.current?.focus()
-    if (phase === 'done') wordInput.current?.focus()
+    if (phase === 'done') typer.inputRef.current?.focus()
   }, [phase])
-
-  // chữ sai chỉ nháy đỏ một lúc
-  useEffect(() => {
-    if (!wrong) return
-    const t = setTimeout(() => setWrong(null), 600)
-    return () => clearTimeout(t)
-  }, [wrong])
 
   // gõ xong từ → chờ tra nghĩa xong (câu ví dụ hoàn chỉnh thường đến từ AI) rồi mới chọn câu
   useEffect(() => {
@@ -155,46 +143,6 @@ export function TypingCard({ card, image, accent, enriching, play, onDone }: Pro
     return () => clearTimeout(t)
   }, [phase, sentence, accent])
 
-  const advance = (to: number) => {
-    setPos(to)
-    if (to < target.length) return
-    play(card)
-    setPhase('pending')
-  }
-
-  const typeChars = (chars: string) => {
-    if (phase !== 'word') return
-    let p = pos
-    for (const ch of chars) {
-      if (p >= target.length) break
-      // dấu cách không cần gõ → dùng để nghe lại
-      if (ch === ' ') {
-        play(card)
-        continue
-      }
-      if (fold(ch) !== fold(target[p])) {
-        setMistakes((n) => n + 1)
-        setWrong((w) => ({ at: p, ch, n: (w?.n ?? 0) + 1 }))
-        break
-      }
-      p = skipToTypeable(target, p + 1)
-    }
-    if (p !== pos) advance(p)
-  }
-
-  const hint = () => {
-    if (phase !== 'word') return
-    setHints((n) => n + 1)
-    advance(skipToTypeable(target, pos + 1))
-    wordInput.current?.focus()
-  }
-
-  const giveUp = () => {
-    setGaveUp(true)
-    play(card)
-    wordInput.current?.focus()
-  }
-
   const check = () => {
     if (!sentence || !typed.trim()) return
     setResult(alignWords(sentence.en, typed))
@@ -203,19 +151,18 @@ export function TypingCard({ card, image, accent, enriching, play, onDone }: Pro
   const next = () => onDone(rating)
 
   useHotkey('Enter', next, { enabled: phase === 'done' || !!result, ignoreInputs: true })
+  // không có câu ví dụ: nghe xong từ là sang; có câu: chờ lâu hơn để xem từ nào sai
+  useAutoAdvance(phase === 'done' || !!result, autoNext, next, result ? 3000 : 1800)
   // Ctrl/⌘ + phím chạy được cả khi đang gõ trong ô nhập
   useHotkey('Mod+J', () => (phase === 'sentence' && sentence ? speak(sentence.en, { accent }) : play(card)))
   useHotkey('Mod+Shift+J', () => sentence && speak(sentence.en, { accent, rate: 0.7 }), {
     enabled: phase === 'sentence',
   })
 
-  // tách theo từ để xuống dòng đúng chỗ với cụm dài
-  const words = [...target.matchAll(/\S+|\s+/g)]
-
   return (
     <article
       className="flex min-h-80 flex-col items-center gap-5 rounded-2xl border bg-card p-6 shadow-sm"
-      onClick={() => phase === 'word' && wordInput.current?.focus()}
+      onClick={() => phase === 'word' && typer.inputRef.current?.focus()}
     >
       {image && <CardImage key={`${card.id}|${image}`} src={image} alt="" className="max-h-44" />}
 
@@ -236,64 +183,18 @@ export function TypingCard({ card, image, accent, enriching, play, onDone }: Pro
         )}
       </div>
 
-      <div className="flex max-w-full flex-wrap justify-center gap-x-5 gap-y-3 font-mono text-3xl">
-        {words.map((m) =>
-          /^\s+$/.test(m[0]) ? null : (
-            <span key={m.index} className="flex gap-1.5">
-              {[...m[0]].map((ch, j) => {
-                const i = m.index + j
-                if (!typeable(ch)) return <span key={i} className="text-muted-foreground">{ch}</span>
-                const isWrong = wrong?.at === i
-                return (
-                  <span
-                    key={isWrong ? `${i}-${wrong.n}` : i}
-                    className={cn(
-                      'grid w-[1.1em] place-items-center border-b-2 pb-0.5',
-                      i < pos
-                        ? 'border-ok text-ok'
-                        : i === pos && phase === 'word'
-                          ? 'border-primary'
-                          : 'border-muted-foreground/40',
-                      isWrong && 'type-shake border-bad text-bad',
-                    )}
-                  >
-                    {i < pos ? ch : isWrong ? wrong.ch : gaveUp ? <span className="opacity-30">{ch}</span> : ' '}
-                  </span>
-                )
-              })}
-            </span>
-          ),
-        )}
-      </div>
-      <input
-        ref={wordInput}
-        className="sr-only"
-        aria-label="Gõ từ"
-        autoComplete="off"
-        autoCapitalize="off"
-        autoCorrect="off"
-        spellCheck={false}
-        value=""
-        onChange={(e) => typeChars(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Tab' && phase === 'word') {
-            e.preventDefault()
-            hint()
-          } else if (e.key === 'Escape' && phase === 'word') giveUp()
-          else if (e.key === 'Enter' && phase === 'done') next()
-        }}
-      />
+      <LetterSlots typer={typer} onEnter={() => phase === 'done' && next()} />
 
       {phase === 'word' ? (
         <div className="flex flex-wrap justify-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => play(card)} title="Nghe lại (Space hoặc Ctrl/⌘+J)">
             <Volume2 /> Nghe
           </Button>
-          <Button size="sm" variant="ghost" onClick={hint} title="Hiện chữ kế tiếp (Tab)">
+          <Button size="sm" variant="ghost" onClick={typer.hint} title="Hiện chữ kế tiếp (Tab)">
             <Lightbulb /> Gợi ý
           </Button>
           {!gaveUp && (
-            <Button size="sm" variant="ghost" onClick={giveUp} title="Xem đáp án (Esc)">
+            <Button size="sm" variant="ghost" onClick={typer.giveUp} title="Xem đáp án (Esc)">
               <Eye /> Xem đáp án
             </Button>
           )}

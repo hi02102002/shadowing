@@ -6,11 +6,13 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Ear, FileText, Mic, PenLine } from 'lucide-react'
+import { useSelector } from '@tanstack/react-store'
+import { BookA, Ear, FileText, Mic, PenLine } from 'lucide-react'
 import { z } from 'zod'
 
 import { LocalPlayer } from '#/components/local-player'
 import { TranscriptList } from '#/components/transcript-list'
+import { vocabPracticeStore } from '#/components/vocab-practice'
 import { VimeoPlayer } from '#/components/vimeo-player'
 import { YouTubePlayer } from '#/components/youtube-player'
 import { playerActions } from '#/lib/player-store'
@@ -54,6 +56,7 @@ const MODES = [
   { to: '/videos/$videoId/shadow', label: 'Shadowing', icon: Ear },
   { to: '/videos/$videoId/dictation', label: 'Chép chính tả', icon: PenLine },
   { to: '/videos/$videoId/pronounce', label: 'Phát âm', icon: Mic },
+  { to: '/videos/$videoId/vocab', label: 'Từ vựng', icon: BookA },
 ] as const
 
 function VideoLayout() {
@@ -64,6 +67,9 @@ function VideoLayout() {
   const pathname = useLocation({ select: (l) => l.pathname })
   const practiceMode = /\/(shadow|dictation|pronounce)$/.exec(pathname)?.[1]
   const vimeoId = vimeoIdFromKey(videoId)
+  // ẩn chữ khi chép chính tả hoặc đang luyện gõ từ (khỏi lộ đáp án)
+  const typingVocab = useSelector(vocabPracticeStore, (s) => s)
+  const hideText = practiceMode === 'dictation' || typingVocab
 
   const onSelect = (idx: number) => {
     if (practiceMode) {
@@ -82,17 +88,17 @@ function VideoLayout() {
         {isLocalKey(videoId) ? (
           <LocalPlayer
             mediaKey={videoId}
-            hideCaptions={practiceMode === 'dictation'}
+            hideCaptions={hideText}
           />
         ) : vimeoId ? (
           <VimeoPlayer
             vimeoId={vimeoId}
-            hideCaptions={practiceMode === 'dictation'}
+            hideCaptions={hideText}
           />
         ) : (
           <YouTubePlayer
             videoId={videoId}
-            hideCaptions={practiceMode === 'dictation'}
+            hideCaptions={hideText}
           />
         )}
         <div>
@@ -136,7 +142,7 @@ function VideoLayout() {
           segments={data.segments}
           selectedIdx={practiceMode ? (seg ?? 0) : undefined}
           onSelect={onSelect}
-          hideText={practiceMode === 'dictation'}
+          hideText={hideText}
           className="h-80 flex-1 p-1 lg:h-auto"
         />
       </aside>
