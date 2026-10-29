@@ -199,3 +199,20 @@
 .grammar-content h4 {
   @apply mt-4 mb-2 font-semibold;
 }
+
+/* gõ sai một chữ ở chế độ gõ từ (flashcards) */
+@keyframes type-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.type-shake {
+  animation: type-shake 0.2s ease-in-out 2;
+}

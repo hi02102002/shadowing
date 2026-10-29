@@ -10,6 +10,7 @@ import { VOCAB_BOOKS, findBook } from '../essential/books.ts'
 import { groupDeck, splitBookDecks } from '../essential/decks.ts'
 import { loadBook, unitGroups } from '../essential/vocab.ts'
 import { contextLookup, dictionaryLookup } from '../lookup.ts'
+import { tatoebaExamples } from '../tatoeba.ts'
 
 /** slug các sách đã thêm vào bộ thẻ (anki_guid dạng ee:<slug>:…) */
 function importedSlugs() {
@@ -142,9 +143,10 @@ export const enrichCard = createServerFn({ method: 'POST' })
 
     // không có câu ví dụ thì đưa chủ đề unit (mặt sau) làm ngữ cảnh cho AI
     const context = card.example?.split('\n')[0] || card.back
-    const [ai, dict] = await Promise.all([
+    const [ai, dict, tatoeba] = await Promise.all([
       contextLookup(card.front, context).catch(() => null),
       dictionaryLookup(card.front).catch(() => null),
+      tatoebaExamples(card.front).catch(() => []),
     ])
     // lỗi mạng → để null, lần học sau tra lại
     if (!ai && !dict) return card
@@ -169,10 +171,10 @@ export const enrichCard = createServerFn({ method: 'POST' })
     const bookExample = card.example?.split('\n')[0]
     const info: CardInfo = {
       pos: bookPos ?? (ai?.partOfSpeech || senses[0]?.kind || null),
-      // ví dụ từ điển (có sẵn bản dịch) trước, rồi tới ví dụ AI đặt
-      examples: [...senses.flatMap((s) => s.examples ?? []), ...(ai?.examples ?? [])]
+      // câu ngắn Tatoeba (người thật viết, có bản dịch) trước, rồi ví dụ từ điển, cuối cùng ví dụ AI đặt
+      examples: [...tatoeba, ...senses.flatMap((s) => s.examples ?? []), ...(ai?.examples ?? [])]
         .filter((e) => e.en !== bookExample)
-        .slice(0, 3),
+        .slice(0, 4),
       collocations: dict?.collocations?.slice(0, 8) ?? [],
       idioms: common
         .filter((s) => isIdiom(s.kind, headword))

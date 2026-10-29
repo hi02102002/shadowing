@@ -143,7 +143,8 @@ export const decks = sqliteTable(
 export interface CardInfo {
   /** từ loại bằng tiếng Việt, vd. "danh từ" */
   pos: string | null
-  examples: Array<{ en: string; vi: string }>
+  /** src: link câu gốc khi lấy từ Tatoeba (CC BY, phải ghi nguồn) */
+  examples: Array<{ en: string; vi: string; src?: string }>
   /** cụm từ hay đi kèm, vd. type "verb + decision": "make, reach, take" */
   collocations: Array<{ type: string; words: string; example: string }>
   /** thành ngữ / cụm cố định chứa từ, kèm nghĩa tiếng Việt */

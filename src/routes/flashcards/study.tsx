@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useHotkey } from '@tanstack/react-hotkeys'
-import { ArrowLeft, ChevronDown, Clapperboard, Loader2, PartyPopper, RotateCcw, Volume2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Clapperboard, Keyboard, Layers, Loader2, PartyPopper, RotateCcw, Volume2 } from 'lucide-react'
 import { z } from 'zod'
 
+import { CardImage } from '#/components/card-image'
+import { TatoebaCredit, TypingCard } from '#/components/typing-card'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Progress } from '#/components/ui/progress'
@@ -21,6 +23,8 @@ const searchSchema = z.object({
   deck: z.number().int().optional().catch(undefined),
   /** học mọi unit của một sách từ vựng */
   book: z.string().optional().catch(undefined),
+  /** type = nghe rồi gõ lại từ và câu ví dụ thay cho lật thẻ */
+  mode: z.enum(['type']).optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/flashcards/study')({
@@ -121,7 +125,10 @@ function CardInfoSections({ info }: { info: CardInfo }) {
           {info.examples.slice(0, 2).map((e) => (
             <li key={e.en}>
               <div>{e.en}</div>
-              <div className="text-muted-foreground">{e.vi}</div>
+              <div className="text-muted-foreground">
+                {e.vi}
+                {e.src && <TatoebaCredit href={e.src} />}
+              </div>
             </li>
           ))}
         </ul>
@@ -164,22 +171,9 @@ function CardInfoSections({ info }: { info: CardInfo }) {
   )
 }
 
-/** ảnh minh hoạ của thẻ; tải lỗi (site gốc không có ảnh) thì ẩn */
-function CardImage({ src, alt }: { src: string; alt: string }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) return null
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className="max-h-56 self-center rounded-lg object-contain"
-      onError={() => setFailed(true)}
-    />
-  )
-}
-
 function Study() {
-  const { deck, book } = Route.useSearch()
+  const { deck, book, mode } = Route.useSearch()
+  const typing = mode === 'type'
   const queryClient = useQueryClient()
   const [accent] = useAccent()
   const { data, isLoading, error } = useQuery(studyQueueQuery(deck, book))
@@ -190,6 +184,8 @@ function Study() {
   // thẻ mới học trong phiên: học xong thì ôn lại một lượt (không ghi lịch FSRS)
   const learned = useRef(new Map<number, StudyCard>())
   const [drill, setDrill] = useState(false)
+  // mỗi lượt chấm một thẻ mới (kể cả thẻ cũ quay lại) → chế độ gõ bắt đầu lại từ đầu
+  const [turn, setTurn] = useState(0)
 
   useEffect(() => {
     if (data && queue === null) {
@@ -252,8 +248,9 @@ function Study() {
   }
 
   const rate = (rating: Rating) => {
-    if (!card || !revealed) return
+    if (!card || (!revealed && !typing)) return
     setRevealed(false)
+    setTurn((n) => n + 1)
     if (drill) {
       // ôn lại: chưa nhớ thì đưa xuống cuối, nhớ rồi thì bỏ khỏi lượt ôn
       const again = rating <= 2
@@ -286,13 +283,17 @@ function Study() {
     play(card)
   }
 
-  useHotkey('Space', () => (revealed ? rate(3) : reveal()), { ignoreInputs: true })
-  useHotkey('Enter', () => (revealed ? rate(3) : reveal()), { ignoreInputs: true })
-  useHotkey('1', () => rate(1), { ignoreInputs: true })
-  useHotkey('2', () => rate(2), { ignoreInputs: true })
-  useHotkey('3', () => rate(3), { ignoreInputs: true })
-  useHotkey('4', () => rate(4), { ignoreInputs: true })
-  useHotkey('R', () => card && play(card), { ignoreInputs: true })
+  useHotkey('Space', () => (revealed ? rate(3) : reveal()), { ignoreInputs: true, enabled: !typing })
+  useHotkey('Enter', () => (revealed ? rate(3) : reveal()), { ignoreInputs: true, enabled: !typing })
+  useHotkey('1', () => rate(1), { ignoreInputs: true, enabled: !typing })
+  useHotkey('2', () => rate(2), { ignoreInputs: true, enabled: !typing })
+  useHotkey('3', () => rate(3), { ignoreInputs: true, enabled: !typing })
+  useHotkey('4', () => rate(4), { ignoreInputs: true, enabled: !typing })
+  useHotkey('R', () => card && play(card), { ignoreInputs: true, enabled: !typing })
+  const navigate = Route.useNavigate()
+  useHotkey('Mod+E', () =>
+    void navigate({ search: (s) => ({ ...s, mode: typing ? undefined : ('type' as const) }), replace: true }),
+  )
 
   const masked = useMemo(
     () => (card?.sentence ? maskSentence(card.sentence, card.front) : null),
@@ -314,6 +315,16 @@ function Study() {
         <span className="font-mono text-xs text-muted-foreground">
           {done}/{total.current}
         </span>
+        <Button size="sm" variant="outline" asChild>
+          <Link
+            to="."
+            search={(s) => ({ ...s, mode: typing ? undefined : ('type' as const) })}
+            title="Đổi chế độ (Ctrl/⌘+E)"
+          >
+            {typing ? <Layers /> : <Keyboard />}
+            {typing ? 'Lật thẻ' : 'Gõ từ'}
+          </Link>
+        </Button>
       </header>
 
       {isLoading || (data && queue === null) ? (
@@ -347,6 +358,22 @@ function Study() {
             </Button>
           </div>
         </div>
+      ) : typing ? (
+        <>
+          <TypingCard
+            key={turn}
+            card={card}
+            image={image}
+            accent={accent}
+            enriching={enriched.isFetching}
+            play={play}
+            onDone={rate}
+          />
+          {review.error && <p className="text-sm text-destructive">{review.error.message}</p>}
+          <p className="text-center text-xs text-muted-foreground">
+            Gõ từ: Space nghe lại · Tab gợi ý chữ · Esc xem đáp án — Gõ câu: Enter kiểm tra · Tab gợi ý · Esc bỏ qua · Ctrl/⌘+J nghe lại (+Shift: chậm) · Ctrl/⌘+E đổi chế độ
+          </p>
+        </>
       ) : (
         <>
           <article className="flex min-h-80 flex-col gap-4 rounded-2xl border bg-card p-6 shadow-sm">
@@ -455,7 +482,7 @@ function Study() {
           <p className="text-center text-xs text-muted-foreground">
             {drill
               ? 'Ôn lại từ vừa học, không đổi lịch ôn · Space hiện đáp án / đã nhớ · 1 chưa nhớ · R nghe lại'
-              : 'Phím tắt: Space hiện đáp án · 1 Quên · 2 Khó · 3 Nhớ · 4 Dễ · R nghe lại'}
+              : 'Phím tắt: Space hiện đáp án · 1 Quên · 2 Khó · 3 Nhớ · 4 Dễ · R nghe lại · Ctrl/⌘+E chế độ gõ'}
           </p>
         </>
       )}
