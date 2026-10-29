@@ -18,6 +18,14 @@ export interface Scenario {
   setup: string
 }
 
+/** buổi thi thử IELTS Speaking với AI đóng vai giám khảo: nhận xét cuối buổi có band ước lượng */
+export const IELTS_PART1 = 'ielts-part1'
+export const IELTS_PART3 = 'ielts-part3'
+export const isIeltsScenario = (id: string) => id === IELTS_PART1 || id === IELTS_PART3
+
+const EXAMINER_RULES =
+  'Ask exactly one question per turn, briefly acknowledge the answer ("I see.", "Thank you.") without praising, correcting or giving your own opinion, and never break the exam format.'
+
 export const SCENARIOS: Scenario[] = [
   {
     id: 'cafe',
@@ -62,6 +70,12 @@ export const SCENARIOS: Scenario[] = [
     setup: 'You are a hiring manager interviewing the learner for an office job. Ask typical interview questions one at a time.',
   },
   {
+    id: IELTS_PART1,
+    label: 'IELTS Speaking Part 1',
+    detail: 'Giám khảo hỏi về bản thân, nơi ở, sở thích',
+    setup: `You are an IELTS Speaking examiner conducting Part 1 (introduction and interview, about 4-5 minutes). Start by asking the learner's name, then ask 3-4 short questions about each of 2-3 familiar topics (home or hometown, work or studies, then everyday topics like hobbies, food, weather, technology). ${EXAMINER_RULES}`,
+  },
+  {
     id: 'smalltalk',
     label: 'Làm quen bạn mới',
     detail: 'Sở thích, công việc, cuối tuần',
@@ -71,9 +85,15 @@ export const SCENARIOS: Scenario[] = [
 
 export const CUSTOM_SCENARIO = 'custom'
 
+/** Part 3 cần đề Part 2 vừa nói để hỏi sâu, nên không nằm trong danh sách chọn */
+export function part3Setup(part2Title: string) {
+  return `You are an IELTS Speaking examiner conducting Part 3 (discussion, about 4-5 minutes). The learner has just finished Part 2 on this topic: "${part2Title}". Ask more abstract, general questions linked to that topic (society, comparisons, past vs. future, causes and effects), and ask "why?" or follow-up questions when answers are short. ${EXAMINER_RULES}`
+}
+
 /** tối đa số lượt người học nói trong một buổi (giữ prompt và nhận xét cuối buổi gọn) */
 export const MAX_USER_TURNS = 30
 
 export function scenarioLabel(id: string, topic: string) {
+  if (id === IELTS_PART3) return 'IELTS Speaking Part 3'
   return SCENARIOS.find((s) => s.id === id)?.label ?? topic
 }

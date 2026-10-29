@@ -375,9 +375,16 @@ function Bubble({ turn, onSpeak }: { turn: Turn; onSpeak: () => void }) {
 function Feedback({ feedback, onSpeak }: { feedback: ConversationFeedback; onSpeak: (text: string) => void }) {
   return (
     <section className="flex flex-col gap-5 rounded-xl border bg-card p-5">
-      <div>
-        <h2 className="font-semibold">Nhận xét</h2>
-        <p className="mt-1 text-sm">{feedback.summary}</p>
+      <div className="flex items-center gap-4">
+        {feedback.band != null && (
+          <div className="grid size-16 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground" title="Band ước lượng">
+            <span className="text-2xl font-bold">{feedback.band}</span>
+          </div>
+        )}
+        <div>
+          <h2 className="font-semibold">Nhận xét{feedback.band != null && <span className="font-normal text-muted-foreground"> · band ước lượng, chưa chấm Pronunciation</span>}</h2>
+          <p className="mt-1 text-sm">{feedback.summary}</p>
+        </div>
       </div>
 
       {feedback.corrections.length > 0 && (

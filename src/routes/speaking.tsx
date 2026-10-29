@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, Loader2, Mic, Presentation, RotateCcw, Shuffle, Square, Trash2, Volume2, X } from 'lucide-react'
+import { ArrowLeft, Check, Loader2, MessagesSquare, Mic, Presentation, RotateCcw, Shuffle, Square, Trash2, Volume2, X } from 'lucide-react'
 import { z } from 'zod'
 
 import { SpeakTabs } from '#/components/speak-tabs'
@@ -10,12 +10,15 @@ import { Progress } from '#/components/ui/progress'
 import { Textarea } from '#/components/ui/textarea'
 import { useAccent } from '#/hooks/use-app-settings'
 import { useRecorder } from '#/hooks/use-recorder'
+import { IELTS_PART1, IELTS_PART3 } from '#/lib/conversation'
+import type { TalkLevel } from '#/lib/conversation'
 import { speak, speakLong } from '#/lib/speech'
 import { CUSTOM_TOPIC, MAX_SPEAK_SECONDS, PREP_SECONDS, SPEAKING_TARGETS, SPEAKING_TARGET_LABEL, SPEAKING_TOPICS, parseCueCard } from '#/lib/speaking-topics'
 import type { SpeakingTarget } from '#/lib/speaking-topics'
-import { speakingAttemptQuery, speakingAttemptsQuery, statsQuery } from '#/lib/queries'
+import { conversationsQuery, speakingAttemptQuery, speakingAttemptsQuery, statsQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
 import { mistakeLabel } from '#/server/ai/prompts'
+import { startConversation } from '#/server/fns/conversation'
 import { assessSpeaking, deleteSpeakingAttempt, submitSpeaking } from '#/server/fns/speaking'
 
 const searchSchema = z.object({
@@ -60,6 +63,23 @@ function useTarget() {
 
 const GROUPS = [...new Set(SPEAKING_TOPICS.map((t) => t.group))]
 
+/** trình độ câu hỏi của giám khảo AI (Part 1 / Part 3) theo band mục tiêu */
+const EXAM_LEVEL: Record<SpeakingTarget, TalkLevel> = { '5': 'A2', '6': 'B1', '7': 'B2' }
+
+/** mở buổi Part 1 / Part 3 với AI giám khảo ở trang /talk */
+function useExam() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (opts: { part: typeof IELTS_PART1 | typeof IELTS_PART3; target: SpeakingTarget; part2Title?: string }) =>
+      startConversation({ data: { scenario: opts.part, level: EXAM_LEVEL[opts.target], custom: opts.part2Title } }),
+    onSuccess: ({ id }) => {
+      void queryClient.invalidateQueries({ queryKey: conversationsQuery().queryKey })
+      void navigate({ to: '/talk', search: { id } })
+    },
+  })
+}
+
 const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
 
 function SpeakingPage() {
@@ -89,6 +109,7 @@ function Picker({ onPick: pick }: { onPick: (t: Topic & { target: SpeakingTarget
     mutationFn: (id: number) => deleteSpeakingAttempt({ data: { id } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: speakingAttemptsQuery().queryKey }),
   })
+  const exam = useExam()
   const custom = parseCueCard(pasted)
   const topics = group ? SPEAKING_TOPICS.filter((t) => t.group === group) : SPEAKING_TOPICS
 
@@ -124,6 +145,17 @@ function Picker({ onPick: pick }: { onPick: (t: Topic & { target: SpeakingTarget
         </div>
         <p className="text-xs text-muted-foreground">Điểm vẫn chấm như thi thật; mục tiêu chỉ đổi độ khó của bài mẫu, từ vựng gợi ý và lời khuyên.</p>
       </div>
+
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-5">
+        <div>
+          <h2 className="font-semibold">Part 1 · Hỏi đáp với giám khảo</h2>
+          <p className="text-sm text-muted-foreground">AI hỏi về bản thân, nơi ở, sở thích như phòng thi; kết thúc để xem band và câu nên sửa.</p>
+          {exam.error && <p className="mt-1 text-sm text-destructive">{exam.error.message}</p>}
+        </div>
+        <Button variant="outline" disabled={exam.isPending} onClick={() => exam.mutate({ part: IELTS_PART1, target })}>
+          {exam.isPending ? <Loader2 className="animate-spin" /> : <MessagesSquare />} Bắt đầu Part 1
+        </Button>
+      </section>
 
       <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
         <h2 className="font-semibold">Dán đề của bạn</h2>
@@ -335,6 +367,7 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
   const queryClient = useQueryClient()
   const [accent] = useAccent()
   const { data, isLoading, error } = useQuery(speakingAttemptQuery(id))
+  const exam = useExam()
   const assess = useMutation({
     mutationFn: () => assessSpeaking({ data: { id } }),
     onSuccess: (feedback) => {
@@ -359,6 +392,7 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
   if (!data) return <p className="text-destructive">{error?.message ?? 'Không tìm thấy bài nói'}</p>
 
   const fb = data.feedback
+  const target = data.target as SpeakingTarget
   const words = data.transcript.split(/\s+/).filter(Boolean).length
 
   return (
@@ -370,8 +404,11 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
           </Link>
         </Button>
         <h1 className="flex-1 text-xl font-semibold">Kết quả</h1>
-        <Button variant="outline" onClick={() => onRetry({ id: data.topicId, title: data.title, bullets: data.bullets, target: data.target as SpeakingTarget })}>
+        <Button variant="outline" onClick={() => onRetry({ id: data.topicId, title: data.title, bullets: data.bullets, target })}>
           <RotateCcw /> Nói lại đề này
+        </Button>
+        <Button disabled={exam.isPending} onClick={() => exam.mutate({ part: IELTS_PART3, target, part2Title: data.title })}>
+          {exam.isPending ? <Loader2 className="animate-spin" /> : <MessagesSquare />} Tiếp Part 3
         </Button>
       </header>
 
@@ -382,7 +419,9 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
         <p className="mt-1 text-xs text-muted-foreground">
           Mục tiêu {SPEAKING_TARGET_LABEL[data.target as SpeakingTarget]} · {mmss(data.durationSec)} · {words} từ{data.durationSec ? ` · ${Math.round((words / data.durationSec) * 60)} từ/phút` : ''}
         </p>
+        {data.hasAudio && <audio controls src={`/api/speaking-audio/${data.id}`} className="mt-3 w-full" />}
         <p className="mt-2 whitespace-pre-wrap">{data.transcript}</p>
+        {exam.error && <p className="mt-2 text-sm text-destructive">{exam.error.message}</p>}
       </section>
 
       {!fb ? (
@@ -414,8 +453,8 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
                 <p className="mt-1 text-sm">{fb.summary}</p>
               </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {fb.criteria.map((c) => (
+            <div className={cn('grid gap-2', fb.pronunciation ? 'sm:grid-cols-2' : 'sm:grid-cols-3')}>
+              {[...fb.criteria, ...(fb.pronunciation ? [{ name: 'Pronunciation', ...fb.pronunciation }] : [])].map((c) => (
                 <div key={c.name} className="rounded-lg bg-muted/60 p-3">
                   <p className="flex items-baseline justify-between gap-2 text-sm font-medium">
                     {c.name} <span className="text-lg font-semibold">{c.band}</span>
@@ -424,7 +463,11 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
                 </div>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">Chưa chấm Pronunciation vì AI chấm trên lời đã chép. Luyện phát âm ở tab Nói trong mỗi video.</p>
+            {!fb.pronunciation && (
+              <p className="text-xs text-muted-foreground">
+                Chưa chấm Pronunciation: cần chọn LLM nghe audio (Gemini / OpenAI) ở mục chấm phát âm trong Cài đặt.
+              </p>
+            )}
             {fb.covered.length > 0 && (
               <ul className="space-y-1 text-sm">
                 {fb.covered.map((c) => (
@@ -453,6 +496,29 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     <span className="font-medium">{mistakeLabel(c.type)}</span> · {c.explanation}
+                  </p>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {fb.pronunciation && fb.pronunciation.mistakes.length > 0 && (
+            <section className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+              <h2 className="font-semibold">
+                Lỗi phát âm <span className="text-sm font-normal text-muted-foreground">· đã lưu vào Sổ lỗi</span>
+              </h2>
+              {fb.pronunciation.mistakes.map((m, i) => (
+                <div key={i} className="rounded-lg bg-muted/60 p-3 text-sm">
+                  <p className="flex flex-wrap items-center gap-x-2 font-medium">
+                    {m.word}
+                    {m.ipa && <span className="font-mono text-xs text-muted-foreground">{m.ipa}</span>}
+                    {m.heard && <span className="text-xs font-normal text-muted-foreground">nghe như “{m.heard}”</span>}
+                    <Button size="icon" variant="ghost" className="size-7" onClick={() => speak(m.word, { accent })} aria-label="Nghe">
+                      <Volume2 />
+                    </Button>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="font-medium">{mistakeLabel(m.type)}</span> · {m.explanation} {m.tip}
                   </p>
                 </div>
               ))}

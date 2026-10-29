@@ -59,33 +59,59 @@ async function post(
  * Gửi bản ghi (WAV) + câu gốc cho model LLM nghe được audio.
  * Trả về chữ model nghe được và nhận xét phát âm trong một lần gọi.
  */
-export async function assessWithAudioLlm(
+export function assessWithAudioLlm(
   wav: Buffer,
   reference: string,
   cfg: AppConfig = getConfig(),
 ): Promise<AudioAssessment> {
+  return audioStructured({
+    wav,
+    system: audioPronunciationSystem(cfg.accent),
+    prompt: audioPronunciationPrompt(reference),
+    schema: AudioAssessmentSchema,
+    name: 'pronunciation_assessment',
+    cfg,
+  })
+}
+
+/** Gửi bản ghi (WAV) kèm câu hỏi cho model nghe được audio, nhận về object đã validate theo zod schema */
+export async function audioStructured<T extends z.ZodType>(opts: {
+  wav: Buffer
+  system: string
+  prompt: string
+  schema: T
+  /** tên schema gửi kèm response_format */
+  name: string
+  cfg?: AppConfig
+}): Promise<z.infer<T>> {
+  const cfg = opts.cfg ?? getConfig()
   const url = resolveEndpoint(cfg)
-  const messages = [
-    { role: 'system', content: audioPronunciationSystem(cfg.accent) },
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: audioPronunciationPrompt(reference) },
-        {
-          type: 'input_audio',
-          input_audio: { data: wav.toString('base64'), format: 'wav' },
-        },
+  const user = {
+    role: 'user',
+    content: [
+      { type: 'text', text: opts.prompt },
+      {
+        type: 'input_audio',
+        input_audio: { data: opts.wav.toString('base64'), format: 'wav' },
+      },
+    ],
+  }
+  // cùng câu hỏi nhưng không dùng response_format: schema nằm trong system prompt
+  const jsonInPrompt = () =>
+    post(url, cfg.llmApiKey, {
+      model: cfg.llmModel,
+      messages: [
+        { role: 'system', content: jsonInstruction(opts.system, opts.schema) },
+        user,
       ],
-    },
-  ]
-  const schema = z.toJSONSchema(AudioAssessmentSchema)
+    })
 
   const res = await post(url, cfg.llmApiKey, {
     model: cfg.llmModel,
-    messages,
+    messages: [{ role: 'system', content: opts.system }, user],
     response_format: {
       type: 'json_schema',
-      json_schema: { name: 'pronunciation_assessment', schema },
+      json_schema: { name: opts.name, schema: z.toJSONSchema(opts.schema) },
     },
   })
   // provider không hỗ trợ json_schema → thử lại, yêu cầu JSON trong prompt
@@ -94,45 +120,19 @@ export async function assessWithAudioLlm(
     res.status === 400 &&
     /response_format|json_schema|schema/i.test(res.text)
   ) {
-    return parseReply(
-      await post(url, cfg.llmApiKey, jsonInPrompt(messages, cfg)),
-      cfg,
-    )
+    return parseReply(await jsonInPrompt(), opts.schema, cfg)
   }
 
   try {
-    return parseReply(res, cfg)
+    return parseReply(res, opts.schema, cfg)
   } catch (err) {
     // một số proxy nhận response_format nhưng lặng lẽ bỏ qua → model trả markdown; dặn JSON trong prompt và hỏi lại
     if (!(err instanceof NotJsonError)) throw err
-    return parseReply(
-      await post(url, cfg.llmApiKey, jsonInPrompt(messages, cfg)),
-      cfg,
-    )
+    return parseReply(await jsonInPrompt(), opts.schema, cfg)
   }
 }
 
 class NotJsonError extends Error {}
-
-/** cùng câu hỏi nhưng không dùng response_format: schema nằm trong system prompt */
-function jsonInPrompt(
-  messages: Array<{ role: string; content: unknown }>,
-  cfg: AppConfig,
-) {
-  return {
-    model: cfg.llmModel,
-    messages: [
-      {
-        role: 'system',
-        content: jsonInstruction(
-          audioPronunciationSystem(cfg.accent),
-          AudioAssessmentSchema,
-        ),
-      },
-      ...messages.slice(1),
-    ],
-  }
-}
 
 /** nội dung trả lời của model; HTTP lỗi thì báo lỗi dễ hiểu */
 function replyContent(
@@ -162,10 +162,11 @@ function replyContent(
   return content
 }
 
-function parseReply(
+function parseReply<T extends z.ZodType>(
   res: Awaited<ReturnType<typeof post>>,
+  schema: T,
   cfg: AppConfig,
-): AudioAssessment {
+): z.infer<T> {
   const content = replyContent(res, cfg)
   let json: unknown
   try {
@@ -185,7 +186,7 @@ function parseReply(
     }
     throw new NotJsonError(`Model không trả về JSON: "${reply}"`)
   }
-  const parsed = AudioAssessmentSchema.safeParse(json)
+  const parsed = schema.safeParse(json)
   if (!parsed.success)
     throw new NotJsonError('Model trả về JSON sai cấu trúc, hãy thử lại')
   return parsed.data

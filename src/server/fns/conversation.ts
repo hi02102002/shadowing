@@ -5,12 +5,13 @@ import { z } from 'zod'
 import { db } from '#/db/index.ts'
 import { conversations, conversationTurns } from '#/db/schema.ts'
 import type { ConversationFeedback } from '#/db/schema.ts'
-import { CUSTOM_SCENARIO, MAX_USER_TURNS, SCENARIOS, TALK_LEVELS } from '#/lib/conversation.ts'
+import { CUSTOM_SCENARIO, IELTS_PART3, MAX_USER_TURNS, SCENARIOS, TALK_LEVELS, isIeltsScenario, part3Setup } from '#/lib/conversation.ts'
 import type { TalkLevel } from '#/lib/conversation.ts'
 import {
   CONVERSATION_FEEDBACK_SYSTEM,
   ConversationFeedbackSchema,
   ConversationReplySchema,
+  IeltsConversationFeedbackSchema,
   conversationFeedbackPrompt,
   conversationPrompt,
   conversationSystem,
@@ -82,6 +83,9 @@ export const startConversation = createServerFn({ method: 'POST' })
     if (data.scenario === CUSTOM_SCENARIO) {
       if (!data.custom) throw new Error('Hãy nhập chủ đề muốn nói')
       topic = data.custom
+    } else if (data.scenario === IELTS_PART3) {
+      if (!data.custom) throw new Error('Thiếu đề Part 2')
+      topic = part3Setup(data.custom)
     } else {
       const preset = SCENARIOS.find((s) => s.id === data.scenario)
       if (!preset) throw new Error('Không có tình huống này')
@@ -138,7 +142,7 @@ export const finishConversation = createServerFn({ method: 'POST' })
     const feedback = await structured({
       system: CONVERSATION_FEEDBACK_SYSTEM,
       prompt: conversationFeedbackPrompt({ topic: convo.topic, level: convo.level as TalkLevel, turns }),
-      schema: ConversationFeedbackSchema,
+      schema: isIeltsScenario(convo.scenario) ? IeltsConversationFeedbackSchema : ConversationFeedbackSchema,
     })
     db.update(conversations).set({ feedback, endedAt: new Date() }).where(eq(conversations.id, convo.id)).run()
     recordSpeechMistakes('conversation', feedback.corrections)

@@ -144,6 +144,8 @@ export interface ConversationFeedback {
   summary: string
   corrections: Array<{ said: string; better: string; type: string; explanation: string }>
   phrases: Array<{ en: string; vi: string }>
+  /** band ước lượng, chỉ có ở buổi luyện IELTS Speaking Part 1 / Part 3 */
+  band?: number | null
 }
 
 /** Bài nói theo đề kiểu IELTS Speaking Part 2 (trang /speaking) */
@@ -157,6 +159,8 @@ export const speakingAttempts = sqliteTable('speaking_attempts', {
   target: text().notNull().default('6'),
   transcript: text().notNull(),
   durationSec: integer('duration_sec').notNull(),
+  /** file ghi âm trong DATA_DIR/recordings, nghe lại qua /api/speaking-audio/:id */
+  audioPath: text('audio_path'),
   /** nhận xét và band ước lượng (SpeakingFeedback), null = chưa chấm xong */
   feedback: text({ mode: 'json' }).$type<SpeakingFeedback>(),
   createdAt: createdAt(),
@@ -171,6 +175,12 @@ export interface SpeakingFeedback {
   corrections: Array<{ said: string; better: string; type: string; explanation: string }>
   vocabulary: Array<{ en: string; vi: string }>
   sample: string
+  /** chỉ có khi chấm bằng model nghe được audio */
+  pronunciation?: {
+    band: number
+    comment: string
+    mistakes: Array<{ word: string; heard: string; type: string; ipa: string; explanation: string; tip: string }>
+  }
 }
 
 export type Video = typeof videos.$inferSelect

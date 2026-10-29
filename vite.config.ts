@@ -21,6 +21,7 @@ const config = defineConfig({
         '/api/essential-media/:slug/:dir/:file': './src/server/essential-media-route.ts',
         '/api/bing-image/:q': './src/server/bing-image-route.ts',
         '/api/tts': './src/server/tts-route.ts',
+        '/api/speaking-audio/:id': './src/server/speaking-audio-route.ts',
       },
     }),
     tailwindcss(),

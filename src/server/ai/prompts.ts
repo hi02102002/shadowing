@@ -424,6 +424,9 @@ export function conversationPrompt(turns: Array<{ role: string; text: string }>)
 
 export const CONVERSATION_MISTAKE_TYPES = ['grammar', 'vocabulary', 'other'] as const
 
+/** band IELTS: 0–9, bước 0.5 */
+const band = () => z.number().min(0).max(9).describe('band IELTS 0-9, bước 0.5')
+
 export const ConversationFeedbackSchema = z.object({
   summary: z
     .string()
@@ -443,6 +446,13 @@ export const ConversationFeedbackSchema = z.object({
     .describe('3-6 cụm từ hữu ích cho tình huống này người học nên dùng lần sau'),
 })
 
+/** buổi IELTS Part 1 / Part 3: thêm band ước lượng */
+export const IeltsConversationFeedbackSchema = ConversationFeedbackSchema.extend({
+  band: band().describe(
+    'band IELTS ước lượng cho phần nói này (trung bình Fluency & Coherence, Lexical Resource, Grammatical Range & Accuracy; không chấm Pronunciation), chấm khắt khe như thi thật',
+  ),
+})
+
 export const CONVERSATION_FEEDBACK_SYSTEM = `${GRAMMAR_SYSTEM}
 - Bạn đang nhận xét một buổi hội thoại nhập vai bằng tiếng Anh của người học.
 - Lời người học được nhận dạng từ giọng nói nên có thể sai chính tả hoặc thiếu dấu câu: KHÔNG tính đó là lỗi, chỉ xét ngữ pháp, dùng từ và độ tự nhiên.
@@ -457,8 +467,6 @@ ${conversationTranscript(opts.turns)}
 """`
 }
 
-/** band IELTS: 0–9, bước 0.5 */
-const band = () => z.number().min(0).max(9).describe('band IELTS 0-9, bước 0.5')
 
 export const SpeakingFeedbackSchema = z.object({
   overall: band(),
@@ -487,9 +495,24 @@ export const SpeakingFeedbackSchema = z.object({
     .describe('bài nói mẫu đúng band mục tiêu bằng tiếng Anh, khoảng 200-250 từ, giữ ý tưởng của người học và trả lời đủ các gợi ý'),
 })
 
-export const SPEAKING_FEEDBACK_SYSTEM = `Bạn là giám khảo IELTS Speaking giàu kinh nghiệm, chấm bài Part 2 của người Việt.
+/** chấm thêm Pronunciation khi model nghe được bản ghi */
+export const SpeakingAudioFeedbackSchema = SpeakingFeedbackSchema.extend({
+  pronunciation: z.object({
+    band: band(),
+    comment: z.string().describe('nhận xét 1-2 câu bằng tiếng Việt về phát âm, ngữ điệu, trọng âm, nối âm'),
+    mistakes: z.array(MistakeSchema).describe('tối đa 8 lỗi phát âm rõ nhất nghe được trong bản ghi; rỗng nếu không có'),
+  }),
+})
+
+export const speakingFeedbackSystem = (accent: Accent, withAudio: boolean) => `Bạn là giám khảo IELTS Speaking giàu kinh nghiệm, chấm bài Part 2 của người Việt.
 - Chấm theo band descriptors chính thức, khắt khe như giám khảo thật; không nâng điểm để khích lệ.
-- Bài nói được nhận dạng từ giọng nói nên có thể sai chính tả, thiếu dấu câu: KHÔNG tính đó là lỗi. Không chấm Pronunciation vì chỉ có văn bản.
+${
+  withAudio
+    ? `- Bạn được nghe bản ghi kèm lời đã chép: chấm cả Pronunciation từ bản ghi (âm cuối, nguyên âm, phụ âm, trọng âm từ và câu, ngữ điệu, nối âm, độ rõ ràng); band tổng là trung bình 4 tiêu chí làm tròn tới 0.5.
+${accentRule(accent)}
+- Lời đã chép có thể sai chính tả, thiếu dấu câu: KHÔNG tính đó là lỗi ngữ pháp.`
+    : '- Bài nói được nhận dạng từ giọng nói nên có thể sai chính tả, thiếu dấu câu: KHÔNG tính đó là lỗi. Không chấm Pronunciation vì chỉ có văn bản.'
+}
 - Fluency & Coherence xét độ dài (Part 2 nên nói 1.5-2 phút), tốc độ, mạch lạc, từ nối; nói dưới 1 phút thì khó quá band 5 ở tiêu chí này.
 - Bài quá ngắn hoặc lạc đề thì nói rõ và chấm thấp tương ứng.
 - Band mục tiêu của người học KHÔNG ảnh hưởng điểm chấm; chỉ dùng để chọn độ khó cho bài mẫu, từ vựng gợi ý và lời khuyên (việc cần làm để đạt mục tiêu).

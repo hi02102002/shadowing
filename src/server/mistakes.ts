@@ -13,7 +13,7 @@ interface MistakeInput {
 }
 
 /** Ghi lỗi vào sổ lỗi: cùng từ + loại + nguồn thì tăng count và cập nhật giải thích mới nhất */
-export function recordMistakes(source: 'dictation' | 'pronunciation', segmentId: number, list: MistakeInput[]) {
+export function recordMistakes(source: 'dictation' | 'pronunciation' | 'speaking', segmentId: number | null, list: MistakeInput[]) {
   for (const m of list) {
     const word = m.word.trim().toLowerCase()
     if (!word) continue

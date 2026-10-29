@@ -1,0 +1,1 @@
+ALTER TABLE `speaking_attempts` ADD `audio_path` text;
