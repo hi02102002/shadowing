@@ -2,6 +2,19 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.31 — 2026-10-29
+
+### Mới
+
+- **Nói theo đề: chấm Pronunciation và nghe lại bài nói**
+  - Khi Cài đặt chọn chấm phát âm bằng LLM nghe audio (Gemini / OpenAI), AI nghe trực tiếp bản ghi để cho band Pronunciation, band tổng tính trên cả 4 tiêu chí.
+  - Mục "Lỗi phát âm": từ phát âm sai, phiên âm IPA, AI nghe ra thành gì, cách sửa; lỗi được lưu vào Sổ lỗi.
+  - Nghe lại bản ghi của mình ngay trên trang kết quả.
+- **IELTS Speaking Part 1 và Part 3 với AI giám khảo**
+  - Part 1: bấm "Bắt đầu Part 1" ở trang Nói theo đề (hoặc chọn trong tab Nhập vai): giám khảo hỏi về bản thân, nơi ở, công việc, sở thích như phòng thi.
+  - Part 3: nói xong một đề Part 2, bấm "Tiếp Part 3" để giám khảo hỏi sâu, mở rộng về chủ đề đó.
+  - Kết thúc buổi để xem band ước lượng (chưa tính Pronunciation), câu nên sửa và cụm từ nên dùng. Độ khó câu hỏi theo band mục tiêu bạn chọn.
+
 ## 0.0.30 — 2026-10-29
 
 ### Mới
