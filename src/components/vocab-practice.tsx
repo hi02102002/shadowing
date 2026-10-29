@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { createStore } from '@tanstack/react-store'
 import { useHotkey } from '@tanstack/react-hotkeys'
-import { ChevronRight, Eye, Lightbulb, PartyPopper, Volume2, X } from 'lucide-react'
+import {
+  BookmarkCheck,
+  BookmarkPlus,
+  ChevronRight,
+  Eye,
+  GraduationCap,
+  Lightbulb,
+  Loader2,
+  PartyPopper,
+  Volume2,
+  X,
+} from 'lucide-react'
 
 import { AutoNextSwitch, LetterSlots, useAutoAdvance, useAutoNext, useLetterTyper } from '#/components/letter-typer'
 import type { TypingStats } from '#/components/letter-typer'
@@ -13,6 +25,7 @@ import { Progress } from '#/components/ui/progress'
 import { playerActions } from '#/lib/player-store'
 import { cn } from '#/lib/utils'
 import { dictionaryEntry } from '#/server/fns/dictionary'
+import { saveVideoWords } from '#/server/fns/flashcards'
 import type { VocabLevel } from '#/lib/levels'
 import type { SegmentView } from '#/server/fns/videos'
 
@@ -180,21 +193,111 @@ function PracticeItem({
   )
 }
 
+interface Result {
+  item: VocabItem
+  seg: SegmentView
+  stats: TypingStats
+}
+
+const missed = (s: TypingStats) => s.gaveUp || s.mistakes + s.hints > 0
+
+/** cuối buổi: lưu từ gõ sai (hoặc tất cả) vào bộ thẻ riêng của video để ôn theo lịch FSRS */
+function Summary({ youtubeId, results, onExit }: { youtubeId: string; results: Result[]; onExit: () => void }) {
+  const queryClient = useQueryClient()
+  const wrong = results.filter((r) => missed(r.stats))
+  const save = useMutation({
+    mutationFn: (list: Result[]) =>
+      saveVideoWords({
+        data: {
+          youtubeId,
+          items: list.map(({ item, seg }) => {
+            const clip = clipFor(seg, item.surface)
+            return {
+              text: item.text,
+              sentence: seg.text,
+              segmentId: seg.id,
+              startMs: Math.round(clip.startMs),
+              endMs: Math.round(clip.endMs),
+              meaningVi: item.meaningVi,
+            }
+          }),
+        },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['video-vocab', youtubeId] })
+      void queryClient.invalidateQueries({ queryKey: ['video-phrases', youtubeId] })
+      void queryClient.invalidateQueries({ queryKey: ['decks'] })
+      void queryClient.invalidateQueries({ queryKey: ['card-saved'] })
+    },
+  })
+
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-8 text-center">
+      <PartyPopper className="size-8 text-primary" />
+      <p className="text-lg font-medium">Đã luyện {results.length} từ!</p>
+      <p className="text-sm text-muted-foreground">
+        {results.length - wrong.length} từ gõ đúng ngay
+        {wrong.length > 0 && <>, {wrong.length} từ sai hoặc cần gợi ý</>}.
+      </p>
+      {wrong.length > 0 && (
+        <p className="max-w-md text-sm">
+          {wrong.map((r) => r.item.text).join(', ')}
+        </p>
+      )}
+      {save.data ? (
+        <div className="flex flex-col items-center gap-2">
+          <p className="flex items-center gap-1.5 text-sm text-ok">
+            <BookmarkCheck className="size-4" />
+            Đã lưu {save.data.total} từ vào bộ “{save.data.deckName}”
+            {save.data.created < save.data.total && ` (${save.data.total - save.data.created} từ đã có, cập nhật lại)`}
+          </p>
+          <Button asChild>
+            <Link to="/flashcards/study" search={{ deck: save.data.deckId, mode: 'type' }}>
+              <GraduationCap />
+              Ôn ngay bằng chế độ gõ
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-center gap-2">
+          {wrong.length > 0 && (
+            <Button onClick={() => save.mutate(wrong)} disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="animate-spin" /> : <BookmarkPlus />}
+              Lưu {wrong.length} từ gõ sai
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => save.mutate(results)} disabled={save.isPending}>
+            Lưu tất cả {results.length} từ
+          </Button>
+        </div>
+      )}
+      {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
+      <Button variant="ghost" onClick={onExit}>
+        Về danh sách từ
+      </Button>
+    </div>
+  )
+}
+
 /**
  * Luyện gõ từ mới của video: phát đúng câu trong video, che từ trong câu, gõ từng chữ cái;
- * gõ xong nghe riêng từ đó và lưu thẻ kèm câu + clip.
+ * gõ xong nghe riêng từ đó và lưu thẻ kèm câu + clip. Cuối buổi (hoặc bấm thoát giữa chừng) lưu cả loạt.
  */
 export function VocabPractice({
+  youtubeId,
   items,
   segments,
   onExit,
 }: {
+  youtubeId: string
   items: VocabItem[]
   segments: SegmentView[]
   onExit: () => void
 }) {
   const [i, setI] = useState(0)
-  const [perfect, setPerfect] = useState(0)
+  const [results, setResults] = useState<Result[]>([])
+  // thoát giữa chừng mà đã gõ vài từ → xem tổng kết để lưu trước khi rời
+  const [ended, setEnded] = useState(false)
   const [autoNext, setAutoNext] = useAutoNext()
   const byIdx = new Map(segments.map((s) => [s.idx, s]))
 
@@ -203,13 +306,18 @@ export function VocabPractice({
     return () => vocabPracticeStore.setState(() => false)
   }, [])
 
-  const item = items.at(i)
+  const item = ended ? undefined : items.at(i)
   const seg = item && byIdx.get(item.segIdx)
 
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-3">
-        <Button size="icon" variant="ghost" onClick={onExit} aria-label="Thoát luyện gõ">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => (seg && results.length ? setEnded(true) : onExit())}
+          aria-label="Thoát luyện gõ"
+        >
           <X />
         </Button>
         <Progress value={(i / items.length) * 100} className="flex-1" />
@@ -225,16 +333,16 @@ export function VocabPractice({
           item={item}
           seg={seg}
           autoNext={autoNext}
-          onNext={(s) => {
-            if (!s.gaveUp && s.mistakes + s.hints === 0) setPerfect((n) => n + 1)
+          onNext={(stats) => {
+            setResults((r) => [...r, { item, seg, stats }])
             setI(i + 1)
           }}
         />
+      ) : results.length ? (
+        <Summary youtubeId={youtubeId} results={results} onExit={onExit} />
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center">
-          <PartyPopper className="size-8 text-primary" />
-          <p className="text-lg font-medium">Đã luyện xong {items.length} từ!</p>
-          <p className="text-sm text-muted-foreground">{perfect} từ gõ đúng ngay, không cần gợi ý.</p>
+          <p className="text-muted-foreground">Chưa luyện từ nào.</p>
           <Button variant="outline" onClick={onExit}>
             Về danh sách từ
           </Button>

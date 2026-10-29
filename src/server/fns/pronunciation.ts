@@ -29,6 +29,7 @@ import {
   transcribeLocal,
   whisperBinary,
   whisperLocalStatus,
+  PRONUNCIATION_MODEL,
 } from '../whisper-local.ts'
 
 const RECORDINGS_DIR = path.resolve(
@@ -82,7 +83,7 @@ export const pronunciationEngines = createServerFn({ method: 'GET' }).handler(
         unavailable: engineUnavailable(id, cfg),
       })),
       /** chấm trên máy lần đầu phải tải model */
-      localModelReady: whisperLocalStatus().model === 'ready',
+      localModelReady: whisperLocalStatus(PRONUNCIATION_MODEL).model === 'ready',
     }
   },
 )
@@ -94,13 +95,13 @@ async function transcribeOnDevice(wav: Buffer): Promise<SttWord[]> {
       'Chưa cấu hình AI và không tìm thấy whisper-cli để chấm trên máy. Vào Cài đặt để nhập API key.',
     )
   }
-  const status = whisperLocalStatus()
+  const status = whisperLocalStatus(PRONUNCIATION_MODEL)
   if (status.model !== 'ready') {
     // tải ở nền (vài trăm MB) thay vì bắt người dùng chờ trong lúc chấm
-    ensureModel().catch(() => {
+    ensureModel(PRONUNCIATION_MODEL).catch(() => {
       /* lỗi được ghi vào whisperLocalStatus().error */
     })
-    const pct = Math.round(whisperLocalStatus().progress * 100)
+    const pct = Math.round(whisperLocalStatus(PRONUNCIATION_MODEL).progress * 100)
     throw new Error(
       `Chưa cấu hình AI nên app chấm phát âm trên máy bằng Whisper. Đang tải model (${pct}%), thử lại sau ít phút — xem tiến độ ở Cài đặt.`,
     )
@@ -109,7 +110,7 @@ async function transcribeOnDevice(wav: Buffer): Promise<SttWord[]> {
   try {
     const wavPath = path.join(dir, 'rec.wav')
     await fs.writeFile(wavPath, wav)
-    return fromWhisperCppJson(await transcribeLocal(wavPath)).map((w) => ({
+    return fromWhisperCppJson(await transcribeLocal(wavPath, { model: PRONUNCIATION_MODEL })).map((w) => ({
       word: w.w,
       start: w.s / 1000,
       end: w.e / 1000,

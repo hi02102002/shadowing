@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as StatsRouteImport } from './routes/stats'
 import { Route as ApiAnkiUploadsRouteImport } from './routes/api/anki-uploads'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
 import { Route as FlashcardsIndexRouteImport } from './routes/flashcards/index'
@@ -46,6 +47,11 @@ const ReviewRoute = ReviewRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatsRoute = StatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAnkiUploadsRoute = ApiAnkiUploadsRouteImport.update({
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/stats': typeof StatsRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
@@ -144,6 +151,7 @@ export interface FileRoutesByTo {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/stats': typeof StatsRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/stats': typeof StatsRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/stats'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/stats'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
@@ -225,6 +236,7 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/stats'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
@@ -246,6 +258,7 @@ export interface RootRouteChildren {
   ExploreRoute: typeof ExploreRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
+  StatsRoute: typeof StatsRoute
   ApiAnkiUploadsRoute: typeof ApiAnkiUploadsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
   FlashcardsStudyRoute: typeof FlashcardsStudyRoute
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stats': {
+      id: '/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof StatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/anki-uploads': {
@@ -413,6 +433,7 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreRoute: ExploreRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
+  StatsRoute: StatsRoute,
   ApiAnkiUploadsRoute: ApiAnkiUploadsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
   FlashcardsStudyRoute: FlashcardsStudyRoute,

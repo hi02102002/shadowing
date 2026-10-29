@@ -10,6 +10,7 @@ import {
 import { getEssentialBook, listEssentialBooks } from '#/server/fns/essential.ts'
 import { listCards, listDecks, studyQueue } from '#/server/fns/flashcards.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
+import { activityStats } from '#/server/fns/stats.ts'
 import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
@@ -145,4 +146,11 @@ export const vocabMeaningsQuery = (youtubeId: string, words: string[]) =>
     enabled: words.length > 0,
     staleTime: Infinity,
     retry: false,
+  })
+
+/** trang Thống kê: chuỗi ngày, lịch hoạt động, xu hướng điểm */
+export const activityStatsQuery = () =>
+  queryOptions({
+    queryKey: ['activity-stats'],
+    queryFn: () => activityStats(),
   })

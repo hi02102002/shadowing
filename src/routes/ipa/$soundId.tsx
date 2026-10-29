@@ -93,7 +93,7 @@ function SoundPage() {
   const sample = exampleWord(sound.examples[0])
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6">
       <nav className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <Link
           to="/ipa"

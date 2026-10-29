@@ -4,6 +4,8 @@ import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
 import { dictationAttempts, mistakes, pronunciationAttempts, segments, videos } from '#/db/schema.ts'
+import { computeStreak, dayKey } from '#/lib/streak.ts'
+import { activeDays } from '../activity.ts'
 
 export const listMistakes = createServerFn({ method: 'GET' }).handler(async () =>
   db
@@ -53,30 +55,16 @@ export const practiceStats = createServerFn({ method: 'GET' }).handler(async () 
     .from(pronunciationAttempts)
     .get()!
   const m = db.select({ n: sql<number>`count(*)` }).from(mistakes).get()!
-  // số ngày luyện tập liên tiếp tính đến hôm nay
-  const days = db
-    .all<{ day: string }>(
-      sql`select distinct date(created_at, 'unixepoch', 'localtime') as day from (
-        select created_at from dictation_attempts union all select created_at from pronunciation_attempts
-      ) order by day desc limit 365`,
-    )
-    .map((row) => row.day)
-  const practiced = new Set(days)
-  const dayKey = (d: Date) => d.toLocaleDateString('sv-SE') // YYYY-MM-DD theo giờ máy
-  const cursor = new Date()
-  // hôm nay chưa luyện thì vẫn giữ chuỗi tính đến hôm qua
-  if (!practiced.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1)
-  let streak = 0
-  while (practiced.has(dayKey(cursor))) {
-    streak++
-    cursor.setDate(cursor.getDate() - 1)
-  }
+  // chuỗi ngày học: mọi chế độ luyện (chép, nói, ôn thẻ, ngữ pháp)
+  const streak = computeStreak(activeDays(), dayKey(new Date()))
   return {
     dictationCount: dict.n,
     dictationAvg: Math.round(dict.avg),
     pronunciationCount: p.n,
     pronunciationAvg: Math.round(p.avg),
     mistakeCount: m.n,
-    streak,
+    streak: streak.current,
+    /** hôm nay đã học chưa (chưa thì chuỗi sắp mất) */
+    practicedToday: streak.today,
   }
 })

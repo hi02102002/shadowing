@@ -32,8 +32,12 @@ export async function dictionaryLookup(raw: string): Promise<DictEntry | null> {
   return entry
 }
 
-/** Nghĩa theo ngữ cảnh câu bằng AI, có cache; null khi chưa cấu hình AI */
-export async function contextLookup(raw: string, sentence: string): Promise<Lookup | null> {
+/** Nghĩa theo ngữ cảnh câu bằng AI, có cache; null khi chưa cấu hình AI (hoặc `cachedOnly` mà chưa tra) */
+export async function contextLookup(
+  raw: string,
+  sentence: string,
+  opts: { cachedOnly?: boolean } = {},
+): Promise<Lookup | null> {
   const text = cleanWord(raw)
   if (!text) throw new Error('Không có từ để tra')
   const key = `${text.toLowerCase()}|${sentence.trim().toLowerCase()}`
@@ -45,7 +49,7 @@ export async function contextLookup(raw: string, sentence: string): Promise<Look
   }
 
   // chưa cấu hình AI: thẻ tra từ chỉ dùng từ điển (dictionaryEntry)
-  if (!hasLlm(getConfig())) return null
+  if (opts.cachedOnly || !hasLlm(getConfig())) return null
 
   const result = await structured({
     system: LOOKUP_SYSTEM,

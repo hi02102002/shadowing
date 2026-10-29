@@ -45,14 +45,17 @@ export function SaveToDeck({
   startMs,
   endMs,
   disabled,
+  cachedOnly,
 }: {
   text: string
   sentence: string
-  segmentId: number
+  segmentId: number | null
   startMs: number
   endMs: number
   /** đợi tra nghĩa xong để thẻ lưu được nghĩa theo ngữ cảnh từ cache */
   disabled?: boolean
+  /** lưu không gọi AI mới (dùng nghĩa AI đã tra nếu có, không thì từ điển) */
+  cachedOnly?: boolean
 }) {
   const queryClient = useQueryClient()
   const { data: decks = [] } = useQuery(decksQuery())
@@ -76,7 +79,15 @@ export function SaveToDeck({
   const save = useMutation({
     mutationFn: () =>
       saveWordCard({
-        data: { text, sentence, segmentId, startMs: Math.round(startMs), endMs: Math.round(endMs), deckId },
+        data: {
+          text,
+          sentence,
+          segmentId,
+          startMs: Math.round(startMs),
+          endMs: Math.round(endMs),
+          deckId,
+          cachedOnly,
+        },
       }),
     onSuccess: (res) => {
       setLastDeck(res.deckId)

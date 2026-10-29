@@ -115,7 +115,7 @@ export function MistakesTable({ data, onDelete }: Props) {
             <div className="flex justify-end gap-1">
               {row.original.grammarRef && (
                 <Button size="icon" variant="ghost" className="size-8" asChild title="Làm lại bài tập">
-                  <Link to="/grammar/$unitId" params={{ unitId: row.original.grammarRef.split('#')[0] }} search={{ tab: 'exercises' }}>
+                  <Link to="/grammar/$unitId" params={{ unitId: row.original.grammarRef.split('#')[0] }} search={{ tab: row.original.grammarRef.endsWith('#ai') ? 'ai' : 'exercises' }}>
                     <Dumbbell />
                   </Link>
                 </Button>

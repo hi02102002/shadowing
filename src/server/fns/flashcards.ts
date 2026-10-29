@@ -187,6 +187,8 @@ export const saveWordCard = createServerFn({ method: 'POST' })
       startMs: z.number().int(),
       endMs: z.number().int(),
       deckId: z.number().int().nullable(),
+      /** không gọi AI mới, chỉ dùng nghĩa AI đã tra (tab Từ vựng: AI chỉ chạy khi người dùng bấm) */
+      cachedOnly: z.boolean().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -197,51 +199,113 @@ export const saveWordCard = createServerFn({ method: 'POST' })
         ? data.deckId
         : defaultDeckId()
 
-    // thẻ tra từ vừa gọi hai nguồn này nên thường đã có sẵn trong cache
-    const [ai, dict] = await Promise.all([
-      contextLookup(front, data.sentence).catch(() => null),
-      dictionaryLookup(front).catch(() => null),
-    ])
-    const accent = getConfig().accent
-    const dictMeaning = dict?.senses
-      .filter((s) => !s.specialized)
-      .slice(0, 2)
-      .map((s) => (s.kind ? `(${s.kind}) ` : '') + s.means.slice(0, 3).join('; '))
-      .join('\n')
-    const content = {
-      back: ai?.meaningInContext || dictMeaning || '',
-      ipa:
-        (accent === 'uk' ? ai?.ipa || dict?.ipaUk : ai?.ipaUs || dict?.ipaUs) ||
-        ai?.ipa ||
-        dict?.ipaUk ||
-        null,
-      example: ai?.examples[0] ? `${ai.examples[0].en}\n${ai.examples[0].vi}` : null,
-      extra:
-        [
-          ai?.partOfSpeech,
-          ai?.definitionEn,
-          ai?.otherMeanings.length ? `Nghĩa khác: ${ai.otherMeanings.join('; ')}` : '',
-          ai && dictMeaning ? dictMeaning : '',
-        ]
-          .filter(Boolean)
-          .join('\n') || null,
-      segmentId: data.segmentId,
-      sentence: data.sentence || null,
-      clipStartMs: data.startMs,
-      clipEndMs: data.endMs,
-    }
+    const content = await wordCardContent(front, data, { cachedOnly: data.cachedOnly })
+    return { ...upsertCard(deckId, front, content), deckId }
+  })
 
-    const existing = findCard(deckId, front)
-    if (existing) {
-      db.update(cards).set(content).where(eq(cards.id, existing.id)).run()
-      return { id: existing.id, deckId, created: false }
+interface WordSource {
+  sentence: string
+  segmentId: number | null
+  startMs: number
+  endMs: number
+  /** nghĩa đã có sẵn (nghĩa AI của cụm từ, bản dịch ngắn) khi không tra AI */
+  meaningVi?: string
+}
+
+/**
+ * Nội dung thẻ cho từ lưu từ video: nghĩa theo ngữ cảnh (AI) + từ điển, kèm câu và đoạn video.
+ * `cachedOnly`: không gọi AI mới (lưu hàng loạt), chỉ dùng nghĩa AI đã tra trước đó nếu có.
+ */
+async function wordCardContent(front: string, data: WordSource, opts: { cachedOnly?: boolean } = {}) {
+  // thẻ tra từ vừa gọi hai nguồn này nên thường đã có sẵn trong cache
+  const [ai, dict] = await Promise.all([
+    contextLookup(front, data.sentence, opts).catch(() => null),
+    dictionaryLookup(front).catch(() => null),
+  ])
+  const accent = getConfig().accent
+  const dictMeaning = dict?.senses
+    .filter((s) => !s.specialized)
+    .slice(0, 2)
+    .map((s) => (s.kind ? `(${s.kind}) ` : '') + s.means.slice(0, 3).join('; '))
+    .join('\n')
+  return {
+    back: ai?.meaningInContext || data.meaningVi || dictMeaning || '',
+    ipa:
+      (accent === 'uk' ? ai?.ipa || dict?.ipaUk : ai?.ipaUs || dict?.ipaUs) ||
+      ai?.ipa ||
+      dict?.ipaUk ||
+      null,
+    example: ai?.examples[0] ? `${ai.examples[0].en}\n${ai.examples[0].vi}` : null,
+    extra:
+      [
+        ai?.partOfSpeech,
+        ai?.definitionEn,
+        ai?.otherMeanings.length ? `Nghĩa khác: ${ai.otherMeanings.join('; ')}` : '',
+        (ai || data.meaningVi) && dictMeaning ? dictMeaning : '',
+      ]
+        .filter(Boolean)
+        .join('\n') || null,
+    segmentId: data.segmentId,
+    sentence: data.sentence || null,
+    clipStartMs: data.startMs,
+    clipEndMs: data.endMs,
+  }
+}
+
+/** lưu cùng từ trong cùng bộ thì cập nhật thẻ cũ (giữ lịch ôn) */
+function upsertCard(deckId: number, front: string, content: Awaited<ReturnType<typeof wordCardContent>>) {
+  const existing = findCard(deckId, front)
+  if (existing) {
+    db.update(cards).set(content).where(eq(cards.id, existing.id)).run()
+    return { id: existing.id, created: false }
+  }
+  const row = db.insert(cards).values({ deckId, front, ...content }).returning({ id: cards.id }).get()
+  return { id: row.id, created: true }
+}
+
+/**
+ * Lưu nhiều từ vừa luyện trong tab Từ vựng vào bộ riêng của video (tạo nếu chưa có), kèm câu và clip.
+ * Không gọi AI để lưu cả chục từ không tốn lượt: nghĩa lấy từ cache AI / nghĩa gửi kèm / từ điển.
+ */
+export const saveVideoWords = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      youtubeId: z.string(),
+      items: z
+        .array(
+          z.object({
+            text: z.string().trim().min(1).max(80),
+            sentence: z.string().max(600),
+            segmentId: z.number().int(),
+            startMs: z.number().int(),
+            endMs: z.number().int(),
+            meaningVi: z.string().max(300).optional(),
+          }),
+        )
+        .min(1)
+        .max(200),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const video = db.select({ title: videos.title }).from(videos).where(eq(videos.youtubeId, data.youtubeId)).get()
+    if (!video) throw new Error('Không tìm thấy video')
+    const ref = `video:${data.youtubeId}`
+    const deck =
+      db.select({ id: decks.id, name: decks.name }).from(decks).where(eq(decks.ref, ref)).get() ??
+      db
+        .insert(decks)
+        .values({ name: video.title.slice(0, 120), source: 'transcript', ref })
+        .returning({ id: decks.id, name: decks.name })
+        .get()
+
+    let created = 0
+    // tuần tự: từ điển dunno.ai giới hạn ~60 lần/phút
+    for (const item of data.items) {
+      const front = cleanWord(item.text)
+      if (!front) continue
+      if (upsertCard(deck.id, front, await wordCardContent(front, item, { cachedOnly: true })).created) created++
     }
-    const row = db
-      .insert(cards)
-      .values({ deckId, front, ...content })
-      .returning({ id: cards.id })
-      .get()
-    return { id: row.id, deckId, created: true }
+    return { deckId: deck.id, deckName: deck.name, created, total: data.items.length }
   })
 
 const studySelect = {

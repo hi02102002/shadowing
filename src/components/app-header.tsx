@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { AudioLines, BookOpen, BookX, Compass, Layers, Library, Moon, Settings, Speech, Sun } from 'lucide-react'
+import { Link, useLocation } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { AudioLines, BookOpen, BookX, Compass, Flame, Layers, Library, Moon, Settings, Speech, Sun } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
+import { statsQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
 
 const NAV = [
@@ -39,11 +41,39 @@ export function AppHeader() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <StreakBadge />
           <ThemeToggle />
         </div>
       </div>
     </header>
+  )
+}
+
+/** chuỗi ngày học, bấm để xem Thống kê; hôm nay chưa học thì lửa xám (sắp mất chuỗi) */
+function StreakBadge() {
+  const { data, refetch } = useQuery(statsQuery())
+  // vừa luyện xong ở trang khác (ôn thẻ, chép chính tả…) → cập nhật lửa khi chuyển trang
+  const pathname = useLocation({ select: (l) => l.pathname })
+  useEffect(() => void refetch(), [pathname, refetch])
+  if (!data) return null
+  const lit = data.practicedToday
+  return (
+    <Link
+      to="/stats"
+      className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-semibold text-foreground no-underline hover:bg-muted"
+      activeProps={{ className: 'bg-muted' }}
+      title={
+        lit
+          ? `Chuỗi ${data.streak} ngày — hôm nay đã học`
+          : data.streak
+            ? `Chuỗi ${data.streak} ngày — hôm nay chưa học, luyện một lượt để giữ chuỗi`
+            : 'Bắt đầu chuỗi ngày học — xem Thống kê'
+      }
+    >
+      <Flame className={cn('size-4', lit ? 'fill-rec/30 text-rec' : 'text-muted-foreground')} />
+      <span className="tabular-nums">{data.streak}</span>
+    </Link>
   )
 }
 

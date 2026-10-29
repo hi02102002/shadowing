@@ -33,6 +33,8 @@ export const AppConfigSchema = z.object({
   reviewsPerDay: z.coerce.number().int().min(0).max(9999),
   /** sách từ vựng: unit dài chia thành các bộ tối đa chừng này từ */
   wordsPerGroup: z.coerce.number().int().min(5).max(200),
+  /** thống kê: số lượt luyện mỗi ngày để tính "đạt mục tiêu" (câu chép, lượt nói, lượt ôn thẻ, câu ngữ pháp) */
+  dailyGoal: z.coerce.number().int().min(1).max(500),
 })
 export type AppConfig = z.infer<typeof AppConfigSchema>
 export type WhisperModel = (typeof WHISPER_MODELS)[number]
@@ -57,6 +59,7 @@ function fromEnv(): AppConfig {
     newPerDay: 20,
     reviewsPerDay: 200,
     wordsPerGroup: 25,
+    dailyGoal: 20,
   }
 }
 

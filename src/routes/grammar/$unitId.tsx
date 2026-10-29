@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { z } from 'zod'
 
+import { GrammarDrillPanel } from '#/components/grammar-drill'
 import { HtmlNodes } from '#/components/html-nodes'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -40,7 +41,7 @@ import {
 } from '#/server/fns/grammar'
 import type { GrammarUnitPage } from '#/server/fns/grammar'
 
-const TABS = ['theory', 'exercises', 'videos'] as const
+const TABS = ['theory', 'exercises', 'ai', 'videos'] as const
 type Tab = (typeof TABS)[number]
 
 export const Route = createFileRoute('/grammar/$unitId')({
@@ -75,7 +76,7 @@ function UnitPage() {
   const { unit } = page
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6">
       <nav className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <Link to="/grammar" className="flex items-center gap-1 text-muted-foreground no-underline hover:text-foreground">
           <ArrowLeft className="size-4" /> Danh sách bài
@@ -100,6 +101,9 @@ function UnitPage() {
           <TabsTrigger value="exercises" disabled={!unit.exercises.length}>
             Bài tập
           </TabsTrigger>
+          <TabsTrigger value="ai">
+            <Sparkles className="size-3.5" /> Luyện thêm (AI)
+          </TabsTrigger>
           <TabsTrigger value="videos">Trong video của bạn</TabsTrigger>
         </TabsList>
         <TabsContent value="theory" className="mt-3 flex flex-col gap-4">
@@ -111,6 +115,9 @@ function UnitPage() {
           {unit.exercises.map((ex) => (
             <ExerciseCard key={`${unit.id}-${ex.key}`} page={page} exercise={ex} />
           ))}
+        </TabsContent>
+        <TabsContent value="ai" className="mt-3">
+          <GrammarDrillPanel unitId={unit.id} />
         </TabsContent>
         <TabsContent value="videos" className="mt-3">
           <VideoExamples unitId={unit.id} hasPattern={page.hasPattern} />

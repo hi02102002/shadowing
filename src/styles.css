@@ -15,6 +15,9 @@
   --popover-foreground: oklch(0.22 0.02 260);
   --primary: oklch(0.45 0.13 262);
   --primary-foreground: oklch(0.98 0.005 260);
+  /* biểu đồ nhiều series (đã kiểm tra tách màu cho người mù màu, sáng/tối) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
   --secondary: oklch(0.955 0.008 260);
   --secondary-foreground: oklch(0.28 0.03 260);
   --muted: oklch(0.955 0.006 85);
@@ -50,6 +53,8 @@
   --popover-foreground: oklch(0.93 0.01 260);
   --primary: oklch(0.72 0.12 262);
   --primary-foreground: oklch(0.18 0.02 260);
+  --series-1: #3987e5;
+  --series-2: #d95926;
   --secondary: oklch(0.26 0.02 260);
   --secondary-foreground: oklch(0.9 0.01 260);
   --muted: oklch(0.25 0.015 260);
@@ -106,6 +111,8 @@
   --color-extra-soft: var(--extra-soft);
   --color-rec: var(--rec);
   --color-karaoke: var(--karaoke);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -215,4 +222,22 @@
 }
 .type-shake {
   animation: type-shake 0.2s ease-in-out 2;
+}
+
+/* lịch hoạt động (trang Thống kê): một màu primary đậm dần theo số lượt luyện
+   (trộn trong oklab: oklch đi vòng sắc độ từ xanh dương qua xanh lá tới màu nền kem) */
+.heat-0 {
+  background: var(--muted);
+}
+.heat-1 {
+  background: color-mix(in oklab, var(--primary) 30%, var(--muted));
+}
+.heat-2 {
+  background: color-mix(in oklab, var(--primary) 55%, var(--muted));
+}
+.heat-3 {
+  background: color-mix(in oklab, var(--primary) 78%, var(--muted));
+}
+.heat-4 {
+  background: var(--primary);
 }

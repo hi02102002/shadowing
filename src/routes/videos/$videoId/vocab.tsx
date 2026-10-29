@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { BookmarkCheck, Keyboard, Loader2, Play, Sparkles } from 'lucide-react'
 
-import { VocabPractice, splitAround } from '#/components/vocab-practice'
+import { VocabPractice, clipFor, splitAround } from '#/components/vocab-practice'
+import { WordLookupCard } from '#/components/word-lookup-card'
+import type { LookupTarget } from '#/components/word-lookup-card'
 import type { VocabItem } from '#/components/vocab-practice'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
@@ -60,7 +62,11 @@ function VocabMode() {
 
   const vocab = useQuery(videoVocabQuery(videoId))
   const wantPhrases = filters.includes(PHRASES)
-  const phrases = useQuery({ ...videoPhrasesQuery(videoId), enabled: wantPhrases })
+  // chỉ đọc cache ở server (không gọi AI) → luôn hỏi để có từ loại theo ngữ cảnh nếu đã tìm
+  const phrases = useQuery(videoPhrasesQuery(videoId))
+  const aiPos = phrases.data?.status === 'ready' ? phrases.data.wordPos : {}
+  const [lookup, setLookup] = useState<LookupTarget | null>(null)
+  const closeLookup = useCallback(() => setLookup(null), [])
   const queryClient = useQueryClient()
   const findPhrases = useMutation({
     mutationFn: () => videoPhrases({ data: { youtubeId: videoId, generate: true } }),
@@ -74,7 +80,8 @@ function VocabMode() {
     surface: w.surface,
     segIdx: w.segIdx,
     level: w.level,
-    pos: posVi(w.pos),
+    // từ loại theo ngữ cảnh câu (AI) nếu đã tìm, không thì theo danh sách CEFR-J
+    pos: posVi(w.lemma in aiPos ? [aiPos[w.lemma]] : w.pos),
     count: w.count,
     meaningVi: meanings.data?.[w.lemma],
     saved: w.saved,
@@ -110,7 +117,7 @@ function VocabMode() {
   }
 
   if (practice)
-    return <VocabPractice items={practice} segments={video.segments} onExit={() => setPractice(null)} />
+    return <VocabPractice youtubeId={videoId} items={practice} segments={video.segments} onExit={() => setPractice(null)} />
 
   const countOf = (f: Filter) =>
     visible(f === PHRASES ? phraseItems : words.filter((w) => w.level === f)).length
@@ -163,12 +170,14 @@ function VocabMode() {
       {wantPhrases && phrases.data?.status === 'no-ai' && (
         <p className="text-sm text-muted-foreground">Tìm cụm từ cần AI: vào Cài đặt để cấu hình nhà cung cấp AI.</p>
       )}
-      {wantPhrases && phrases.data?.status === 'idle' && (
+      {phrases.data?.status === 'idle' && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          <span className="flex-1">Chưa tìm cụm từ (phrasal verb, thành ngữ, collocation) cho bài này.</span>
+          <span className="flex-1">
+            Chưa tìm cụm từ (phrasal verb, thành ngữ, collocation) và loại từ theo ngữ cảnh câu cho bài này.
+          </span>
           <Button size="sm" variant="outline" onClick={() => findPhrases.mutate()} disabled={findPhrases.isPending}>
             {findPhrases.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
-            Tìm cụm từ bằng AI
+            {findPhrases.isPending ? 'Đang tìm…' : 'Tìm bằng AI'}
           </Button>
         </div>
       )}
@@ -183,7 +192,13 @@ function VocabMode() {
               </h3>
               <ul className="divide-y rounded-xl border bg-card">
                 {s.items.map((w) => (
-                  <VocabRow key={w.key} item={w} seg={segments.get(w.segIdx)} onPractice={() => startPractice(w)} />
+                  <VocabRow
+                    key={w.key}
+                    item={w}
+                    seg={segments.get(w.segIdx)}
+                    onPractice={() => startPractice(w)}
+                    onLookup={setLookup}
+                  />
                 ))}
               </ul>
             </section>
@@ -195,13 +210,25 @@ function VocabMode() {
         <a href="https://github.com/openlanguageprofiles/olp-en-cefrj" target="_blank" rel="noreferrer">
           CEFR-J Wordlist 1.5 (Tono Lab, TUFS) và Octanove Vocabulary Profile C1/C2 (CC BY-SA 4.0)
         </a>
-        ; cụm từ do AI chọn.
+        ; cụm từ và loại từ theo ngữ cảnh do AI chọn. Bấm vào từ để xem nghĩa theo câu.
       </p>
+      {lookup && <WordLookupCard target={lookup} onClose={closeLookup} autoAi={false} />}
     </div>
   )
 }
 
-function VocabRow({ item, seg, onPractice }: { item: VocabItem; seg?: SegmentView; onPractice: () => void }) {
+function VocabRow({
+  item,
+  seg,
+  onPractice,
+  onLookup,
+}: {
+  item: VocabItem
+  seg?: SegmentView
+  onPractice: () => void
+  /** mở thẻ tra từ (từ điển + nghĩa AI theo đúng câu, lưu thẻ) ngay dưới từ */
+  onLookup: (target: LookupTarget) => void
+}) {
   const parts = seg && item.surface ? splitAround(seg.text, item.surface) : null
   return (
     <li className="flex items-center gap-3 px-3 py-2">
@@ -217,7 +244,27 @@ function VocabRow({ item, seg, onPractice }: { item: VocabItem; seg?: SegmentVie
       </Button>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-semibold">{item.text}</span>
+          <button
+            type="button"
+            className="font-semibold underline-offset-4 hover:text-primary hover:underline disabled:no-underline"
+            disabled={!seg}
+            title="Xem nghĩa theo câu"
+            onClick={(e) => {
+              if (!seg) return
+              const rect = e.currentTarget.getBoundingClientRect()
+              const clip = clipFor(seg, item.surface || item.text)
+              onLookup({
+                text: item.text,
+                sentence: seg.text,
+                segmentId: seg.id,
+                startMs: clip.startMs,
+                endMs: clip.endMs,
+                rect: { top: rect.top, bottom: rect.bottom, left: rect.left },
+              })
+            }}
+          >
+            {item.text}
+          </button>
           {(item.kind ?? item.pos) && (
             <span className="text-xs text-muted-foreground">{item.kind ?? item.pos}</span>
           )}

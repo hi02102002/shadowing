@@ -27,6 +27,9 @@ export function normalizeAnswer(s: string): string {
     .replace(/^[-–—x0ø]$/, '-')
 }
 
+/** câu trả lời gõ tay khớp một trong các đáp án (bỏ qua hoa/thường, dạng rút gọn, dấu câu đầu cuối) */
+export const matchesAnswer = (input: string, answers: string[]) => matches(input, answers)
+
 const matches = (input: string, answers: string[]) => {
   const got = normalizeAnswer(input)
   return got !== '' && answers.some((a) => normalizeAnswer(a) === got)

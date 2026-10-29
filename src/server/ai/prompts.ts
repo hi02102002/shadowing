@@ -280,7 +280,74 @@ ${opts.question}
 Người học trả lời: ${opts.answer || '(bỏ trống)'}`
 }
 
+/** độ khó bài tập ngữ pháp do AI tạo */
+export const DRILL_LEVELS = ['easy', 'medium', 'hard'] as const
+export type DrillLevel = (typeof DRILL_LEVELS)[number]
+
+const DRILL_LEVEL_DESC: Record<DrillLevel, string> = {
+  easy: 'DỄ (A2): câu ngắn một mệnh đề, từ vựng thông dụng, dùng dạng cơ bản nhất của cấu trúc, ngữ cảnh rõ ràng.',
+  medium:
+    'VỪA (B1): câu có ngữ cảnh 1–2 mệnh đề, trộn khẳng định / phủ định / nghi vấn, có câu cần phân biệt với cấu trúc dễ nhầm.',
+  hard: 'KHÓ (B2–C1): ngữ cảnh dài hơn, câu phức, trường hợp đặc biệt / ngoại lệ, phân biệt tinh tế với cấu trúc gần giống, bẫy người Việt hay mắc.',
+}
+
+/** dạng bài tập AI tạo */
+export const DRILL_TYPES = ['fill', 'choice', 'fix', 'order', 'rewrite'] as const
+export type DrillType = (typeof DRILL_TYPES)[number]
+
+const DRILL_TYPE_DESC: Record<DrillType, string> = {
+  fill: '"fill" — điền vào chỗ trống: prompt là câu có đúng một ___, hint là từ gợi ý trong ngoặc như "(go)", answers là mọi cách điền đúng',
+  choice:
+    '"choice" — trắc nghiệm: prompt là câu có đúng một ___, options 3–4 phương án (phương án sai là lỗi người học hay mắc), answers là đúng một phương án chép nguyên văn',
+  fix: '"fix" — tìm và sửa lỗi: prompt là câu có ĐÚNG MỘT lỗi ngữ pháp thuộc chủ điểm (không có ___), wrong là phần sai chép nguyên văn trong prompt, answers là các cách sửa phần đó',
+  order:
+    '"order" — sắp xếp từ thành câu: prompt là nghĩa tiếng Việt của câu, answers[0] là câu tiếng Anh đúng 4–12 từ (các phần tử khác nếu có là cách sắp xếp khác cũng đúng)',
+  rewrite:
+    '"rewrite" — viết lại câu: prompt là câu gốc tiếng Anh, hint là yêu cầu bằng tiếng Việt kèm từ gợi ý (vd. \'Dùng "since"\', \'Bắt đầu bằng "She has…"\'), answers là mọi câu viết lại đúng, đầy đủ',
+}
+
+export const GrammarDrillSchema = z.object({
+  questions: z
+    .array(
+      z.object({
+        type: z.enum(DRILL_TYPES),
+        prompt: z.string(),
+        hint: z.string().describe('rỗng nếu dạng bài không cần'),
+        options: z.array(z.string()).describe('chỉ dạng choice, các dạng khác là mảng rỗng'),
+        wrong: z.string().describe('chỉ dạng fix, các dạng khác là chuỗi rỗng'),
+        answers: z.array(z.string()),
+        explanation: z.string().describe('giải thích tiếng Việt 1–2 câu vì sao đáp án đúng'),
+      }),
+    )
+    .describe('đúng số câu được yêu cầu, chia đều các dạng được yêu cầu, xếp xen kẽ'),
+})
+export type GrammarDrill = z.infer<typeof GrammarDrillSchema>
+
+export function grammarDrillPrompt(opts: {
+  unitTitle: string
+  theory: string
+  level: DrillLevel
+  count: number
+  types: readonly DrillType[]
+  /** nhóm chủ đề cho lượt này khi chia nhiều lượt gọi (để các lượt không trùng câu) */
+  themes?: string
+}) {
+  return `Bài: ${opts.unitTitle}
+Lý thuyết trong sách (tiếng Anh):
+"""
+${opts.theory}
+"""
+Hãy tạo ${opts.count} câu bài tập mới luyện ĐÚNG chủ điểm của bài này, độ khó ${DRILL_LEVEL_DESC[opts.level]}
+Chỉ dùng các dạng sau, chia đều số câu:
+${opts.types.map((t) => `- ${DRILL_TYPE_DESC[t]}`).join('\n')}
+Yêu cầu chung:
+- Tự đặt câu với chủ đề ${opts.themes ? `xoay quanh: ${opts.themes}` : 'đời thường đa dạng'}, không chép ví dụ trong sách, không lặp cấu trúc câu.
+- Mỗi câu chỉ có một cách hiểu đúng (trừ các dạng viết tương đương liệt kê trong answers, kể cả dạng rút gọn như "'s gone").`
+}
+
 export const PHRASE_KINDS = ['phrasal verb', 'idiom', 'collocation', 'expression'] as const
+/** từ loại theo ngữ cảnh câu (khớp nhãn POS_VI trong src/lib/levels.ts) */
+export const WORD_POS = ['noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'conjunction', 'determiner', 'interjection'] as const
 
 export const VideoPhrasesSchema = z.object({
   phrases: z
@@ -297,15 +364,21 @@ export const VideoPhrasesSchema = z.object({
       }),
     )
     .describe('tối đa 30 cụm đáng học, theo thứ tự xuất hiện'),
+  words: z
+    .array(z.object({ word: z.string(), pos: z.enum(WORD_POS) }))
+    .describe('từ loại của MỖI từ trong danh sách "Từ cần xác định từ loại", theo nghĩa trong câu đã cho'),
 })
 export type VideoPhrases = z.infer<typeof VideoPhrasesSchema>
 
 export const VIDEO_PHRASES_SYSTEM = `Bạn giúp người Việt học tiếng Anh qua video.
-Từ transcript, liệt kê các CỤM TỪ đáng học: phrasal verb, thành ngữ, collocation, cách nói cố định.
+1. Từ transcript, liệt kê các CỤM TỪ đáng học: phrasal verb, thành ngữ, collocation, cách nói cố định.
 - Chỉ lấy cụm có thật trong transcript, KHÔNG lấy từ đơn, bỏ cụm quá cơ bản (cấp A1 như "go to", "a lot of").
 - "segment" là số trong ngoặc vuông của câu chứa cụm (lần xuất hiện đầu tiên).
-- "surface" phải chép nguyên văn từ câu đó để có thể tìm thấy bằng so khớp chuỗi.`
+- "surface" phải chép nguyên văn từ câu đó để có thể tìm thấy bằng so khớp chuỗi.
+2. Với danh sách từ cần xác định từ loại (mỗi dòng: từ gốc | dạng trong câu | số câu), cho từ loại của từ
+   ĐÚNG THEO CÁCH DÙNG trong câu đó (vd. "view" trong "a nice view" là noun, trong "view the page" là verb).
+   "word" chép đúng từ gốc.`
 
-export function videoPhrasesPrompt(lines: string) {
-  return `Transcript (mỗi dòng: [số thứ tự] câu):\n${lines}`
+export function videoPhrasesPrompt(lines: string, words: string) {
+  return `Transcript (mỗi dòng: [số thứ tự] câu):\n${lines}\n\nTừ cần xác định từ loại:\n${words || '(không có)'}`
 }

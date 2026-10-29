@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Lightbulb,
   Loader2,
+  Sparkles,
   Volume2,
   X,
 } from 'lucide-react'
@@ -22,7 +23,8 @@ import type { DictEntry } from '#/server/dunno'
 export interface LookupTarget {
   text: string
   sentence: string
-  segmentId: number
+  /** null: tra nhanh ở ngoài video (không có đoạn để nghe lại) */
+  segmentId: number | null
   startMs: number
   endMs: number
   /** vị trí của từ trên màn hình để đặt thẻ ngay dưới/trên nó */
@@ -35,10 +37,14 @@ const GAP = 8
 export function WordLookupCard({
   target,
   onClose,
+  autoAi = true,
 }: {
   target: LookupTarget
   onClose: () => void
+  /** false: chỉ hiện nghĩa AI đã tra trước đó, muốn tra mới thì bấm nút (tab Từ vựng) */
+  autoAi?: boolean
 }) {
+  const [askAi, setAskAi] = useState(autoAi)
   const ref = useRef<HTMLDivElement>(null)
   // đổi UK/US ở đây là đổi giọng chuẩn của cả app
   const [accent, chooseAccent] = useAccent()
@@ -49,9 +55,9 @@ export function WordLookupCard({
 
   // nghĩa theo ngữ cảnh bằng AI (null khi chưa cấu hình AI)
   const query = useQuery({
-    queryKey: ['lookup', target.text.toLowerCase(), target.sentence],
+    queryKey: ['lookup', target.text.toLowerCase(), target.sentence, askAi ? 'ai' : 'cache'],
     queryFn: () =>
-      lookupWord({ data: { text: target.text, sentence: target.sentence } }),
+      lookupWord({ data: { text: target.text, sentence: target.sentence, cachedOnly: !askAi } }),
     staleTime: Infinity,
     retry: false,
   })
@@ -145,14 +151,16 @@ export function WordLookupCard({
       </header>
 
       <div className="mt-2 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => playerActions.playClip(target.startMs, target.endMs)}
-        >
-          <AudioLines />
-          Nghe trong video
-        </Button>
+        {target.segmentId != null && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => playerActions.playClip(target.startMs, target.endMs)}
+          >
+            <AudioLines />
+            Nghe trong video
+          </Button>
+        )}
         <SaveToDeck
           text={target.text}
           sentence={target.sentence}
@@ -160,6 +168,7 @@ export function WordLookupCard({
           startMs={target.startMs}
           endMs={target.endMs}
           disabled={query.isPending}
+          cachedOnly={!askAi}
         />
         {canSpeak() && (
           <div className="flex items-center gap-1">
@@ -220,6 +229,24 @@ export function WordLookupCard({
             <Loader2 className="size-4 animate-spin" /> Đang tra nghĩa theo ngữ
             cảnh…
           </p>
+        )}
+
+        {query.isSuccess && !d && (
+          askAi ? (
+            !autoAi && (
+              <p className="text-muted-foreground">
+                Chưa cấu hình AI.{' '}
+                <Link to="/settings" onClick={onClose}>
+                  Mở Cài đặt AI →
+                </Link>
+              </p>
+            )
+          ) : (
+            <Button size="sm" variant="outline" className="self-start" onClick={() => setAskAi(true)}>
+              <Sparkles />
+              Tra nghĩa theo câu bằng AI
+            </Button>
+          )
         )}
 
         {query.isError && (

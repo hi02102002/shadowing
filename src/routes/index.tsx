@@ -49,7 +49,7 @@ function Home() {
   const { data: stats } = useSuspenseQuery(statsQuery())
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10">
+    <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-10">
       <section className="flex flex-col items-center gap-6 text-center">
         <div className="flex flex-col gap-3">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Luyện nghe nói từ bất kỳ video YouTube</h1>
@@ -92,7 +92,7 @@ function Home() {
             tiếng Anh. Video không có phụ đề sẽ được tạo phụ đề bằng Whisper.
           </div>
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {videos.map((v) => (
               <VideoCard key={v.id} video={v} />
             ))}

@@ -27,11 +27,11 @@ export const LOCAL_MODELS = {
   },
 } satisfies Record<WhisperModel, { file: string; url: string; bytes: number; sha256: string }>
 
-/** model đang chọn trong Cài đặt */
-const currentModel = () => {
-  const name = getConfig().whisperModel
-  return { name, ...LOCAL_MODELS[name] }
-}
+/** chấm phát âm: câu ngắn, cần trả kết quả ngay → luôn dùng model nhỏ, không theo lựa chọn cho phụ đề */
+export const PRONUNCIATION_MODEL: WhisperModel = 'small.en'
+
+/** model cho phụ đề: theo Cài đặt */
+const resolveModel = (name: WhisperModel = getConfig().whisperModel) => ({ name, ...LOCAL_MODELS[name] })
 
 const exe = process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli'
 
@@ -43,7 +43,7 @@ export function whisperBinary(): string | null {
   return existsSync(local) ? local : null
 }
 
-const modelPath = (file = currentModel().file) => path.resolve(process.env.DATA_DIR ?? 'data', 'models', file)
+const modelPath = (file: string) => path.resolve(process.env.DATA_DIR ?? 'data', 'models', file)
 
 /** mỗi lúc chỉ tải một model; đổi model giữa chừng thì lượt tải cũ vẫn chạy cho xong */
 let download: { name: WhisperModel; promise: Promise<void>; received: number } | null = null
@@ -51,10 +51,10 @@ let downloadError: string | null = null
 
 export type ModelState = 'missing' | 'downloading' | 'ready'
 
-export function whisperLocalStatus() {
-  const model = currentModel()
+export function whisperLocalStatus(name?: WhisperModel) {
+  const model = resolveModel(name)
   const downloading = download?.name === model.name
-  const state: ModelState = downloading ? 'downloading' : existsSync(modelPath()) ? 'ready' : 'missing'
+  const state: ModelState = downloading ? 'downloading' : existsSync(modelPath(model.file)) ? 'ready' : 'missing'
   return {
     binary: whisperBinary() !== null,
     model: state,
@@ -67,8 +67,8 @@ export function whisperLocalStatus() {
 }
 
 /** Tải model (chỉ một lượt tải dù gọi nhiều lần), kiểm tra SHA-256 rồi mới đổi tên thành file thật */
-export function ensureModel(): Promise<void> {
-  const model = currentModel()
+export function ensureModel(name?: WhisperModel): Promise<void> {
+  const model = resolveModel(name)
   if (existsSync(modelPath(model.file))) return Promise.resolve()
   if (download) {
     if (download.name === model.name) return download.promise
@@ -123,15 +123,18 @@ export async function transcribeLocal(
     /** tiến độ tải model lần đầu (0–1) */
     onModelProgress?: (fraction: number) => void
     onStart?: () => void
+    /** mặc định: model phụ đề trong Cài đặt */
+    model?: WhisperModel
   } = {},
 ): Promise<WhisperCppJson> {
+  const model = resolveModel(opts.model)
   const bin = whisperBinary()
   if (!bin) throw new Error('Không tìm thấy whisper-cli. Cài whisper.cpp hoặc đặt WHISPER_CPP_PATH.')
-  if (!existsSync(modelPath())) {
-    const timer = setInterval(() => opts.onModelProgress?.(whisperLocalStatus().progress), 500)
+  if (!existsSync(modelPath(model.file))) {
+    const timer = setInterval(() => opts.onModelProgress?.(whisperLocalStatus(model.name).progress), 500)
     try {
       opts.onModelProgress?.(0)
-      await ensureModel()
+      await ensureModel(model.name)
     } finally {
       clearInterval(timer)
     }
@@ -142,7 +145,7 @@ export async function transcribeLocal(
   const outBase = wavPath.replace(/\.wav$/i, '')
   // whisper.cpp không tăng tốc thêm sau ~8 luồng, chừa 1 nhân cho app
   const threads = Math.max(1, Math.min(8, os.availableParallelism() - 1))
-  const args = ['-m', modelPath(), '-f', wavPath, '-l', 'en', '-t', String(threads)]
+  const args = ['-m', modelPath(model.file), '-f', wavPath, '-l', 'en', '-t', String(threads)]
   args.push('-ml', '1', '-sow', '-oj', '-of', outBase, '-pp', '-np')
 
   await new Promise<void>((resolve, reject) => {

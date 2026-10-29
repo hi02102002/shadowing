@@ -18,9 +18,11 @@ export const lookupWord = createServerFn({ method: 'POST' })
     z.object({
       text: z.string().trim().min(1).max(80),
       sentence: z.string().max(600),
+      /** chỉ trả nghĩa AI đã tra trước đó, không gọi AI mới */
+      cachedOnly: z.boolean().optional(),
     }),
   )
-  .handler(async ({ data }) => contextLookup(data.text, data.sentence))
+  .handler(async ({ data }) => contextLookup(data.text, data.sentence, { cachedOnly: data.cachedOnly }))
 
 /** Phiên âm IPA cho từng từ trong câu (từ điển CMU, không cần AI) */
 export const wordsIpa = createServerFn({ method: 'POST' })

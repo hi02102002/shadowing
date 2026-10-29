@@ -28,6 +28,8 @@ import { downloadWhisperModel, whisperStatus } from '#/server/fns/captions'
 import { saveSettings, testLlm } from '#/server/fns/settings'
 import type { PublicSettings } from '#/server/fns/settings'
 import { ACCENT_DEPENDENT_KEYS } from '#/hooks/use-app-settings'
+import { useStoredToggle } from '#/hooks/use-stored-toggle'
+import { QUICK_LOOKUP_OFF_KEY } from '#/components/quick-lookup'
 
 export const Route = createFileRoute('/settings')({
   loader: ({ context }) => context.queryClient.ensureQueryData(settingsQuery()),
@@ -451,7 +453,7 @@ function SettingsPage() {
           <form.Field name="whisperModel">
             {(field) => (
               <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">Model Whisper trên máy (dùng cả khi chấm phát âm không có AI)</span>
+                <span className="text-sm font-medium">Model Whisper tạo phụ đề (chấm phát âm trên máy luôn dùng small.en cho nhanh)</span>
                 <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
                   {WHISPER_MODELS.map((m) => (
                     <label
@@ -582,8 +584,30 @@ function SettingsPage() {
         </form.Subscribe>
       </form>
 
+      <QuickLookupSetting />
+
       <AppVersion />
     </div>
+  )
+}
+
+/** bật/tắt tra từ nhanh toàn app (lưu trong trình duyệt, không cần bấm Lưu cài đặt) */
+function QuickLookupSetting() {
+  const [off, setOff] = useStoredToggle(QUICK_LOOKUP_OFF_KEY)
+  return (
+    <fieldset className="flex flex-col gap-2 rounded-xl border bg-card p-5">
+      <legend className="px-1 text-sm font-semibold">Tra từ nhanh</legend>
+      <label className="flex items-start gap-3 text-sm">
+        <Switch checked={!off} onCheckedChange={(on) => setOff(!on)} className="mt-0.5" />
+        <span className="flex flex-col gap-0.5">
+          <span className="font-medium">Nhấp đúp hoặc bôi đen từ tiếng Anh ở bất kỳ trang nào để tra nghĩa</span>
+          <span className="text-xs text-muted-foreground">
+            Nhấp đúp: mở thẻ tra từ ngay. Bôi đen một cụm: hiện nút “Tra” cạnh chỗ chọn. Thẻ dùng từ điển, nghĩa AI theo
+            câu chỉ tra khi bạn bấm.
+          </span>
+        </span>
+      </label>
+    </fieldset>
   )
 }
 

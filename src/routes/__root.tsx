@@ -4,6 +4,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import { FormDevtoolsPanel } from '@tanstack/react-form-devtools'
 
 import { AppHeader, THEME_SCRIPT } from '#/components/app-header'
+import { QuickLookup } from '#/components/quick-lookup'
 import { TooltipProvider } from '#/components/ui/tooltip'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
@@ -47,6 +48,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <TooltipProvider delayDuration={300}>
           <AppHeader />
           <main>{children}</main>
+          <QuickLookup />
         </TooltipProvider>
         <TanStackDevtools
           config={{ position: 'bottom-left' }}

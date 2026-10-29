@@ -64,7 +64,7 @@ function Explore() {
   const { importUrl, importing, error, dialog } = useVideoImport()
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight">
           Bài nghe theo cấp độ
@@ -124,7 +124,7 @@ function Explore() {
       {error && <p className="text-sm text-destructive">{error.message}</p>}
 
       {catalog.isPending ? (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {SKELETONS.map((k) => (
             <li
               key={k}
@@ -160,7 +160,7 @@ function Explore() {
       ) : (
         <ul
           className={cn(
-            'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 transition-opacity',
+            'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 transition-opacity',
             catalog.isPlaceholderData && 'opacity-60',
           )}
         >

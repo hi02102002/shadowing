@@ -9,13 +9,17 @@ import type { GrammarUnit } from '#/lib/grammar.ts'
 import { checkAnswer, decodeChoice, decodeRightWrong, normalizeAnswer } from '#/lib/grammar-check.ts'
 import { GRAMMAR_PATTERNS, matchGrammar } from '#/lib/grammar-patterns.ts'
 import {
+  DRILL_LEVELS,
+  DRILL_TYPES,
   GRAMMAR_SYSTEM,
+  GrammarDrillSchema,
   GrammarExplainSchema,
   GrammarMistakeSchema,
   grammarAnswerPrompt,
+  grammarDrillPrompt,
   grammarSectionPrompt,
 } from '../ai/prompts.ts'
-import type { GrammarExplain, GrammarMistake } from '../ai/prompts.ts'
+import type { GrammarDrill, GrammarExplain, GrammarMistake } from '../ai/prompts.ts'
 import { structured } from '../ai/provider.ts'
 import { getUnit, loadBook, plainText } from '../grammar/egiu.ts'
 import { recordGrammarMistake } from '../mistakes.ts'
@@ -219,4 +223,126 @@ export const grammarExamples = createServerFn({ method: 'GET' })
       if (out.length >= EXAMPLE_LIMIT) break
     }
     return out
+  })
+
+/** mỗi lượt gọi AI tối đa chừng này câu; bộ lớn hơn chia nhiều lượt gọi song song */
+const DRILL_BATCH = 20
+/** mỗi lượt một nhóm chủ đề khác nhau để các lượt không đặt trùng câu */
+const DRILL_THEMES = [
+  'gia đình, nhà cửa, bạn bè',
+  'công việc, học tập, trường lớp',
+  'du lịch, mua sắm, ăn uống',
+  'sức khoẻ, thể thao, thời tiết',
+  'công nghệ, giải trí, tin tức',
+]
+const drillKey = (unitId: string, level: string) => `grammar:drill:${unitId}:${level}`
+
+const words = (s: string) => s.trim().split(/\s+/).filter(Boolean)
+
+/**
+ * bỏ câu AI tạo sai dạng: điền/trắc nghiệm phải có đúng một ___, trắc nghiệm phải có đáp án trong phương án,
+ * sửa lỗi phải chỉ ra được phần sai trong câu, sắp xếp phải là câu 3–16 từ
+ */
+export function cleanDrill(drill: GrammarDrill): GrammarDrill['questions'] {
+  return drill.questions.flatMap((q) => {
+    const blanks = q.prompt.split('___').length - 1
+    const answers = q.answers.map((a) => a.trim()).filter(Boolean)
+    if (!answers.length || !q.prompt.trim()) return []
+    const base = { ...q, options: [], wrong: '', answers }
+    switch (q.type) {
+      case 'fill':
+        return blanks === 1 ? [base] : []
+      case 'choice': {
+        const options = [...new Set(q.options.map((o) => o.trim()).filter(Boolean))]
+        const right = options.find((o) => normalizeAnswer(o) === normalizeAnswer(answers[0]))
+        return blanks === 1 && right && options.length >= 2 ? [{ ...base, options, answers: [right] }] : []
+      }
+      case 'fix': {
+        const wrong = q.wrong.trim()
+        if (blanks || !wrong || !q.prompt.includes(wrong)) return []
+        // chấp nhận cả gõ lại nguyên câu đã sửa
+        return [{ ...base, wrong, answers: [...answers, ...answers.map((a) => q.prompt.replace(wrong, a))] }]
+      }
+      case 'order': {
+        const n = words(answers[0]).length
+        return n >= 3 && n <= 16 ? [base] : []
+      }
+      case 'rewrite':
+        return blanks ? [] : [base]
+    }
+  })
+}
+
+/**
+ * Bài tập AI tạo theo độ khó cho một unit: `generate` mới gọi AI (tạo bộ mới, thay bộ cũ),
+ * không thì chỉ trả bộ đã tạo gần nhất (null nếu chưa có).
+ */
+export const grammarDrill = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      unitId: z.string(),
+      level: z.enum(DRILL_LEVELS),
+      types: z.array(z.enum(DRILL_TYPES)).min(1).default([...DRILL_TYPES]),
+      count: z.number().int().min(1).max(50).default(10),
+      generate: z.boolean().default(false),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const key = drillKey(data.unitId, data.level)
+    if (!data.generate) {
+      const hit = db.select().from(lookups).where(eq(lookups.key, key)).get()
+      return hit ? (JSON.parse(hit.json) as { questions: GrammarDrill['questions']; createdAt: number }) : null
+    }
+    const unit = await requireUnit(data.unitId)
+    const theory = unit.sections
+      .map((s) => `${s.label}. ${plainText(s.body)}`)
+      .join('\n\n')
+      .slice(0, 8000)
+    const batches = Math.ceil(data.count / DRILL_BATCH)
+    const parts = await Promise.all(
+      Array.from({ length: batches }, (_, b) =>
+        structured({
+          system: GRAMMAR_SYSTEM,
+          prompt: grammarDrillPrompt({
+            unitTitle: unit.title,
+            theory,
+            level: data.level,
+            // chia đều: 50 câu → 17 + 17 + 16
+            count: Math.floor(data.count / batches) + (b < data.count % batches ? 1 : 0),
+            types: data.types,
+            themes: batches > 1 ? DRILL_THEMES[b % DRILL_THEMES.length] : undefined,
+          }),
+          schema: GrammarDrillSchema,
+        }),
+      ),
+    )
+    const questions = cleanDrill({ questions: parts.flatMap((p) => p.questions) })
+    if (!questions.length) throw new Error('AI tạo bài tập không đúng dạng, thử tạo lại')
+    const value = { questions, createdAt: Date.now() }
+    const json = JSON.stringify(value)
+    db.insert(lookups).values({ key, json }).onConflictDoUpdate({ target: lookups.key, set: { json } }).run()
+    return value
+  })
+
+export type GrammarDrillSet = NonNullable<Awaited<ReturnType<typeof grammarDrill>>>
+
+/** ghi câu sai của bài tập AI vào sổ lỗi (đáp án đúng, câu trả lời, câu hỏi) */
+export const recordDrillMistakes = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      unitId: z.string(),
+      wrong: z
+        .array(z.object({ prompt: z.string().max(600), expected: z.string().max(200), answer: z.string().max(200) }))
+        .max(50),
+    }),
+  )
+  .handler(async ({ data }) => {
+    for (const w of data.wrong)
+      recordGrammarMistake({
+        word: w.expected,
+        heard: w.answer,
+        ref: `${data.unitId}#ai`,
+        explanation: `Unit ${data.unitId}, bài tập AI: ${w.prompt}`,
+      })
+    return { ok: true }
   })
