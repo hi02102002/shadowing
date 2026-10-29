@@ -181,7 +181,9 @@ function parseHtmlUnit(book: VocabBook, u: RawUnit, index: number): VocabUnit {
     const word = li.getAttribute('word')?.trim()
     if (!word) return []
     // <div><em>v.</em> định nghĩa</div><div>câu ví dụ</div>
-    const [def, exam] = li.querySelectorAll('div')
+    const divs = li.querySelectorAll('div')
+    const def = divs.at(0)
+    const exam = divs.at(1)
     const img = li.getAttribute('img')?.trim()
     return [
       {
@@ -231,11 +233,11 @@ async function download(book: VocabBook, file: string) {
     signal: AbortSignal.timeout(60_000),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const text = (await res.text()).replace(/^﻿/, '')
-  JSON.parse(text) // file hỏng thì không lưu
+  const body = (await res.text()).replace(/^\uFEFF/, '')
+  JSON.parse(body) // file hỏng thì không lưu
   await fs.mkdir(path.dirname(file), { recursive: true })
-  await fs.writeFile(file, text)
-  return text
+  await fs.writeFile(file, body)
+  return body
 }
 
 const books = new Map<string, Promise<VocabUnit[]>>()
@@ -247,12 +249,12 @@ export function loadBook(slug: string): Promise<VocabUnit[]> {
   if (!units) {
     units = (async () => {
       const file = path.join(essentialDir(), slug, 'data.json')
-      const text = await fs.readFile(file, 'utf8').catch(() =>
+      const raw = await fs.readFile(file, 'utf8').catch(() =>
         download(book, file).catch((err: unknown) => {
           throw new Error(`Không tải được sách ${book.title} (${err instanceof Error ? err.message : String(err)})`)
         }),
       )
-      return parseBook(book, JSON.parse(text.replace(/^﻿/, '')) as RawBook)
+      return parseBook(book, JSON.parse(raw.replace(/^\uFEFF/, '')) as RawBook)
     })().catch((err: unknown) => {
       books.delete(slug) // lỗi mạng → lần sau thử lại
       throw err

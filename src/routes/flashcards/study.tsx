@@ -257,8 +257,9 @@ function Study() {
       // ôn lại: chưa nhớ thì đưa xuống cuối, nhớ rồi thì bỏ khỏi lượt ôn
       const again = rating <= 2
       setQueue((q) => {
-        const [first, ...rest] = q ?? []
-        return again && first ? [...rest, first] : rest
+        if (!q?.length) return []
+        const [first, ...rest] = q
+        return again ? [...rest, first] : rest
       })
       if (!again) setDone((n) => n + 1)
       return

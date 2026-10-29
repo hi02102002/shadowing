@@ -31,9 +31,9 @@ async function fetchMedia(url: URL, file: string) {
 
 export default defineHandler(async (event) => {
   const params = event.context.params ?? {}
-  const slug = params.slug ?? ''
-  const dir = params.dir ?? ''
-  const name = path.basename(decodeURIComponent(params.file ?? ''))
+  // pattern route bắt buộc đủ 3 tham số
+  const { slug, dir } = params
+  const name = path.basename(decodeURIComponent(params.file))
   if (!findBook(slug) || !/^[\w-]+$/.test(dir) || !/^[\w.-]+\.(jpe?g|png|gif|webp|mp3)$/i.test(name)) {
     return new Response('Not found', { status: 404 })
   }
