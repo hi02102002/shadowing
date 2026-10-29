@@ -35,6 +35,12 @@ const features = tableFeatures({
   sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, text: sortFn_text },
 })
 
+const SOURCE_LABEL: Record<string, string | undefined> = {
+  dictation: 'Chép chính tả',
+  pronunciation: 'Phát âm',
+  grammar: 'Ngữ pháp',
+}
+
 const helper = createColumnHelper<typeof features, MistakeRow>()
 
 interface Props {
@@ -76,7 +82,7 @@ export function MistakesTable({ data, onDelete }: Props) {
         helper.accessor('source', {
           header: 'Nguồn',
           filterFn: 'equalsString',
-          cell: ({ getValue }) => (getValue() === 'dictation' ? 'Chép chính tả' : 'Phát âm'),
+          cell: ({ getValue }) => SOURCE_LABEL[getValue()] ?? getValue(),
         }),
         helper.accessor('explanation', {
           header: 'Giải thích',
@@ -107,6 +113,13 @@ export function MistakesTable({ data, onDelete }: Props) {
           header: '',
           cell: ({ row }) => (
             <div className="flex justify-end gap-1">
+              {row.original.grammarRef && (
+                <Button size="icon" variant="ghost" className="size-8" asChild title="Làm lại bài tập">
+                  <Link to="/grammar/$unitId" params={{ unitId: row.original.grammarRef.split('#')[0] }} search={{ tab: 'exercises' }}>
+                    <Dumbbell />
+                  </Link>
+                </Button>
+              )}
               {row.original.youtubeId && row.original.segmentIdx != null && (
                 <Button size="icon" variant="ghost" className="size-8" asChild title="Luyện lại câu chứa lỗi">
                   <Link
@@ -189,6 +202,7 @@ export function MistakesTable({ data, onDelete }: Props) {
           <option value="">Mọi nguồn</option>
           <option value="dictation">Chép chính tả</option>
           <option value="pronunciation">Phát âm</option>
+          <option value="grammar">Ngữ pháp</option>
         </select>
         <span className="text-sm text-muted-foreground">{rows.length} lỗi</span>
       </div>

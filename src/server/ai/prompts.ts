@@ -222,3 +222,60 @@ export function lookupPrompt(text: string, sentence: string) {
   return `Từ/cụm từ cần tra: "${text}"
 Câu ngữ cảnh: "${sentence}"`
 }
+
+export const GrammarExplainSchema = z.object({
+  summary: z.string().describe('ý chính của mục ngữ pháp này trong 1-2 câu tiếng Việt'),
+  points: z
+    .array(
+      z.object({
+        rule: z.string().describe('một quy tắc / cách dùng, giải thích bằng tiếng Việt dễ hiểu'),
+        examples: z
+          .array(z.object({ en: z.string(), vi: z.string() }))
+          .describe('1-2 câu ví dụ tiếng Anh ngắn, tự đặt, kèm bản dịch'),
+      }),
+    )
+    .describe('2-5 điểm chính'),
+  pitfalls: z
+    .array(z.string())
+    .describe('lỗi người Việt hay mắc với cấu trúc này (tiếng Việt), có thể rỗng'),
+})
+export type GrammarExplain = z.infer<typeof GrammarExplainSchema>
+
+export const GrammarMistakeSchema = z.object({
+  explanation: z
+    .string()
+    .describe('vì sao câu trả lời của người học sai và vì sao đáp án đúng, bằng tiếng Việt, 2-4 câu'),
+  tip: z.string().describe('mẹo ngắn để lần sau không sai, bằng tiếng Việt'),
+})
+export type GrammarMistake = z.infer<typeof GrammarMistakeSchema>
+
+export const GRAMMAR_SYSTEM = `Bạn là giáo viên ngữ pháp tiếng Anh giàu kinh nghiệm, dạy người Việt.
+- Luôn trả lời bằng tiếng Việt, ngắn gọn, cụ thể; giữ nguyên thuật ngữ và ví dụ tiếng Anh khi cần.
+- So sánh với tiếng Việt khi giúp người học hiểu (tiếng Việt không chia thì, không có mạo từ…).
+- Ví dụ phải là câu do bạn tự đặt, không chép nguyên văn từ sách.`
+
+export function grammarSectionPrompt(unitTitle: string, label: string, text: string) {
+  return `Bài: ${unitTitle}
+Mục ${label} trong sách (tiếng Anh):
+"""
+${text}
+"""
+Hãy giảng lại mục này bằng tiếng Việt cho người học trình độ trung cấp.`
+}
+
+export function grammarAnswerPrompt(opts: {
+  unitTitle: string
+  exercise: string
+  question: string
+  expected: string
+  answer: string
+}) {
+  return `Bài: ${opts.unitTitle}
+Yêu cầu bài tập: ${opts.exercise}
+Câu hỏi (chỗ cần điền là ___):
+"""
+${opts.question}
+"""
+Đáp án đúng: ${opts.expected}
+Người học trả lời: ${opts.answer || '(bỏ trống)'}`
+}

@@ -9,6 +9,7 @@ import {
 } from '#/server/fns/pronunciation.ts'
 import { listCards, listDecks, studyQueue } from '#/server/fns/flashcards.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
+import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
 import type { Level } from './levels.ts'
@@ -92,4 +93,16 @@ export const studyQueueQuery = (deckId?: number) =>
     // hàng đợi chỉ lấy một lần mỗi phiên học, không tự refetch làm nhảy thẻ
     staleTime: Infinity,
     gcTime: 0,
+  })
+
+export const grammarUnitsQuery = () =>
+  queryOptions({
+    queryKey: ['grammar-units'],
+    queryFn: () => listGrammarUnits(),
+  })
+
+export const grammarUnitQuery = (unitId: string) =>
+  queryOptions({
+    queryKey: ['grammar-unit', unitId],
+    queryFn: () => getGrammarUnit({ data: { unitId } }),
   })

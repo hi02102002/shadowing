@@ -16,6 +16,7 @@ export const listMistakes = createServerFn({ method: 'GET' }).handler(async () =
       explanation: mistakes.explanation,
       tip: mistakes.tip,
       ipa: mistakes.ipa,
+      grammarRef: mistakes.grammarRef,
       count: mistakes.count,
       lastSeenAt: mistakes.lastSeenAt,
       segmentIdx: segments.idx,

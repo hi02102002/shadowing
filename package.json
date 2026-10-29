@@ -58,6 +58,7 @@
     "fflate": "^0.8.3",
     "lucide-react": "^0.577.0",
     "nitro": "3.0.260610-beta",
+    "node-html-parser": "^9.0.5",
     "radix-ui": "^1.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

@@ -84,7 +84,7 @@ export const mistakes = sqliteTable(
     word: text().notNull(),
     heard: text(),
     type: text().notNull(),
-    /** dictation | pronunciation */
+    /** dictation | pronunciation | grammar */
     source: text().notNull(),
     segmentId: integer('segment_id').references(() => segments.id, {
       onDelete: 'set null',
@@ -92,6 +92,8 @@ export const mistakes = sqliteTable(
     explanation: text(),
     tip: text(),
     ipa: text(),
+    /** lỗi bài tập ngữ pháp: "<unit>#<exercise>#<câu>", vd. "12#12.2#3" */
+    grammarRef: text('grammar_ref'),
     count: integer().notNull().default(1),
     lastSeenAt: integer('last_seen_at', { mode: 'timestamp' })
       .notNull()
@@ -188,3 +190,19 @@ export const reviewLogs = sqliteTable(
 
 export type Deck = typeof decks.$inferSelect
 export type Card = typeof cards.$inferSelect
+
+/** Câu trả lời bài tập ngữ pháp (English Grammar in Use): giữ lần làm gần nhất của mỗi câu */
+export const grammarAnswers = sqliteTable(
+  'grammar_answers',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    /** id unit trong sách: "12" | "appendix-3" */
+    unitId: text('unit_id').notNull(),
+    /** "<exercise>#<câu>", vd. "12.2#3" */
+    itemKey: text('item_key').notNull(),
+    answer: text().notNull(),
+    correct: integer({ mode: 'boolean' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  },
+  (t) => [uniqueIndex('grammar_answers_unit_item_idx').on(t.unitId, t.itemKey)],
+)

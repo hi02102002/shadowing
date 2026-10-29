@@ -17,6 +17,7 @@ const config = defineConfig({
       routes: {
         '/api/media/:key': './src/server/media-route.ts',
         '/api/card-media/:file': './src/server/card-media-route.ts',
+        '/api/grammar-media/:file': './src/server/grammar-media-route.ts',
         '/api/tts': './src/server/tts-route.ts',
       },
     }),

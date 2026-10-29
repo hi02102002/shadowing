@@ -17,6 +17,8 @@ import { Route as ApiAnkiUploadsRouteImport } from './routes/api/anki-uploads'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
 import { Route as FlashcardsIndexRouteImport } from './routes/flashcards/index'
 import { Route as FlashcardsStudyRouteImport } from './routes/flashcards/study'
+import { Route as GrammarIndexRouteImport } from './routes/grammar/index'
+import { Route as GrammarUnitIdRouteImport } from './routes/grammar/$unitId'
 import { Route as IpaIndexRouteImport } from './routes/ipa/index'
 import { Route as IpaSoundIdRouteImport } from './routes/ipa/$soundId'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
@@ -65,6 +67,16 @@ const FlashcardsStudyRoute = FlashcardsStudyRouteImport.update({
   path: '/flashcards/study',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GrammarIndexRoute = GrammarIndexRouteImport.update({
+  id: '/grammar/',
+  path: '/grammar/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GrammarUnitIdRoute = GrammarUnitIdRouteImport.update({
+  id: '/grammar/$unitId',
+  path: '/grammar/$unitId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IpaIndexRoute = IpaIndexRouteImport.update({
   id: '/ipa/',
   path: '/ipa/',
@@ -109,9 +121,11 @@ export interface FileRoutesByFullPath {
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
+  '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
   '/flashcards/': typeof FlashcardsIndexRoute
+  '/grammar/': typeof GrammarIndexRoute
   '/ipa/': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -126,8 +140,10 @@ export interface FileRoutesByTo {
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
+  '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
   '/flashcards': typeof FlashcardsIndexRoute
+  '/grammar': typeof GrammarIndexRoute
   '/ipa': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -143,9 +159,11 @@ export interface FileRoutesById {
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
+  '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
   '/flashcards/': typeof FlashcardsIndexRoute
+  '/grammar/': typeof GrammarIndexRoute
   '/ipa/': typeof IpaIndexRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
@@ -162,9 +180,11 @@ export interface FileRouteTypes {
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
+    | '/grammar/$unitId'
     | '/ipa/$soundId'
     | '/videos/$videoId'
     | '/flashcards/'
+    | '/grammar/'
     | '/ipa/'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -179,8 +199,10 @@ export interface FileRouteTypes {
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
+    | '/grammar/$unitId'
     | '/ipa/$soundId'
     | '/flashcards'
+    | '/grammar'
     | '/ipa'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -195,9 +217,11 @@ export interface FileRouteTypes {
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
+    | '/grammar/$unitId'
     | '/ipa/$soundId'
     | '/videos/$videoId'
     | '/flashcards/'
+    | '/grammar/'
     | '/ipa/'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
@@ -213,9 +237,11 @@ export interface RootRouteChildren {
   ApiAnkiUploadsRoute: typeof ApiAnkiUploadsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
   FlashcardsStudyRoute: typeof FlashcardsStudyRoute
+  GrammarUnitIdRoute: typeof GrammarUnitIdRoute
   IpaSoundIdRoute: typeof IpaSoundIdRoute
   VideosVideoIdRoute: typeof VideosVideoIdRouteWithChildren
   FlashcardsIndexRoute: typeof FlashcardsIndexRoute
+  GrammarIndexRoute: typeof GrammarIndexRoute
   IpaIndexRoute: typeof IpaIndexRoute
 }
 
@@ -275,6 +301,20 @@ declare module '@tanstack/react-router' {
       path: '/flashcards/study'
       fullPath: '/flashcards/study'
       preLoaderRoute: typeof FlashcardsStudyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/grammar/': {
+      id: '/grammar/'
+      path: '/grammar'
+      fullPath: '/grammar/'
+      preLoaderRoute: typeof GrammarIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/grammar/$unitId': {
+      id: '/grammar/$unitId'
+      path: '/grammar/$unitId'
+      fullPath: '/grammar/$unitId'
+      preLoaderRoute: typeof GrammarUnitIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ipa/': {
@@ -355,9 +395,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAnkiUploadsRoute: ApiAnkiUploadsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
   FlashcardsStudyRoute: FlashcardsStudyRoute,
+  GrammarUnitIdRoute: GrammarUnitIdRoute,
   IpaSoundIdRoute: IpaSoundIdRoute,
   VideosVideoIdRoute: VideosVideoIdRouteWithChildren,
   FlashcardsIndexRoute: FlashcardsIndexRoute,
+  GrammarIndexRoute: GrammarIndexRoute,
   IpaIndexRoute: IpaIndexRoute,
 }
 export const routeTree = rootRouteImport

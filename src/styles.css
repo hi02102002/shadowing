@@ -142,3 +142,60 @@
 .rec-pulse {
   animation: rec-pulse 1.4s ease-in-out infinite;
 }
+
+/* nội dung sách ngữ pháp (cây HTML đã lọc từ English Grammar in Use) */
+.grammar-content {
+  @apply text-sm leading-relaxed;
+}
+.grammar-content .para {
+  @apply my-2;
+}
+.grammar-content ul,
+.grammar-content ol {
+  @apply my-2 flex flex-col gap-1 pl-5;
+}
+.grammar-content ul {
+  @apply list-disc;
+}
+.grammar-content ol {
+  @apply list-decimal;
+}
+.grammar-content ul.ul-square {
+  list-style-type: square;
+}
+.grammar-content ul.ul-free-option-none,
+.grammar-content ol.ul-free-option-reformat {
+  @apply list-none flex-row flex-wrap gap-x-2 gap-y-1 pl-0;
+}
+.grammar-content ul.ul-free-option-none > li,
+.grammar-content ol.ul-free-option-reformat > li {
+  @apply rounded-md border bg-muted/50 px-2 py-0.5;
+}
+.grammar-content strong {
+  @apply font-semibold text-foreground;
+}
+.grammar-content table {
+  @apply my-3 border-collapse text-sm;
+}
+.grammar-content td,
+.grammar-content th {
+  @apply border px-2.5 py-1.5 align-top;
+}
+.grammar-content img {
+  @apply my-2 max-h-72 rounded-lg border bg-white object-contain;
+}
+.grammar-content .sample-cover {
+  @apply my-3 flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-start;
+}
+.grammar-content .sample-cover img {
+  @apply my-0 sm:max-w-[45%];
+}
+.grammar-content .boxed {
+  @apply my-2 rounded-lg border border-dashed border-miss/60 bg-miss-soft/40 p-3;
+}
+.grammar-content .example-answer {
+  @apply border-b border-dotted border-current font-medium;
+}
+.grammar-content h4 {
+  @apply mt-4 mb-2 font-semibold;
+}
