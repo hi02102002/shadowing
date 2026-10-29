@@ -131,6 +131,19 @@ export const decks = sqliteTable('decks', {
   createdAt: createdAt(),
 })
 
+/** thông tin tra thêm cho thẻ (từ điển dunno.ai / AI), lưu JSON trong cards.info */
+export interface CardInfo {
+  /** từ loại bằng tiếng Việt, vd. "danh từ" */
+  pos: string | null
+  examples: Array<{ en: string; vi: string }>
+  /** cụm từ hay đi kèm, vd. type "verb + decision": "make, reach, take" */
+  collocations: Array<{ type: string; words: string; example: string }>
+  /** thành ngữ / cụm cố định chứa từ, kèm nghĩa tiếng Việt */
+  idioms: Array<{ en: string; vi: string }>
+  family: Array<{ kind: string; words: string[] }>
+  synonyms: string[]
+}
+
 /** Thẻ học kiểu Anki, lịch ôn tính bằng FSRS (src/server/srs.ts) */
 export const cards = sqliteTable(
   'cards',
@@ -149,6 +162,10 @@ export const cards = sqliteTable(
     /** URL ảnh/audio trong app, vd. /api/essential-media/… (sách từ vựng essentialenglish.review) */
     imageUrl: text('image_url'),
     audioUrl: text('audio_url'),
+    /** nghĩa tiếng Việt tra bổ sung khi học (sách essentialenglish.review chỉ có định nghĩa tiếng Anh); null = chưa tra */
+    meaningVi: text('meaning_vi'),
+    /** từ loại, ví dụ, cụm từ, họ từ… tra bổ sung cùng lúc với meaningVi; null = chưa tra */
+    info: text({ mode: 'json' }).$type<CardInfo>(),
     // ngữ cảnh khi lưu từ transcript
     segmentId: integer('segment_id').references(() => segments.id, { onDelete: 'set null' }),
     sentence: text(),

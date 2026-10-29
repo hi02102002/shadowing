@@ -1,0 +1,1 @@
+ALTER TABLE `cards` ADD `meaning_vi` text;

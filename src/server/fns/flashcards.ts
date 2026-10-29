@@ -53,6 +53,7 @@ export const listCards = createServerFn({ method: 'GET' })
         id: cards.id,
         front: cards.front,
         back: cards.back,
+        meaningVi: cards.meaningVi,
         ipa: cards.ipa,
         sentence: cards.sentence,
         state: cards.state,

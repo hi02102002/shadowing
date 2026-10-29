@@ -71,7 +71,8 @@ describe('parseBook — dạng wordlist', () => {
   })
 
   it('không có câu ví dụ thì lấy câu trong bài đọc (ưu tiên câu có từ in đậm)', () => {
-    const [unit] = parseBook(WORDLIST_BOOK, {
+    // như English Vocabulary in Use: không có ảnh riêng cho từ
+    const [unit] = parseBook({ ...WORDLIST_BOOK, images: false }, {
       flashcard: [
         {
           en: 'Unit 1: Family',
@@ -79,14 +80,23 @@ describe('parseBook — dạng wordlist', () => {
           reading: [
             {
               story:
-                '<p>My uncle lives far away.</p><ul><li>Tom is my <strong>uncle</strong>.</li><li>Ann is my <strong>cousin.</strong></li></ul>',
+                '<div class="section-rotate">A</div><p><img src="data/Unit1-1.jpg" /></p><p>My uncle lives far away.</p>' +
+                '<ul><li>Tom is my <strong>uncle</strong>.</li><li>Ann is my <strong>cousin.</strong></li></ul>' +
+                '<div class="section-rotate">B</div><p>My <strong>niece</strong> is two.</p><p><img src="data/Unit1-2.jpg" /></p>',
             },
           ],
         },
       ],
     })
-    expect(unit.words.map((w) => w.example)).toEqual(['Ann is my cousin.', 'Tom is my uncle.', null])
+    expect(unit.words.map((w) => w.example)).toEqual(['Ann is my cousin.', 'Tom is my uncle.', 'My niece is two.'])
     expect(unit.words.every((w) => w.definition === '' && w.audioUrl === null)).toBe(true)
+    // không có ảnh riêng cho từ → dùng ảnh của mục bài đọc chứa câu (ảnh ở sau đoạn văn vẫn tính),
+    // nhưng ảnh mục A dùng chung cho uncle và cousin → bỏ, chỉ giữ ảnh mục B của riêng niece
+    expect(unit.words.map((w) => w.imageUrl)).toEqual([
+      null,
+      null,
+      '/api/essential-media/sample-wordlist/__/Unit1-2.jpg',
+    ])
   })
 })
 

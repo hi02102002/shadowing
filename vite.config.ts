@@ -19,6 +19,7 @@ const config = defineConfig({
         '/api/card-media/:file': './src/server/card-media-route.ts',
         '/api/grammar-media/:file': './src/server/grammar-media-route.ts',
         '/api/essential-media/:slug/:dir/:file': './src/server/essential-media-route.ts',
+        '/api/bing-image/:q': './src/server/bing-image-route.ts',
         '/api/tts': './src/server/tts-route.ts',
       },
     }),

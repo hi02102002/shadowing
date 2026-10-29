@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useHotkey } from '@tanstack/react-hotkeys'
-import { ArrowLeft, Clapperboard, Loader2, PartyPopper, Volume2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Clapperboard, Loader2, PartyPopper, Volume2 } from 'lucide-react'
 import { z } from 'zod'
 
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Progress } from '#/components/ui/progress'
 import { useAccent } from '#/hooks/use-app-settings'
 import { studyQueueQuery } from '#/lib/queries'
 import { speak } from '#/lib/speech'
 import { cn } from '#/lib/utils'
+import { enrichCard } from '#/server/fns/essential'
 import { reviewCard } from '#/server/fns/flashcards'
+import type { CardInfo } from '#/db/schema'
 import type { StudyCard } from '#/server/fns/flashcards'
 
 const searchSchema = z.object({
@@ -44,6 +47,120 @@ const maskSentence = (sentence: string, word: string) =>
   sentence.replace(new RegExp(`\\b${escapeRegExp(word)}\\b`, 'gi'), '_____')
 
 let audio: HTMLAudioElement | null = null
+
+/** thẻ sách từ vựng chưa có nghĩa tiếng Việt, từ loại, cụm từ… → tra bổ sung (server lưu lại, chỉ tra một lần) */
+const needsEnrich = (c: StudyCard | undefined): c is StudyCard =>
+  !!c && c.info == null && !!c.ankiGuid?.startsWith('ee:')
+
+const enrichQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['enrich-card', id],
+    queryFn: () => enrichCard({ data: { id } }),
+    staleTime: Infinity,
+    retry: false,
+  })
+
+const MORE_KEY = 'flashcards.showMore'
+
+/** gộp collocation theo loại, mỗi loại vài từ ngắn (thẻ tra trước đây còn lưu dạng "a, b | c (informal)") */
+function compactCollocations(list: CardInfo['collocations']) {
+  const groups = new Map<string, string[]>()
+  for (const c of list) {
+    const words = c.words
+      .split(/[|,]/)
+      .map((w) => w.trim())
+      .filter((w) => w && w.length <= 30 && !/[()=.·]/.test(w))
+    groups.set(c.type, [...new Set([...(groups.get(c.type) ?? []), ...words])])
+  }
+  return [...groups]
+    .filter(([, words]) => words.length > 0)
+    .slice(0, 3)
+    .map(([type, words]) => ({ type, words: words.slice(0, 5).join(', ') }))
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <li className="grid grid-cols-[7rem_1fr] gap-2">
+      <span className="text-xs leading-5 text-muted-foreground">{label}</span>
+      <span>{children}</span>
+    </li>
+  )
+}
+
+/**
+ * ví dụ luôn hiện (tối đa 2); cụm từ, thành ngữ, họ từ, đồng nghĩa gọn lại trong mục "Mở rộng"
+ * (nhớ trạng thái mở/đóng giữa các thẻ)
+ */
+function CardInfoSections({ info }: { info: CardInfo }) {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(MORE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggle = () => {
+    setOpen(!open)
+    try {
+      localStorage.setItem(MORE_KEY, open ? '0' : '1')
+    } catch {}
+  }
+
+  const collocations = compactCollocations(info.collocations)
+  const idioms = info.idioms.slice(0, 3)
+  const family = info.family.slice(0, 4)
+  const synonyms = info.synonyms.slice(0, 6)
+  const hasMore = collocations.length + idioms.length + family.length + synonyms.length > 0
+
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      {info.examples.length > 0 && (
+        <ul className="flex flex-col gap-1.5">
+          {info.examples.slice(0, 2).map((e) => (
+            <li key={e.en}>
+              <div>{e.en}</div>
+              <div className="text-muted-foreground">{e.vi}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {hasMore && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            className="flex items-center gap-1 self-start text-xs font-medium text-muted-foreground hover:text-foreground"
+            onClick={toggle}
+            aria-expanded={open}
+          >
+            <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} />
+            Mở rộng: cụm từ, thành ngữ, họ từ
+          </button>
+          {open && (
+            <ul className="flex flex-col gap-1.5">
+              {collocations.map((c) => (
+                <Row key={c.type} label={c.type || 'cụm từ'}>
+                  <span className="font-medium">{c.words}</span>
+                </Row>
+              ))}
+              {idioms.map((i) => (
+                <Row key={i.en} label="thành ngữ">
+                  <span className="font-medium">{i.en}</span>
+                  <span className="text-muted-foreground"> — {i.vi}</span>
+                </Row>
+              ))}
+              {family.map((f) => (
+                <Row key={f.kind} label={f.kind}>
+                  {f.words.join(', ')}
+                </Row>
+              ))}
+              {synonyms.length > 0 && <Row label="đồng nghĩa">{synonyms.join(', ')}</Row>}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** ảnh minh hoạ của thẻ; tải lỗi (site gốc không có ảnh) thì ẩn */
 function CardImage({ src, alt }: { src: string; alt: string }) {
@@ -82,7 +199,33 @@ function Study() {
     [queryClient],
   )
 
-  const card = queue?.[0]
+  const current = queue?.[0]
+  const enriched = useQuery({ ...enrichQuery(current?.id ?? 0), enabled: needsEnrich(current) })
+  const card =
+    current && enriched.data?.id === current.id
+      ? {
+          ...current,
+          meaningVi: enriched.data.meaningVi,
+          ipa: enriched.data.ipa,
+          example: enriched.data.example,
+          imageUrl: enriched.data.imageUrl,
+          info: enriched.data.info,
+        }
+      : current
+
+  // thẻ sách không có ảnh riêng (English Vocabulary in Use, Verbal Advantage) → ảnh Bing theo từ;
+  // chờ tra xong vì lúc tra có thể được gắn ảnh của sách
+  const image =
+    card?.imageUrl ??
+    (card?.ankiGuid?.startsWith('ee:') && !enriched.isFetching
+      ? `/api/bing-image/${encodeURIComponent(card.front)}`
+      : null)
+
+  // tra trước thẻ kế tiếp để lật thẻ không phải chờ
+  const next = queue?.[1]
+  useEffect(() => {
+    if (needsEnrich(next)) void queryClient.prefetchQuery(enrichQuery(next.id))
+  }, [next, queryClient])
 
   const review = useMutation({
     mutationFn: (v: { cardId: number; rating: Rating }) => reviewCard({ data: v }),
@@ -185,9 +328,27 @@ function Study() {
 
             {revealed && (
               <div className="flex flex-col gap-3 border-t pt-4">
-                {card.imageUrl && <CardImage key={card.id} src={card.imageUrl} alt={card.front} />}
-                {card.ipa && <p className="ipa text-muted-foreground">{card.ipa}</p>}
-                <p className="text-xl font-medium whitespace-pre-line">{card.back}</p>
+                {image && <CardImage key={`${card.id}|${image}`} src={image} alt={card.front} />}
+                {(card.ipa || card.info?.pos) && (
+                  <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                    {card.ipa && <span className="ipa">{card.ipa}</span>}
+                    {card.info?.pos && <Badge variant="secondary">{card.info.pos}</Badge>}
+                  </p>
+                )}
+                {card.meaningVi && <p className="text-xl font-medium whitespace-pre-line">{card.meaningVi}</p>}
+                <p
+                  className={cn(
+                    'whitespace-pre-line',
+                    card.meaningVi ? 'text-muted-foreground' : 'text-xl font-medium',
+                  )}
+                >
+                  {card.back}
+                </p>
+                {enriched.isFetching && (
+                  <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" /> Đang tra nghĩa tiếng Việt…
+                  </p>
+                )}
                 {card.sentence && (
                   <button
                     type="button"
@@ -203,6 +364,7 @@ function Study() {
                     {card.example}
                   </p>
                 )}
+                {card.info && <CardInfoSections info={card.info} />}
                 {card.extra && (
                   <p className="text-sm text-muted-foreground whitespace-pre-line">{card.extra}</p>
                 )}

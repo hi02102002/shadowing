@@ -11,6 +11,20 @@ export interface DictSense {
   /** true: nghĩa chuyên ngành (kỹ thuật, xây dựng…) */
   specialized: boolean
   means: string[]
+  /** câu ví dụ kèm bản dịch của các nghĩa (tối đa 3) */
+  examples?: DictExample[]
+}
+
+export interface DictExample {
+  en: string
+  vi: string
+}
+
+/** cụm từ hay đi kèm (Oxford Collocations), vd. type "verb + decision": "make, reach, take" */
+export interface DictCollocation {
+  type: string
+  words: string
+  example: string
 }
 
 export interface DictEntry {
@@ -22,6 +36,9 @@ export interface DictEntry {
   antonyms: string[]
   /** các dạng của động từ: quá khứ, phân từ… */
   forms: string[]
+  collocations?: DictCollocation[]
+  /** họ từ theo từ loại, vd. { kind: 'adjective', words: ['related', 'relative'] } */
+  family?: Array<{ kind: string; words: string[] }>
 }
 
 interface RawEntry {
@@ -31,8 +48,13 @@ interface RawEntry {
   content?: Array<{
     kind?: string
     field?: string
-    means?: Array<{ mean?: string }>
+    means?: Array<{ mean?: string; examples?: Array<{ e?: string | null; m?: string | null }> | null }>
   }> | null
+  coll?: Array<{
+    kind?: string
+    cls?: Array<{ cl?: Array<{ type?: string; cbs?: Array<{ cb?: string; ex?: string }> }> }>
+  }> | null
+  word_family?: Array<{ kind?: string; field?: string; content?: string[] }> | null
   conjugation?: Record<string, { w?: string } | undefined> | null
   snym?: Array<{
     content?: Array<{ syno?: string[]; anto?: string[] }>
@@ -97,6 +119,30 @@ function pick(results: RawEntry[], text: string) {
 
 const unique = (list: string[]) => [...new Set(list.filter(Boolean))]
 
+/** gộp collocation theo loại (adj, verb + từ…), mỗi loại tối đa 8 từ ngắn và một câu ví dụ ngắn */
+function collocations(coll: NonNullable<RawEntry['coll']>): DictCollocation[] {
+  const groups = new Map<string, { words: string[]; example: string }>()
+  for (const cl of coll.flatMap((c) => c.cls ?? []).flatMap((c) => c.cl ?? [])) {
+    const type = cl.type?.trim() ?? ''
+    const group = groups.get(type) ?? { words: [], example: '' }
+    groups.set(type, group)
+    for (const b of cl.cbs ?? []) {
+      // cb kiểu "new, newborn, tiny | low birthweight, small"; đôi khi lẫn ghi chú "(informal)", "etc."
+      const words = (b.cb ?? '')
+        .split(/[|,]/)
+        .map((w) => w.trim())
+        .filter((w) => w && w.length <= 30 && !/[()=.·]/.test(w))
+      group.words = unique([...group.words, ...words])
+      const ex = b.ex?.replace(/^\([^)]*\)\s*/, '').trim() ?? ''
+      if (!group.example && ex.length >= 10 && ex.length <= 100) group.example = ex
+    }
+  }
+  return [...groups]
+    .filter(([, g]) => g.words.length > 0)
+    .slice(0, 6)
+    .map(([type, g]) => ({ type, words: g.words.slice(0, 8).join(', '), example: g.example }))
+}
+
 export async function dunnoLookup(text: string): Promise<DictEntry | null> {
   const data = (await get(
     `https://api.dunno.ai/api/search/vi/envi/${encodeURIComponent(text)}?limit=10&page=1`,
@@ -109,6 +155,11 @@ export async function dunnoLookup(text: string): Promise<DictEntry | null> {
       kind: c.kind ?? '',
       specialized: c.field === 'major',
       means: unique((c.means ?? []).map((m) => m.mean?.trim() ?? '')),
+      examples: (c.means ?? [])
+        .flatMap((m) => m.examples ?? [])
+        .map((e) => ({ en: e.e?.trim() ?? '', vi: e.m?.trim() ?? '' }))
+        .filter((e) => e.en && e.vi)
+        .slice(0, 3),
     }))
     .filter((s) => s.means.length > 0)
   const snym = (raw.snym ?? []).flatMap((s) => s.content ?? [])
@@ -127,5 +178,11 @@ export async function dunnoLookup(text: string): Promise<DictEntry | null> {
     forms: unique(
       Object.values(raw.conjugation ?? {}).map((c) => c?.w ?? ''),
     ).filter((w) => norm(w) !== norm(raw.word)),
+    collocations: collocations(raw.coll ?? []),
+    // mục "related" là danh sách từ liên quan lỏng lẻo, không phải họ từ
+    family: (raw.word_family ?? [])
+      .filter((f) => f.kind && !f.field)
+      .map((f) => ({ kind: f.kind ?? '', words: unique(f.content ?? []) }))
+      .filter((f) => f.words.length > 0),
   }
 }

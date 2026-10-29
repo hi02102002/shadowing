@@ -17,7 +17,8 @@ export const cleanWord = (text: string) =>
 export async function dictionaryLookup(raw: string): Promise<DictEntry | null> {
   const text = cleanWord(raw).toLowerCase()
   if (!text) throw new Error('Không có từ để tra')
-  const key = `dunno|${text}`
+  // dunno2: thêm ví dụ, collocation, họ từ → không dùng lại cache cũ thiếu các trường này
+  const key = `dunno2|${text}`
 
   const cached = db.select().from(lookups).where(eq(lookups.key, key)).get()
   if (cached) return JSON.parse(cached.json) as DictEntry | null

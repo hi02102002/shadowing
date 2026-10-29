@@ -261,7 +261,10 @@ function CardList({ deckId, onChanged }: { deckId: number; onChanged: () => void
                     <div className="font-semibold">{c.front}</div>
                     {c.ipa && <div className="ipa text-xs text-muted-foreground">{c.ipa}</div>}
                   </td>
-                  <td className="max-w-md px-3 py-2 whitespace-pre-line">{c.back}</td>
+                  <td className="max-w-md px-3 py-2 whitespace-pre-line">
+                    {c.meaningVi && <div className="font-medium">{c.meaningVi}</div>}
+                    <div className={cn(c.meaningVi && 'text-muted-foreground')}>{c.back}</div>
+                  </td>
                   <td className="px-3 py-2">
                     <Badge variant="secondary">{STATE_LABEL.at(c.state) ?? c.state}</Badge>
                     {c.lapses > 0 && <span className="ml-2 text-xs text-bad">quên ×{c.lapses}</span>}

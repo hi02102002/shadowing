@@ -1,7 +1,7 @@
 /**
  * GET /api/essential-media/:slug/:dir/:file — ảnh/audio thẻ từ vựng essentialenglish.review:
  * lần đầu tải từ site rồi lưu DATA_DIR/essential/<slug>/<dir>/<file>.
- * dir '_' = data/wordlist (2nd Edition), còn lại = data/<dir>/wordlist (tên unit đã chuẩn hoá)
+ * dir '_' = data/wordlist (2nd Edition), '__' = data/ (ảnh bài đọc), còn lại = data/<dir>/wordlist (tên unit đã chuẩn hoá)
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -38,7 +38,8 @@ export default defineHandler(async (event) => {
     return new Response('Not found', { status: 404 })
   }
   const file = path.join(essentialDir(), slug, dir, name)
-  const url = new URL(`${slug}/data/${dir === '_' ? '' : `${dir}/`}wordlist/${name}`, EE_BASE)
+  const sub = dir === '__' ? '' : dir === '_' ? 'wordlist/' : `${dir}/wordlist/`
+  const url = new URL(`${slug}/data/${sub}${name}`, EE_BASE)
   const data = (await fs.readFile(file).catch(() => null)) ?? (await fetchMedia(url, file).catch(() => null))
   if (!data) return new Response('Not found', { status: 404 })
   return new Response(data, {
