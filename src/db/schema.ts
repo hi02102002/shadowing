@@ -120,7 +120,10 @@ export const lookups = sqliteTable('lookups', {
   createdAt: createdAt(),
 })
 
-/** Bộ thẻ từ vựng: transcript (lưu từ khi tra trong video) | anki (import từ .apkg) */
+/**
+ * Bộ thẻ từ vựng: transcript (lưu từ khi tra trong video) | anki (import từ .apkg) | custom
+ * | essential (sách từ vựng essentialenglish.review)
+ */
 export const decks = sqliteTable('decks', {
   id: integer().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
@@ -143,6 +146,9 @@ export const cards = sqliteTable(
     extra: text(),
     /** tên file trong DATA_DIR/card-media (audio import từ Anki) */
     audioFile: text('audio_file'),
+    /** URL ảnh/audio trong app, vd. /api/essential-media/… (sách từ vựng essentialenglish.review) */
+    imageUrl: text('image_url'),
+    audioUrl: text('audio_url'),
     // ngữ cảnh khi lưu từ transcript
     segmentId: integer('segment_id').references(() => segments.id, { onDelete: 'set null' }),
     sentence: text(),

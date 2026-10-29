@@ -7,6 +7,7 @@ import {
   pronunciationEngines,
   pronunciationHistory,
 } from '#/server/fns/pronunciation.ts'
+import { getEssentialBook, listEssentialBooks } from '#/server/fns/essential.ts'
 import { listCards, listDecks, studyQueue } from '#/server/fns/flashcards.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
@@ -93,6 +94,18 @@ export const studyQueueQuery = (deckId?: number) =>
     // hàng đợi chỉ lấy một lần mỗi phiên học, không tự refetch làm nhảy thẻ
     staleTime: Infinity,
     gcTime: 0,
+  })
+
+export const essentialBooksQuery = () =>
+  queryOptions({
+    queryKey: ['essential-books'],
+    queryFn: () => listEssentialBooks(),
+  })
+
+export const essentialBookQuery = (slug: string) =>
+  queryOptions({
+    queryKey: ['essential-book', slug],
+    queryFn: () => getEssentialBook({ data: { slug } }),
   })
 
 export const grammarUnitsQuery = () =>

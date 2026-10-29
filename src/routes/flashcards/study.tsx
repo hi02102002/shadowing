@@ -45,6 +45,20 @@ const maskSentence = (sentence: string, word: string) =>
 
 let audio: HTMLAudioElement | null = null
 
+/** ảnh minh hoạ của thẻ; tải lỗi (site gốc không có ảnh) thì ẩn */
+function CardImage({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="max-h-56 self-center rounded-lg object-contain"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 function Study() {
   const { deck } = Route.useSearch()
   const queryClient = useQueryClient()
@@ -82,8 +96,9 @@ function Study() {
 
   const play = (c: StudyCard) => {
     audio?.pause()
-    if (c.audioFile) {
-      audio = new Audio(`/api/card-media/${encodeURIComponent(c.audioFile)}`)
+    const src = c.audioUrl ?? (c.audioFile ? `/api/card-media/${encodeURIComponent(c.audioFile)}` : null)
+    if (src) {
+      audio = new Audio(src)
       audio.play().catch(() => speak(c.front, { accent }))
     } else speak(c.front, { accent })
   }
@@ -170,6 +185,7 @@ function Study() {
 
             {revealed && (
               <div className="flex flex-col gap-3 border-t pt-4">
+                {card.imageUrl && <CardImage key={card.id} src={card.imageUrl} alt={card.front} />}
                 {card.ipa && <p className="ipa text-muted-foreground">{card.ipa}</p>}
                 <p className="text-xl font-medium whitespace-pre-line">{card.back}</p>
                 {card.sentence && (

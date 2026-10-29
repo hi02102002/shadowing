@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileUp, FolderPlus, GraduationCap, Layers, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { BookOpen, FileUp, FolderPlus, GraduationCap, Layers, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 
 import { AnkiImportDialog } from '#/components/anki-import-dialog'
+import { EssentialImportDialog } from '#/components/essential-import-dialog'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -19,13 +20,19 @@ export const Route = createFileRoute('/flashcards/')({
 })
 
 const STATE_LABEL = ['Mới', 'Đang học', 'Ôn tập', 'Học lại']
-const SOURCE_LABEL: Record<string, string | undefined> = { anki: 'Anki', transcript: 'Video', custom: 'Tự tạo' }
+const SOURCE_LABEL: Record<string, string | undefined> = {
+  anki: 'Anki',
+  transcript: 'Video',
+  custom: 'Tự tạo',
+  essential: 'Essential English',
+}
 
 function Flashcards() {
   const queryClient = useQueryClient()
   const { data: decks = [], isLoading } = useQuery(decksQuery())
   const [selected, setSelected] = useState<number | null>(null)
   const [importing, setImporting] = useState(false)
+  const [browsing, setBrowsing] = useState(false)
   const [creating, setCreating] = useState(false)
   const deckId = selected ?? decks.at(0)?.id ?? null
 
@@ -54,6 +61,10 @@ function Flashcards() {
         <Button variant="outline" onClick={() => setCreating((v) => !v)}>
           <FolderPlus />
           Tạo bộ thẻ
+        </Button>
+        <Button variant="outline" onClick={() => setBrowsing(true)}>
+          <BookOpen />
+          Thư viện từ vựng
         </Button>
         <Button variant="outline" onClick={() => setImporting(true)}>
           <FileUp />
@@ -87,7 +98,7 @@ function Flashcards() {
         </div>
       ) : decks.length === 0 ? (
         <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
-          Chưa có thẻ nào. Tạo bộ thẻ, lưu từ khi xem video, hoặc import một deck Anki.
+          Chưa có thẻ nào. Tạo bộ thẻ, lưu từ khi xem video, thêm sách từ Thư viện từ vựng hoặc import một deck Anki.
         </div>
       ) : (
         <>
@@ -106,6 +117,14 @@ function Flashcards() {
         </>
       )}
 
+      <EssentialImportDialog
+        open={browsing}
+        onOpenChange={setBrowsing}
+        onImported={(id) => {
+          refresh()
+          setSelected(id)
+        }}
+      />
       <AnkiImportDialog
         open={importing}
         onOpenChange={setImporting}

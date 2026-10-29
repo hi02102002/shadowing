@@ -241,6 +241,13 @@ const ENTITIES: Record<string, string> = {
   gt: '>',
   quot: '"',
   apos: "'",
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+  ndash: '–',
+  mdash: '—',
+  hellip: '…',
 }
 
 /** HTML của một trường → chữ thuần + danh sách file âm thanh [sound:…] */
