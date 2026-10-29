@@ -1,13 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, eq, gte, lte, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
 import { cards, decks, reviewLogs, segments, videos } from '#/db/schema.ts'
 import type { Card } from '#/db/schema.ts'
 import { cleanField, readApkg } from '../anki/apkg.ts'
+import { splitBookDecks } from '../essential/decks.ts'
 import { getConfig } from '../config.ts'
 import { cleanWord, contextLookup, dictionaryLookup } from '../lookup.ts'
 import { cardMediaDir, findUpload, removeUpload } from '../media-store.ts'
@@ -15,8 +16,7 @@ import { previewIntervals, review } from '../srs.ts'
 
 
 const TRANSCRIPT_DECK = 'Từ vựng từ video'
-/** số thẻ mới tối đa mỗi ngày (giống mặc định của Anki) */
-const NEW_PER_DAY = 20
+/** số thẻ đang học tối đa mỗi lần lấy hàng đợi (số từ mới/lượt ôn mỗi ngày ở cài đặt) */
 const QUEUE_LIMIT = 200
 
 const startOfToday = () => {
@@ -26,12 +26,15 @@ const startOfToday = () => {
 }
 
 export const listDecks = createServerFn({ method: 'GET' }).handler(async () => {
+  await splitBookDecks().catch(() => {})
   const now = new Date()
   return db
     .select({
       id: decks.id,
       name: decks.name,
       source: decks.source,
+      book: decks.book,
+      ref: decks.ref,
       total: sql<number>`count(${cards.id})`,
       newCount: sql<number>`coalesce(sum(${cards.state} = 0), 0)`,
       dueCount: sql<number>`coalesce(sum(${cards.state} != 0 and ${cards.due} <= ${Math.floor(now.getTime() / 1000)}), 0)`,
@@ -255,10 +258,16 @@ export type StudyCard = ReturnType<typeof withIntervals>
 
 /** Hàng đợi học: thẻ đang học/học lại → thẻ ôn đến hạn → thẻ mới (giới hạn mỗi ngày) */
 export const studyQueue = createServerFn({ method: 'GET' })
-  .validator(z.object({ deckId: z.number().int().optional() }))
+  .validator(z.object({ deckId: z.number().int().optional(), book: z.string().optional() }))
   .handler(async ({ data }) => {
     const now = new Date()
-    const inDeck = data.deckId == null ? undefined : eq(cards.deckId, data.deckId)
+    // một bộ, hoặc mọi unit của một sách
+    const inDeck =
+      data.deckId != null
+        ? eq(cards.deckId, data.deckId)
+        : data.book
+          ? inArray(cards.deckId, db.select({ id: decks.id }).from(decks).where(eq(decks.book, data.book)))
+          : undefined
     const base = () =>
       db
         .select(studySelect)
@@ -266,25 +275,36 @@ export const studyQueue = createServerFn({ method: 'GET' })
         .leftJoin(segments, eq(segments.id, cards.segmentId))
         .leftJoin(videos, eq(videos.id, segments.videoId))
 
-    const due = base()
-      .where(and(inDeck, ne(cards.state, 0), lte(cards.due, now)))
-      // learning/relearning (1, 3) trước review (2)
-      .orderBy(sql`${cards.state} = 2`, asc(cards.due))
+    const { newPerDay, reviewsPerDay } = getConfig()
+    // lượt đã học hôm nay theo trạng thái thẻ lúc chấm (0 mới, 2 ôn tập)
+    const doneToday = (state: number) =>
+      db
+        .select({ n: sql<number>`count(*)` })
+        .from(reviewLogs)
+        .innerJoin(cards, eq(cards.id, reviewLogs.cardId))
+        .where(and(inDeck, eq(reviewLogs.state, state), gte(reviewLogs.reviewedAt, startOfToday())))
+        .get()?.n ?? 0
+
+    // thẻ đang học / học lại (1, 3) luôn hiện, không tính vào giới hạn ôn mỗi ngày (như Anki)
+    const learning = base()
+      .where(and(inDeck, inArray(cards.state, [1, 3]), lte(cards.due, now)))
+      .orderBy(asc(cards.due))
       .limit(QUEUE_LIMIT)
       .all()
-
-    const newToday = db
-      .select({ n: sql<number>`count(*)` })
-      .from(reviewLogs)
-      .innerJoin(cards, eq(cards.id, reviewLogs.cardId))
-      .where(and(inDeck, eq(reviewLogs.state, 0), gte(reviewLogs.reviewedAt, startOfToday())))
-      .get()!.n
-    const newLimit = Math.max(0, Math.min(NEW_PER_DAY - newToday, QUEUE_LIMIT - due.length))
+    const reviewLimit = Math.max(0, reviewsPerDay - doneToday(2))
+    const reviews = reviewLimit
+      ? base()
+          .where(and(inDeck, eq(cards.state, 2), lte(cards.due, now)))
+          .orderBy(asc(cards.due))
+          .limit(reviewLimit)
+          .all()
+      : []
+    const newLimit = Math.max(0, newPerDay - doneToday(0))
     const fresh = newLimit
       ? base().where(and(inDeck, eq(cards.state, 0))).orderBy(asc(cards.id)).limit(newLimit).all()
       : []
 
-    return [...due, ...fresh].map(withIntervals)
+    return [...learning, ...reviews, ...fresh].map(withIntervals)
   })
 
 /** Chấm điểm một thẻ (1 Again | 2 Hard | 3 Good | 4 Easy), trả thẻ đã cập nhật lịch */

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, FileUp, FolderPlus, GraduationCap, Layers, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronDown, FileUp, FolderPlus, GraduationCap, Layers, Loader2, Pencil, Plus, Search, Settings2, Trash2 } from 'lucide-react'
 
 import { AnkiImportDialog } from '#/components/anki-import-dialog'
 import { EssentialImportDialog } from '#/components/essential-import-dialog'
+import { StudySettingsDialog } from '#/components/study-settings-dialog'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -33,8 +34,10 @@ function Flashcards() {
   const [selected, setSelected] = useState<number | null>(null)
   const [importing, setImporting] = useState(false)
   const [browsing, setBrowsing] = useState(false)
+  const [tuning, setTuning] = useState(false)
   const [creating, setCreating] = useState(false)
   const deckId = selected ?? decks.at(0)?.id ?? null
+  const current = decks.find((d) => d.id === deckId)
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['decks'] })
@@ -61,6 +64,9 @@ function Flashcards() {
         <Button variant="outline" onClick={() => setCreating((v) => !v)}>
           <FolderPlus />
           Tạo bộ thẻ
+        </Button>
+        <Button variant="outline" size="icon" onClick={() => setTuning(true)} title="Cài đặt học" aria-label="Cài đặt học">
+          <Settings2 />
         </Button>
         <Button variant="outline" onClick={() => setBrowsing(true)}>
           <BookOpen />
@@ -103,20 +109,38 @@ function Flashcards() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {decks.map((deck) => (
-              <DeckCard
-                key={deck.id}
-                deck={deck}
-                active={deck.id === deckId}
-                onSelect={() => setSelected(deck.id)}
-                onChanged={refresh}
-              />
-            ))}
+            {groupDecks(decks).map((item) =>
+              item.kind === 'book' ? (
+                <BookGroup
+                  key={`book:${item.book}`}
+                  book={item.book}
+                  decks={item.decks}
+                  activeId={deckId}
+                  onSelect={setSelected}
+                  onChanged={refresh}
+                />
+              ) : (
+                <DeckCard
+                  key={item.deck.id}
+                  deck={item.deck}
+                  active={item.deck.id === deckId}
+                  onSelect={() => setSelected(item.deck.id)}
+                  onChanged={refresh}
+                />
+              ),
+            )}
           </div>
+          {current && (
+            <h2 className="text-lg font-semibold">
+              {current.book && <span className="text-muted-foreground">{current.book} · </span>}
+              {current.name}
+            </h2>
+          )}
           {deckId != null && <CardList deckId={deckId} onChanged={refresh} />}
         </>
       )}
 
+      <StudySettingsDialog open={tuning} onOpenChange={setTuning} />
       <EssentialImportDialog
         open={browsing}
         onOpenChange={setBrowsing}
@@ -133,6 +157,96 @@ function Flashcards() {
           setSelected(id)
         }}
       />
+    </div>
+  )
+}
+
+type DeckItem = { kind: 'deck'; deck: DeckRow } | { kind: 'book'; book: string; decks: DeckRow[] }
+
+/** ref ee:<slug>:<unit>:<nhóm> → thứ tự trong sách */
+function unitOrder(d: DeckRow) {
+  const [, , unit = '0', part = '0'] = d.ref?.split(':') ?? []
+  return Number(unit) * 1000 + Number(part)
+}
+
+/** bộ thẻ theo unit của cùng một sách gộp thành một nhóm, đặt ở vị trí unit được thêm sớm nhất */
+function groupDecks(decks: DeckRow[]): DeckItem[] {
+  const items: DeckItem[] = []
+  const books = new Map<string, DeckRow[]>()
+  for (const deck of decks) {
+    if (!deck.book) {
+      items.push({ kind: 'deck', deck })
+      continue
+    }
+    let list = books.get(deck.book)
+    if (!list) {
+      list = []
+      books.set(deck.book, list)
+      items.push({ kind: 'book', book: deck.book, decks: list })
+    }
+    list.push(deck)
+  }
+  for (const list of books.values()) list.sort((a, b) => unitOrder(a) - unitOrder(b))
+  return items
+}
+
+function BookGroup({
+  book,
+  decks,
+  activeId,
+  onSelect,
+  onChanged,
+}: {
+  book: string
+  decks: DeckRow[]
+  activeId: number | null
+  onSelect: (id: number) => void
+  onChanged: () => void
+}) {
+  const [open, setOpen] = useState(() => decks.some((d) => d.id === activeId))
+  const sum = (key: 'newCount' | 'dueCount' | 'total') => decks.reduce((n, d) => n + d[key], 0)
+  const newCount = sum('newCount')
+  const dueCount = sum('dueCount')
+
+  return (
+    <div className="col-span-full flex flex-col gap-3 rounded-xl border bg-card p-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
+          <ChevronDown className={cn('size-4 shrink-0 transition-transform', !open && '-rotate-90')} />
+          <BookOpen className="size-4 shrink-0 text-primary" />
+          <span className="truncate font-semibold">{book}</span>
+          <span className="shrink-0 text-sm text-muted-foreground">{decks.length} bộ</span>
+        </button>
+        <span className="flex gap-3 text-sm">
+          <span className="text-primary">{newCount} mới</span>
+          <span className="text-ok">{dueCount} đến hạn</span>
+          <span className="text-muted-foreground">{sum('total')} thẻ</span>
+        </span>
+        <Button size="sm" asChild disabled={!newCount && !dueCount}>
+          <Link to="/flashcards/study" search={{ book }}>
+            <GraduationCap />
+            Học cả sách
+          </Link>
+        </Button>
+      </div>
+      {open && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {decks.map((deck) => (
+            <DeckCard
+              key={deck.id}
+              deck={deck}
+              active={deck.id === activeId}
+              onSelect={() => onSelect(deck.id)}
+              onChanged={onChanged}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -176,9 +290,12 @@ function DeckCard({
       <button type="button" className="flex flex-col gap-1 text-left" onClick={onSelect}>
         <span className={cn('flex items-center gap-2 font-semibold', renaming && 'hidden')}>
           <span className="truncate">{deck.name}</span>
-          <Badge variant="secondary" className="shrink-0">
-            {SOURCE_LABEL[deck.source] ?? deck.source}
-          </Badge>
+          {/* bộ unit nằm trong nhóm sách, không cần nhãn nguồn */}
+          {!deck.book && (
+            <Badge variant="secondary" className="shrink-0">
+              {SOURCE_LABEL[deck.source] ?? deck.source}
+            </Badge>
+          )}
         </span>
         <span className="flex gap-3 text-sm">
           <span className="text-primary">{deck.newCount} mới</span>

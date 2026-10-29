@@ -3,27 +3,26 @@ import { eq, like, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
-import { cards, decks } from '#/db/schema.ts'
+import { cards } from '#/db/schema.ts'
 import type { CardInfo } from '#/db/schema.ts'
 import { getConfig } from '../config.ts'
 import { VOCAB_BOOKS, findBook } from '../essential/books.ts'
-import { loadBook } from '../essential/vocab.ts'
+import { groupDeck, splitBookDecks } from '../essential/decks.ts'
+import { loadBook, unitGroups } from '../essential/vocab.ts'
 import { contextLookup, dictionaryLookup } from '../lookup.ts'
 
-const SOURCE = 'essential'
-
-/** slug sách → bộ thẻ đang chứa thẻ của sách đó (anki_guid dạng ee:<slug>:…), vẫn đúng khi đổi tên bộ */
-function deckBySlug() {
-  const rows = db
-    .select({
-      deckId: cards.deckId,
-      slug: sql<string>`substr(${cards.ankiGuid}, 4, instr(substr(${cards.ankiGuid}, 4), ':') - 1)`,
-    })
-    .from(cards)
-    .where(like(cards.ankiGuid, 'ee:%'))
-    .groupBy(sql`1, 2`)
-    .all()
-  return new Map(rows.map((r) => [r.slug, r.deckId]))
+/** slug các sách đã thêm vào bộ thẻ (anki_guid dạng ee:<slug>:…) */
+function importedSlugs() {
+  return new Set(
+    db
+      .selectDistinct({
+        slug: sql<string>`substr(${cards.ankiGuid}, 4, instr(substr(${cards.ankiGuid}, 4), ':') - 1)`,
+      })
+      .from(cards)
+      .where(like(cards.ankiGuid, 'ee:%'))
+      .all()
+      .map((r) => r.slug),
+  )
 }
 
 const guidsOf = (slug: string) =>
@@ -37,12 +36,12 @@ const guidsOf = (slug: string) =>
   )
 
 export const listEssentialBooks = createServerFn({ method: 'GET' }).handler(async () => {
-  const decksOf = deckBySlug()
+  const imported = importedSlugs()
   return VOCAB_BOOKS.map((b) => ({
     slug: b.slug,
     title: b.title,
     series: b.series,
-    deckId: decksOf.get(b.slug) ?? null,
+    added: imported.has(b.slug),
   }))
 })
 
@@ -65,7 +64,7 @@ export const getEssentialBook = createServerFn({ method: 'GET' })
 
 export type EssentialUnitRow = Awaited<ReturnType<typeof getEssentialBook>>[number]
 
-/** thêm các unit đã chọn vào bộ thẻ của sách (tạo bộ nếu chưa có); từ đã có thì bỏ qua */
+/** thêm các unit đã chọn, mỗi unit (unit dài thì mỗi nhóm) một bộ thẻ, gộp theo sách; từ đã có thì bỏ qua */
 export const importEssentialBook = createServerFn({ method: 'POST' })
   .validator(z.object({ slug: z.string(), units: z.array(z.number().int().min(0)).min(1) }))
   .handler(async ({ data }) => {
@@ -73,21 +72,28 @@ export const importEssentialBook = createServerFn({ method: 'POST' })
     if (!book) throw new Error('Không có sách từ vựng này')
     const want = new Set(data.units)
     const units = (await loadBook(data.slug)).filter((u) => want.has(u.index))
+    // bộ cả sách của bản trước còn giữ thẻ → tách trước, để không thêm trùng từ
+    await splitBookDecks()
+    const have = guidsOf(data.slug)
 
-    const deckId =
-      deckBySlug().get(book.slug) ??
-      db.insert(decks).values({ name: book.title, source: SOURCE }).returning({ id: decks.id }).get().id
-
+    const max = getConfig().wordsPerGroup
+    let deckId: number | null = null
     let added = 0
     let skipped = 0
-    // thẻ mới học theo thứ tự id → chèn theo thứ tự unit trong sách
+    // thẻ mới học theo thứ tự id → chèn theo thứ tự unit, nhóm trong sách
     db.transaction((tx) => {
-      for (const u of units) {
-        for (const w of u.words) {
+      for (const g of units.flatMap((u) => unitGroups(u, max))) {
+        const u = g.unit
+        const fresh = g.words.filter((w) => !have.has(w.guid))
+        skipped += g.words.length - fresh.length
+        if (!fresh.length) continue
+        const unitDeckId = groupDeck(book, g)
+        deckId ??= unitDeckId
+        for (const w of fresh) {
           const row = tx
             .insert(cards)
             .values({
-              deckId,
+              deckId: unitDeckId,
               front: w.word,
               // English Vocabulary in Use không có định nghĩa → mặt sau là chủ đề của unit
               back: w.definition || u.title,

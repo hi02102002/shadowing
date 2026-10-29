@@ -24,6 +24,12 @@ export const AppConfigSchema = z.object({
   captionEngine: z.enum(CAPTION_ENGINES),
   accent: z.enum(ACCENTS),
   aiAnalysis: z.enum(AI_ANALYSIS),
+  /** thẻ từ: số từ mới tối đa mỗi ngày (mặc định như Anki) */
+  newPerDay: z.coerce.number().int().min(0).max(1000),
+  /** thẻ từ: số lượt ôn (thẻ đến hạn) tối đa mỗi ngày */
+  reviewsPerDay: z.coerce.number().int().min(0).max(9999),
+  /** sách từ vựng: unit dài chia thành các bộ tối đa chừng này từ */
+  wordsPerGroup: z.coerce.number().int().min(5).max(200),
 })
 export type AppConfig = z.infer<typeof AppConfigSchema>
 
@@ -43,6 +49,9 @@ function fromEnv(): AppConfig {
     captionEngine: e.CAPTION_ENGINE === 'api' ? 'api' : 'local',
     accent: e.ACCENT === 'uk' ? 'uk' : 'us',
     aiAnalysis: e.AI_ANALYSIS === 'off' ? 'off' : 'on',
+    newPerDay: 20,
+    reviewsPerDay: 200,
+    wordsPerGroup: 25,
   }
 }
 

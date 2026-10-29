@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { VocabBook } from './books.ts'
 import { VOCAB_BOOKS, findBook } from './books.ts'
-import { parseBook, urlFriendlyFull } from './vocab.ts'
+import { parseBook, unitGroups, urlFriendlyFull } from './vocab.ts'
+import type { VocabUnit, VocabWord } from './vocab.ts'
 
 // fixture tự viết, mô phỏng cấu trúc data.json của từng dạng sách (không chép nội dung sách)
 const WORDLIST_BOOK: VocabBook = {
@@ -152,5 +153,23 @@ describe('VOCAB_BOOKS', () => {
       '4000-essential-english-words-3-2nd-edition',
     )
     expect(findBook('nope')).toBeUndefined()
+  })
+})
+
+describe('unitGroups', () => {
+  const unit = (n: number): VocabUnit => ({
+    index: 0,
+    title: 'Unit 1',
+    words: Array.from({ length: n }, (_, i) => ({ word: `w${i}` }) as VocabWord),
+  })
+  const sizes = (n: number, max: number) => unitGroups(unit(n), max).map((g) => g.words.length)
+
+  it('chia đều, mỗi nhóm tối đa max từ, giữ thứ tự', () => {
+    expect(sizes(100, 25)).toEqual([25, 25, 25, 25])
+    expect(sizes(35, 25)).toEqual([17, 18])
+    expect(sizes(20, 25)).toEqual([20])
+    const groups = unitGroups(unit(7), 3)
+    expect(groups.map((g) => [g.part, g.parts])).toEqual([[0, 3], [1, 3], [2, 3]])
+    expect(groups.flatMap((g) => g.words.map((w) => w.word))).toEqual(unit(7).words.map((w) => w.word))
   })
 })

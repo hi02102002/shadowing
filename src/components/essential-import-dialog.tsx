@@ -44,7 +44,7 @@ export function EssentialImportDialog({ open, onOpenChange, onImported }: Props)
 
   const close = (next: boolean) => {
     if (next) return onOpenChange(true)
-    if (submit.data) onImported(submit.data.deckId)
+    if (submit.data?.deckId != null) onImported(submit.data.deckId)
     choose(null)
     onOpenChange(false)
   }
@@ -63,8 +63,8 @@ export function EssentialImportDialog({ open, onOpenChange, onImported }: Props)
           </DialogTitle>
           <DialogDescription>
             {book
-              ? 'Chọn các unit muốn học. Thẻ mới được học theo thứ tự unit; ảnh và audio tải về khi học lần đầu.'
-              : 'Bộ từ vựng của essentialenglish.review. Mỗi sách thành một bộ thẻ, có thể thêm dần từng unit.'}
+              ? 'Chọn các unit muốn học, mỗi unit thành một bộ thẻ riêng. Ảnh và audio tải về khi học lần đầu.'
+              : 'Bộ từ vựng của essentialenglish.review. Mỗi unit một bộ thẻ, gộp theo sách; có thể thêm dần từng unit.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -120,7 +120,7 @@ function BookList({ onChoose }: { onChoose: (b: EssentialBookRow) => void }) {
               >
                 <BookOpen className="size-4 shrink-0 text-primary" />
                 <span className="flex-1">{b.title}</span>
-                {b.deckId != null && <Badge variant="secondary">Đã thêm</Badge>}
+                {b.added && <Badge variant="secondary">Đã thêm</Badge>}
                 <ChevronRight className="size-4 text-muted-foreground" />
               </button>
             ))}

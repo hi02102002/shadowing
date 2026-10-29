@@ -124,12 +124,20 @@ export const lookups = sqliteTable('lookups', {
  * Bộ thẻ từ vựng: transcript (lưu từ khi tra trong video) | anki (import từ .apkg) | custom
  * | essential (sách từ vựng essentialenglish.review)
  */
-export const decks = sqliteTable('decks', {
-  id: integer().primaryKey({ autoIncrement: true }),
-  name: text().notNull(),
-  source: text().notNull(),
-  createdAt: createdAt(),
-})
+export const decks = sqliteTable(
+  'decks',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    name: text().notNull(),
+    source: text().notNull(),
+    /** tên sách khi bộ là một unit của sách (essential): danh sách bộ thẻ gộp các unit theo sách */
+    book: text(),
+    /** id ổn định của unit, vd. ee:<slug>:<unit index>; null = bộ thường */
+    ref: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('decks_ref_idx').on(t.ref)],
+)
 
 /** thông tin tra thêm cho thẻ (từ điển dunno.ai / AI), lưu JSON trong cards.info */
 export interface CardInfo {

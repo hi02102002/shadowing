@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useHotkey } from '@tanstack/react-hotkeys'
-import { ArrowLeft, ChevronDown, Clapperboard, Loader2, PartyPopper, Volume2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Clapperboard, Loader2, PartyPopper, RotateCcw, Volume2 } from 'lucide-react'
 import { z } from 'zod'
 
 import { Badge } from '#/components/ui/badge'
@@ -19,6 +19,8 @@ import type { StudyCard } from '#/server/fns/flashcards'
 
 const searchSchema = z.object({
   deck: z.number().int().optional().catch(undefined),
+  /** học mọi unit của một sách từ vựng */
+  book: z.string().optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/flashcards/study')({
@@ -177,14 +179,17 @@ function CardImage({ src, alt }: { src: string; alt: string }) {
 }
 
 function Study() {
-  const { deck } = Route.useSearch()
+  const { deck, book } = Route.useSearch()
   const queryClient = useQueryClient()
   const [accent] = useAccent()
-  const { data, isLoading, error } = useQuery(studyQueueQuery(deck))
+  const { data, isLoading, error } = useQuery(studyQueueQuery(deck, book))
   const [queue, setQueue] = useState<StudyCard[] | null>(null)
   const [revealed, setRevealed] = useState(false)
   const [done, setDone] = useState(0)
   const total = useRef(0)
+  // thẻ mới học trong phiên: học xong thì ôn lại một lượt (không ghi lịch FSRS)
+  const learned = useRef(new Map<number, StudyCard>())
+  const [drill, setDrill] = useState(false)
 
   useEffect(() => {
     if (data && queue === null) {
@@ -248,11 +253,31 @@ function Study() {
 
   const rate = (rating: Rating) => {
     if (!card || !revealed) return
+    setRevealed(false)
+    if (drill) {
+      // ôn lại: chưa nhớ thì đưa xuống cuối, nhớ rồi thì bỏ khỏi lượt ôn
+      const again = rating <= 2
+      setQueue((q) => {
+        const [first, ...rest] = q ?? []
+        return again && first ? [...rest, first] : rest
+      })
+      if (!again) setDone((n) => n + 1)
+      return
+    }
+    if (card.state === 0) learned.current.set(card.id, card)
     // chuyển thẻ ngay, lưu ở nền
     review.mutate({ cardId: card.id, rating })
     setQueue((q) => q?.slice(1) ?? null)
-    setRevealed(false)
     setDone((n) => n + 1)
+  }
+
+  const startDrill = () => {
+    const list = [...learned.current.values()]
+    learned.current = new Map()
+    total.current = list.length
+    setDrill(true)
+    setDone(0)
+    setQueue(list)
   }
 
   const reveal = () => {
@@ -300,13 +325,27 @@ function Study() {
       ) : !card ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-12 text-center">
           <PartyPopper className="size-8 text-primary" />
-          <p className="text-lg font-medium">Đã học xong hôm nay!</p>
-          <p className="text-sm text-muted-foreground">
-            {done ? `Bạn vừa ôn ${done} lượt thẻ.` : 'Không có thẻ nào đến hạn.'} Quay lại sau để ôn tiếp.
-          </p>
-          <Button asChild variant="outline">
-            <Link to="/flashcards">Về danh sách thẻ</Link>
-          </Button>
+          {drill ? (
+            <p className="text-lg font-medium">Đã ôn lại xong {done} từ!</p>
+          ) : (
+            <>
+              <p className="text-lg font-medium">Đã học xong hôm nay!</p>
+              <p className="text-sm text-muted-foreground">
+                {done ? `Bạn vừa ôn ${done} lượt thẻ.` : 'Không có thẻ nào đến hạn.'} Quay lại sau để ôn tiếp.
+              </p>
+            </>
+          )}
+          <div className="flex flex-wrap justify-center gap-2">
+            {!drill && learned.current.size > 0 && (
+              <Button onClick={startDrill}>
+                <RotateCcw />
+                Ôn lại {learned.current.size} từ vừa học
+              </Button>
+            )}
+            <Button asChild variant="outline">
+              <Link to="/flashcards">Về danh sách thẻ</Link>
+            </Button>
+          </div>
         </div>
       ) : (
         <>
@@ -384,7 +423,16 @@ function Study() {
             )}
           </article>
 
-          {revealed ? (
+          {revealed && drill ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="border-bad/40 text-bad hover:bg-bad-soft" onClick={() => rate(1)}>
+                Chưa nhớ <kbd className="ml-1 text-xs opacity-70">1</kbd>
+              </Button>
+              <Button variant="outline" className="border-ok/40 text-ok hover:bg-ok-soft" onClick={() => rate(3)}>
+                Đã nhớ <kbd className="ml-1 text-xs opacity-70">Space</kbd>
+              </Button>
+            </div>
+          ) : revealed ? (
             <div className="grid grid-cols-4 gap-2">
               {RATINGS.map((r) => (
                 <Button
@@ -405,7 +453,9 @@ function Study() {
           )}
           {review.error && <p className="text-sm text-destructive">{review.error.message}</p>}
           <p className="text-center text-xs text-muted-foreground">
-            Phím tắt: Space hiện đáp án · 1 Quên · 2 Khó · 3 Nhớ · 4 Dễ · R nghe lại
+            {drill
+              ? 'Ôn lại từ vừa học, không đổi lịch ôn · Space hiện đáp án / đã nhớ · 1 chưa nhớ · R nghe lại'
+              : 'Phím tắt: Space hiện đáp án · 1 Quên · 2 Khó · 3 Nhớ · 4 Dễ · R nghe lại'}
           </p>
         </>
       )}

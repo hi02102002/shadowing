@@ -13,6 +13,13 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // localStorage gắn với origin (có cả cổng) → cố định cổng để không mất cài đặt phía client giữa các lần mở
 const PREFERRED_PORT = 47821
 
+/**
+ * Bản yt-dlp app dùng: null = luôn theo bản stable mới nhất.
+ * Ghim 2026.10.21 vì 2026.10.26 (curl_cffi 0.17) bị Vimeo trả 401 với video nhúng của elllo;
+ * bỏ ghim khi yt-dlp có bản sửa (YouTube hay đổi, cần bản mới để lấy được phụ đề).
+ */
+const YTDLP_VERSION = '2026.10.21'
+
 const YTDLP_ASSETS = {
   linux: { x64: 'yt-dlp_linux', arm64: 'yt-dlp_linux_aarch64' },
   darwin: { x64: 'yt-dlp_macos', arm64: 'yt-dlp_macos' },
@@ -105,14 +112,17 @@ async function start() {
 async function ensureYtdlp() {
   if (fs.existsSync(ytdlpPath)) {
     // YouTube đổi thường xuyên, bản cũ sẽ không lấy được phụ đề → cập nhật nền mỗi lần mở
-    execFile(ytdlpPath, ['-U', '--update-to', 'stable'], { timeout: 120_000 }, () => {})
+    // (đang ghim thì đưa về đúng bản ghim, kể cả hạ cấp từ bản mới hơn đã cài)
+    const target = YTDLP_VERSION ? `stable@${YTDLP_VERSION}` : 'stable'
+    execFile(ytdlpPath, ['-U', '--update-to', target], { timeout: 120_000 }, () => {})
     return
   }
   const asset = YTDLP_ASSETS[process.platform]?.[process.arch]
   if (!asset) throw new Error(`yt-dlp không hỗ trợ ${process.platform}-${process.arch}`)
 
   setStatus('Đang tải yt-dlp (chỉ lần đầu)…')
-  const res = await fetch(`https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`)
+  const release = YTDLP_VERSION ? `download/${YTDLP_VERSION}` : 'latest/download'
+  const res = await fetch(`https://github.com/yt-dlp/yt-dlp/releases/${release}/${asset}`)
   if (!res.ok) throw new Error(`Không tải được yt-dlp (HTTP ${res.status}). Kiểm tra kết nối mạng.`)
   const tmp = `${ytdlpPath}.download`
   fs.writeFileSync(tmp, Buffer.from(await res.arrayBuffer()))

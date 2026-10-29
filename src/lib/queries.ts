@@ -87,10 +87,10 @@ export const cardsQuery = (deckId: number) =>
     queryFn: () => listCards({ data: { deckId } }),
   })
 
-export const studyQueueQuery = (deckId?: number) =>
+export const studyQueueQuery = (deckId?: number, book?: string) =>
   queryOptions({
-    queryKey: ['study-queue', deckId ?? 'all'],
-    queryFn: () => studyQueue({ data: { deckId } }),
+    queryKey: ['study-queue', deckId ?? book ?? 'all'],
+    queryFn: () => studyQueue({ data: { deckId, book } }),
     // hàng đợi chỉ lấy một lần mỗi phiên học, không tự refetch làm nhảy thẻ
     staleTime: Infinity,
     gcTime: 0,

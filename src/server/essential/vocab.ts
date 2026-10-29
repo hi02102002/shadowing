@@ -199,6 +199,26 @@ function parseHtmlUnit(book: VocabBook, u: RawUnit, index: number): VocabUnit {
   return { index, title: u.en.trim(), words }
 }
 
+export interface UnitGroup {
+  unit: VocabUnit
+  /** thứ tự nhóm trong unit (từ 0) và số nhóm */
+  part: number
+  parts: number
+  words: VocabWord[]
+}
+
+/** chia unit dài thành các nhóm đều nhau, mỗi nhóm tối đa `max` từ (vd. 100 từ, max 25 → 4 nhóm 25 từ) */
+export function unitGroups(unit: VocabUnit, max: number): UnitGroup[] {
+  const n = unit.words.length
+  const parts = Math.max(1, Math.ceil(n / max))
+  return Array.from({ length: parts }, (_, part) => ({
+    unit,
+    part,
+    parts,
+    words: unit.words.slice(Math.floor((part * n) / parts), Math.floor(((part + 1) * n) / parts)),
+  }))
+}
+
 /** các unit có từ (bỏ Index, Appendix, bài đọc thêm…) */
 export function parseBook(book: VocabBook, raw: RawBook): VocabUnit[] {
   return raw.flashcard
