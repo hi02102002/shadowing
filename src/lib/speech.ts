@@ -48,3 +48,31 @@ function speakWithBrowser(
 }
 
 export const canSpeak = () => typeof window !== 'undefined'
+
+/** /api/tts chỉ đọc tối đa 200 ký tự: tách theo câu, câu quá dài thì tách tiếp theo dấu phẩy / khoảng trắng */
+export function splitForSpeech(text: string, max = 200): string[] {
+  const out: string[] = []
+  for (const sentence of text.match(/[^.!?]+[.!?]*/g) ?? []) {
+    let rest = sentence.trim()
+    while (rest.length > max) {
+      const cut = Math.max(rest.lastIndexOf(', ', max), rest.lastIndexOf(' ', max))
+      const at = cut > 0 ? cut + 1 : max
+      out.push(rest.slice(0, at).trim())
+      rest = rest.slice(at).trim()
+    }
+    if (rest) out.push(rest)
+  }
+  return out
+}
+
+/** Đọc đoạn nhiều câu, nối từng phần một; gọi speak/speakLong khác sẽ dừng đoạn đang đọc */
+export function speakLong(text: string, opts: { accent: Accent; rate?: number }) {
+  const parts = splitForSpeech(text)
+  const next = (i: number) => {
+    if (i >= parts.length) return
+    speak(parts[i], opts)
+    const current = player
+    current?.addEventListener('ended', () => current === player && next(i + 1), { once: true })
+  }
+  next(0)
+}

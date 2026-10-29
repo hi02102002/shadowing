@@ -11,6 +11,8 @@ import { getEssentialBook, listEssentialBooks } from '#/server/fns/essential.ts'
 import { listCards, listDecks, studyQueue } from '#/server/fns/flashcards.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { activityStats } from '#/server/fns/stats.ts'
+import { getConversation, listConversations } from '#/server/fns/conversation.ts'
+import { getSpeakingAttempt, listSpeakingAttempts } from '#/server/fns/speaking.ts'
 import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
@@ -154,3 +156,15 @@ export const activityStatsQuery = () =>
     queryKey: ['activity-stats'],
     queryFn: () => activityStats(),
   })
+
+export const conversationsQuery = () =>
+  queryOptions({ queryKey: ['conversations'], queryFn: () => listConversations() })
+
+export const conversationQuery = (id: number) =>
+  queryOptions({ queryKey: ['conversation', id], queryFn: () => getConversation({ data: { id } }) })
+
+export const speakingAttemptsQuery = () =>
+  queryOptions({ queryKey: ['speaking-attempts'], queryFn: () => listSpeakingAttempts() })
+
+export const speakingAttemptQuery = (id: number) =>
+  queryOptions({ queryKey: ['speaking-attempt', id], queryFn: () => getSpeakingAttempt({ data: { id } }) })

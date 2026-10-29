@@ -1,0 +1,1 @@
+ALTER TABLE `speaking_attempts` ADD `target` text DEFAULT '6' NOT NULL;

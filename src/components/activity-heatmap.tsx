@@ -10,6 +10,8 @@ const KINDS = [
   { key: 'pronunciation', label: 'Luyện nói' },
   { key: 'review', label: 'Ôn thẻ' },
   { key: 'grammar', label: 'Ngữ pháp' },
+  { key: 'conversation', label: 'Hội thoại' },
+  { key: 'speaking', label: 'Nói theo đề' },
 ] as const
 
 const WEEKDAYS = ['T2', '', 'T4', '', 'T6', '', '']

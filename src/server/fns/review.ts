@@ -55,7 +55,7 @@ export const practiceStats = createServerFn({ method: 'GET' }).handler(async () 
     .from(pronunciationAttempts)
     .get()!
   const m = db.select({ n: sql<number>`count(*)` }).from(mistakes).get()!
-  // chuỗi ngày học: mọi chế độ luyện (chép, nói, ôn thẻ, ngữ pháp)
+  // chuỗi ngày học: mọi chế độ luyện (chép, nói, ôn thẻ, ngữ pháp, hội thoại, nói theo đề)
   const streak = computeStreak(activeDays(), dayKey(new Date()))
   return {
     dictationCount: dict.n,

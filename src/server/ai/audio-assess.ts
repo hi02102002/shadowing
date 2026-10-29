@@ -134,10 +134,11 @@ function jsonInPrompt(
   }
 }
 
-function parseReply(
+/** nội dung trả lời của model; HTTP lỗi thì báo lỗi dễ hiểu */
+function replyContent(
   res: Awaited<ReturnType<typeof post>>,
   cfg: AppConfig,
-): AudioAssessment {
+): string {
   if (!res.ok) {
     if (res.status === 401 || res.status === 403)
       throw new Error(
@@ -152,14 +153,20 @@ function parseReply(
       `Gọi model lỗi HTTP ${res.status}: ${res.text.slice(0, 200)}`,
     )
   }
-
   const content = (
     JSON.parse(res.text) as {
       choices?: Array<{ message?: { content?: string } }>
     }
   ).choices?.[0]?.message?.content
   if (!content) throw new Error('Model không trả về nội dung')
+  return content
+}
 
+function parseReply(
+  res: Awaited<ReturnType<typeof post>>,
+  cfg: AppConfig,
+): AudioAssessment {
+  const content = replyContent(res, cfg)
   let json: unknown
   try {
     json = extractJson(content)
@@ -182,4 +189,37 @@ function parseReply(
   if (!parsed.success)
     throw new NotJsonError('Model trả về JSON sai cấu trúc, hãy thử lại')
   return parsed.data
+}
+
+const TRANSCRIBE_SYSTEM = `You transcribe short recordings of a language learner speaking English.
+Write exactly what the speaker says, keeping their grammar mistakes (do not correct them).
+Output only the transcript as plain text: no quotes, no notes. If nothing intelligible is said, output an empty line.`
+
+/** Chép lời nói tự do (không có câu mẫu) bằng model nghe được audio, dùng cho hội thoại */
+export async function transcribeWithAudioLlm(
+  wav: Buffer,
+  cfg: AppConfig = getConfig(),
+): Promise<string> {
+  const res = await post(resolveEndpoint(cfg), cfg.llmApiKey, {
+    model: cfg.llmModel,
+    messages: [
+      { role: 'system', content: TRANSCRIBE_SYSTEM },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Transcribe this recording.' },
+          {
+            type: 'input_audio',
+            input_audio: { data: wav.toString('base64'), format: 'wav' },
+          },
+        ],
+      },
+    ],
+  })
+  const content = replyContent(res, cfg)
+  if (/not supported|unsupported|could not be processed|cannot (process|hear)/i.test(content))
+    throw new Error(
+      `Model "${cfg.llmModel}" không nhận audio qua endpoint này. Dùng model/provider nghe được audio, hoặc nhập STT trong Cài đặt.`,
+    )
+  return content.trim().replace(/^["“]|["”]$/g, '').trim()
 }

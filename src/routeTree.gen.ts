@@ -13,7 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SpeakingRouteImport } from './routes/speaking'
 import { Route as StatsRouteImport } from './routes/stats'
+import { Route as TalkRouteImport } from './routes/talk'
 import { Route as ApiAnkiUploadsRouteImport } from './routes/api/anki-uploads'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
 import { Route as FlashcardsIndexRouteImport } from './routes/flashcards/index'
@@ -49,9 +51,19 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SpeakingRoute = SpeakingRouteImport.update({
+  id: '/speaking',
+  path: '/speaking',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
   path: '/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TalkRoute = TalkRouteImport.update({
+  id: '/talk',
+  path: '/talk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAnkiUploadsRoute = ApiAnkiUploadsRouteImport.update({
@@ -130,7 +142,9 @@ export interface FileRoutesByFullPath {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
+  '/talk': typeof TalkRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
@@ -151,7 +165,9 @@ export interface FileRoutesByTo {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
+  '/talk': typeof TalkRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
@@ -172,7 +188,9 @@ export interface FileRoutesById {
   '/explore': typeof ExploreRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
+  '/talk': typeof TalkRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
@@ -195,7 +213,9 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/speaking'
     | '/stats'
+    | '/talk'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
@@ -216,7 +236,9 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/speaking'
     | '/stats'
+    | '/talk'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
@@ -236,7 +258,9 @@ export interface FileRouteTypes {
     | '/explore'
     | '/review'
     | '/settings'
+    | '/speaking'
     | '/stats'
+    | '/talk'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/flashcards/study'
@@ -258,7 +282,9 @@ export interface RootRouteChildren {
   ExploreRoute: typeof ExploreRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
+  SpeakingRoute: typeof SpeakingRoute
   StatsRoute: typeof StatsRoute
+  TalkRoute: typeof TalkRoute
   ApiAnkiUploadsRoute: typeof ApiAnkiUploadsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
   FlashcardsStudyRoute: typeof FlashcardsStudyRoute
@@ -300,11 +326,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/speaking': {
+      id: '/speaking'
+      path: '/speaking'
+      fullPath: '/speaking'
+      preLoaderRoute: typeof SpeakingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/stats': {
       id: '/stats'
       path: '/stats'
       fullPath: '/stats'
       preLoaderRoute: typeof StatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/talk': {
+      id: '/talk'
+      path: '/talk'
+      fullPath: '/talk'
+      preLoaderRoute: typeof TalkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/anki-uploads': {
@@ -433,7 +473,9 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreRoute: ExploreRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
+  SpeakingRoute: SpeakingRoute,
   StatsRoute: StatsRoute,
+  TalkRoute: TalkRoute,
   ApiAnkiUploadsRoute: ApiAnkiUploadsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
   FlashcardsStudyRoute: FlashcardsStudyRoute,

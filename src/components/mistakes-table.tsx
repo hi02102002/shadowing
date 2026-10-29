@@ -39,6 +39,8 @@ const SOURCE_LABEL: Record<string, string | undefined> = {
   dictation: 'Chép chính tả',
   pronunciation: 'Phát âm',
   grammar: 'Ngữ pháp',
+  conversation: 'Hội thoại',
+  speaking: 'Nói theo đề',
 }
 
 const helper = createColumnHelper<typeof features, MistakeRow>()

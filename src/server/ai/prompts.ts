@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import type { AlignToken } from '#/lib/align.ts'
+import type { TalkLevel } from '#/lib/conversation.ts'
+import type { SpeakingTarget } from '#/lib/speaking-topics.ts'
 import type { Accent } from '#/lib/speech.ts'
 
 export const MISTAKE_TYPES = [
@@ -381,4 +383,132 @@ export const VIDEO_PHRASES_SYSTEM = `Bạn giúp người Việt học tiếng A
 
 export function videoPhrasesPrompt(lines: string, words: string) {
   return `Transcript (mỗi dòng: [số thứ tự] câu):\n${lines}\n\nTừ cần xác định từ loại:\n${words || '(không có)'}`
+}
+
+const TALK_LEVEL_DESC: Record<TalkLevel, string> = {
+  A2: 'A2 (elementary): very short simple sentences, everyday words only, speak slowly and clearly, no idioms.',
+  B1: 'B1 (intermediate): short natural sentences, common phrasal verbs are fine, avoid rare words.',
+  B2: 'B2 (upper-intermediate): natural everyday English with common idioms and varied structures.',
+}
+
+export const ConversationReplySchema = z.object({
+  reply: z.string().describe('your next line in the role-play, in English'),
+  hints: z
+    .array(z.string())
+    .describe('2 short, different English replies the learner could say next, at their level'),
+})
+export type ConversationReply = z.infer<typeof ConversationReplySchema>
+
+/** vai AI trong buổi hội thoại; prompt viết tiếng Anh để AI trả lời tự nhiên bằng tiếng Anh */
+export const conversationSystem = (topic: string, level: TalkLevel) => `You are an English conversation partner for a Vietnamese learner, doing a spoken role-play.
+Scenario: ${topic}
+Learner level: ${TALK_LEVEL_DESC[level]}
+Rules:
+- Stay in your role. Reply in English only, 1–3 short sentences (under 40 words), because your reply is read aloud.
+- Keep the conversation going: usually end with a question or a natural prompt for the learner.
+- Do NOT correct the learner's mistakes during the conversation; feedback comes at the end. Just respond naturally to what they meant.
+- The learner's lines come from speech recognition and may contain recognition errors: guess the intended meaning.
+- If the learner writes Vietnamese or seems stuck, help gently in simple English and keep going.
+- No emojis, no markdown, no stage directions.`
+
+/** lịch sử hội thoại dạng kịch bản cho prompt */
+export function conversationTranscript(turns: Array<{ role: string; text: string }>) {
+  return turns.map((t) => `${t.role === 'ai' ? 'You' : 'Learner'}: ${t.text}`).join('\n')
+}
+
+export function conversationPrompt(turns: Array<{ role: string; text: string }>) {
+  return turns.length
+    ? `Conversation so far:\n${conversationTranscript(turns)}\n\nWrite your next line.`
+    : 'Start the conversation with a natural opening line for this scenario.'
+}
+
+export const CONVERSATION_MISTAKE_TYPES = ['grammar', 'vocabulary', 'other'] as const
+
+export const ConversationFeedbackSchema = z.object({
+  summary: z
+    .string()
+    .describe('nhận xét tổng quan 2-3 câu bằng tiếng Việt: điểm tốt, điểm cần cải thiện'),
+  corrections: z
+    .array(
+      z.object({
+        said: z.string().describe('nguyên văn phần người học nói sai hoặc chưa tự nhiên'),
+        better: z.string().describe('cách nói đúng, tự nhiên bằng tiếng Anh'),
+        type: z.enum(CONVERSATION_MISTAKE_TYPES),
+        explanation: z.string().describe('giải thích ngắn bằng tiếng Việt'),
+      }),
+    )
+    .describe('tối đa 8 lỗi quan trọng nhất, theo thứ tự xuất hiện; rỗng nếu không có lỗi'),
+  phrases: z
+    .array(z.object({ en: z.string(), vi: z.string().describe('nghĩa tiếng Việt') }))
+    .describe('3-6 cụm từ hữu ích cho tình huống này người học nên dùng lần sau'),
+})
+
+export const CONVERSATION_FEEDBACK_SYSTEM = `${GRAMMAR_SYSTEM}
+- Bạn đang nhận xét một buổi hội thoại nhập vai bằng tiếng Anh của người học.
+- Lời người học được nhận dạng từ giọng nói nên có thể sai chính tả hoặc thiếu dấu câu: KHÔNG tính đó là lỗi, chỉ xét ngữ pháp, dùng từ và độ tự nhiên.
+- Chỉ nhận xét câu của người học (Learner), không nhận xét câu của AI.`
+
+export function conversationFeedbackPrompt(opts: { topic: string; level: TalkLevel; turns: Array<{ role: string; text: string }> }) {
+  return `Tình huống: ${opts.topic}
+Trình độ người học: ${opts.level}
+Hội thoại:
+"""
+${conversationTranscript(opts.turns)}
+"""`
+}
+
+/** band IELTS: 0–9, bước 0.5 */
+const band = () => z.number().min(0).max(9).describe('band IELTS 0-9, bước 0.5')
+
+export const SpeakingFeedbackSchema = z.object({
+  overall: band(),
+  criteria: z
+    .array(z.object({ name: z.string(), band: band(), comment: z.string().describe('nhận xét 1-2 câu bằng tiếng Việt') }))
+    .describe('đúng 3 tiêu chí theo thứ tự: "Fluency & Coherence", "Lexical Resource", "Grammatical Range & Accuracy"'),
+  covered: z
+    .array(z.object({ point: z.string(), done: z.boolean() }))
+    .describe('mỗi gợi ý của đề (chép nguyên văn) và người học đã nói tới chưa'),
+  summary: z.string().describe('nhận xét tổng quan 2-3 câu bằng tiếng Việt: điểm tốt và việc cần làm để lên band'),
+  corrections: z
+    .array(
+      z.object({
+        said: z.string().describe('nguyên văn phần người học nói sai hoặc chưa tự nhiên'),
+        better: z.string().describe('cách nói đúng, tự nhiên bằng tiếng Anh'),
+        type: z.enum(CONVERSATION_MISTAKE_TYPES),
+        explanation: z.string().describe('giải thích ngắn bằng tiếng Việt'),
+      }),
+    )
+    .describe('tối đa 8 lỗi quan trọng nhất, theo thứ tự xuất hiện; rỗng nếu không có lỗi'),
+  vocabulary: z
+    .array(z.object({ en: z.string(), vi: z.string().describe('nghĩa tiếng Việt') }))
+    .describe('4-8 từ / cụm từ hợp với đề này, vừa sức band mục tiêu (cao hơn trình độ hiện tại một chút)'),
+  sample: z
+    .string()
+    .describe('bài nói mẫu đúng band mục tiêu bằng tiếng Anh, khoảng 200-250 từ, giữ ý tưởng của người học và trả lời đủ các gợi ý'),
+})
+
+export const SPEAKING_FEEDBACK_SYSTEM = `Bạn là giám khảo IELTS Speaking giàu kinh nghiệm, chấm bài Part 2 của người Việt.
+- Chấm theo band descriptors chính thức, khắt khe như giám khảo thật; không nâng điểm để khích lệ.
+- Bài nói được nhận dạng từ giọng nói nên có thể sai chính tả, thiếu dấu câu: KHÔNG tính đó là lỗi. Không chấm Pronunciation vì chỉ có văn bản.
+- Fluency & Coherence xét độ dài (Part 2 nên nói 1.5-2 phút), tốc độ, mạch lạc, từ nối; nói dưới 1 phút thì khó quá band 5 ở tiêu chí này.
+- Bài quá ngắn hoặc lạc đề thì nói rõ và chấm thấp tương ứng.
+- Band mục tiêu của người học KHÔNG ảnh hưởng điểm chấm; chỉ dùng để chọn độ khó cho bài mẫu, từ vựng gợi ý và lời khuyên (việc cần làm để đạt mục tiêu).
+- Nhận xét, giải thích bằng tiếng Việt; ví dụ và cách nói đúng bằng tiếng Anh.`
+
+const SPEAKING_TARGET_DESC: Record<SpeakingTarget, string> = {
+  '5': 'band 5–5.5: câu đơn và câu ghép đơn giản, từ vựng thông dụng, ít lỗi; bài mẫu dễ nói lại được',
+  '6': 'band 6–6.5: có câu phức, từ nối đa dạng, vài collocation và cụm từ tự nhiên',
+  '7': 'band 7+: cấu trúc linh hoạt, idiom và collocation ít phổ biến dùng đúng chỗ, mạch lạc tự nhiên',
+}
+
+export function speakingFeedbackPrompt(opts: { title: string; bullets: string[]; transcript: string; durationSec: number; target: string }) {
+  const words = opts.transcript.split(/\s+/).filter(Boolean).length
+  return `Band mục tiêu: ${SPEAKING_TARGET_DESC[opts.target as SpeakingTarget]}
+Đề: ${opts.title}
+${opts.bullets.length ? `Gợi ý:\n${opts.bullets.map((b) => `- ${b}`).join('\n')}` : '(không có gợi ý)'}
+Thời lượng nói: ${opts.durationSec} giây, ${words} từ (${opts.durationSec ? Math.round((words / opts.durationSec) * 60) : 0} từ/phút)
+Bài nói của người học:
+"""
+${opts.transcript}
+"""`
 }

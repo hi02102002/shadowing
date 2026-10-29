@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { AudioLines, BookOpen, BookX, Compass, Flame, Layers, Library, Moon, Settings, Speech, Sun } from 'lucide-react'
+import { AudioLines, BookOpen, BookX, Compass, Flame, Layers, Library, MessagesSquare, Moon, Settings, Speech, Sun } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { statsQuery } from '#/lib/queries'
@@ -10,6 +10,7 @@ import { cn } from '#/lib/utils'
 const NAV = [
   { to: '/', label: 'Thư viện', icon: Library },
   { to: '/explore', label: 'Khám phá', icon: Compass },
+  { to: '/talk', label: 'Nói với AI', icon: MessagesSquare },
   { to: '/ipa', label: 'Luyện IPA', icon: Speech },
   { to: '/grammar', label: 'Ngữ pháp', icon: BookOpen },
   { to: '/flashcards', label: 'Thẻ từ', icon: Layers },

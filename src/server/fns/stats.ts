@@ -28,7 +28,7 @@ export const activityStats = createServerFn({ method: 'GET' }).handler(async () 
   const daily = dailyActivity(start)
   const days: Array<{ day: string } & Record<ActivityKind, number> & { total: number }> = []
   for (let d = start; d <= today; d = addDays(d, 1)) {
-    const c = daily.get(d) ?? { dictation: 0, pronunciation: 0, review: 0, grammar: 0 }
+    const c = daily.get(d) ?? { dictation: 0, pronunciation: 0, review: 0, grammar: 0, conversation: 0, speaking: 0 }
     days.push({ day: d, ...c, total: ACTIVITY_KINDS.reduce((n, k) => n + c[k], 0) })
   }
 

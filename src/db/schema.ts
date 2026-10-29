@@ -84,7 +84,7 @@ export const mistakes = sqliteTable(
     word: text().notNull(),
     heard: text(),
     type: text().notNull(),
-    /** dictation | pronunciation | grammar */
+    /** dictation | pronunciation | grammar | conversation | speaking */
     source: text().notNull(),
     segmentId: integer('segment_id').references(() => segments.id, {
       onDelete: 'set null',
@@ -106,6 +106,72 @@ export const settings = sqliteTable('settings', {
   key: text().primaryKey(),
   value: text().notNull(),
 })
+
+/** Buổi hội thoại nhập vai với AI (trang /talk) */
+export const conversations = sqliteTable('conversations', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  /** id tình huống có sẵn (src/lib/conversation.ts) hoặc "custom" */
+  scenario: text().notNull(),
+  /** mô tả tình huống đưa cho AI; với "custom" là chủ đề người học tự nhập */
+  topic: text().notNull(),
+  /** A2 | B1 | B2 */
+  level: text().notNull(),
+  /** nhận xét cuối buổi (ConversationFeedback), null = chưa kết thúc */
+  feedback: text({ mode: 'json' }).$type<ConversationFeedback>(),
+  createdAt: createdAt(),
+  endedAt: integer('ended_at', { mode: 'timestamp' }),
+})
+
+export const conversationTurns = sqliteTable(
+  'conversation_turns',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    conversationId: integer('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    /** user | ai */
+    role: text().notNull(),
+    text: text().notNull(),
+    /** lượt AI: vài câu người học có thể đáp lại */
+    hints: text({ mode: 'json' }).$type<string[]>(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('conversation_turns_conv_idx').on(t.conversationId)],
+)
+
+/** nhận xét cuối buổi hội thoại, cùng cấu trúc với ConversationFeedbackSchema (src/server/ai/prompts.ts) */
+export interface ConversationFeedback {
+  summary: string
+  corrections: Array<{ said: string; better: string; type: string; explanation: string }>
+  phrases: Array<{ en: string; vi: string }>
+}
+
+/** Bài nói theo đề kiểu IELTS Speaking Part 2 (trang /speaking) */
+export const speakingAttempts = sqliteTable('speaking_attempts', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  /** id đề có sẵn (src/lib/speaking-topics.ts) hoặc "custom" khi người học dán đề */
+  topicId: text('topic_id').notNull(),
+  title: text().notNull(),
+  bullets: text({ mode: 'json' }).notNull().$type<string[]>(),
+  /** band mục tiêu: 5 | 6 | 7 (SPEAKING_TARGETS), quyết định độ khó bài mẫu và từ vựng gợi ý */
+  target: text().notNull().default('6'),
+  transcript: text().notNull(),
+  durationSec: integer('duration_sec').notNull(),
+  /** nhận xét và band ước lượng (SpeakingFeedback), null = chưa chấm xong */
+  feedback: text({ mode: 'json' }).$type<SpeakingFeedback>(),
+  createdAt: createdAt(),
+})
+
+/** cùng cấu trúc với SpeakingFeedbackSchema (src/server/ai/prompts.ts) */
+export interface SpeakingFeedback {
+  overall: number
+  criteria: Array<{ name: string; band: number; comment: string }>
+  covered: Array<{ point: string; done: boolean }>
+  summary: string
+  corrections: Array<{ said: string; better: string; type: string; explanation: string }>
+  vocabulary: Array<{ en: string; vi: string }>
+  sample: string
+}
 
 export type Video = typeof videos.$inferSelect
 export type Segment = typeof segments.$inferSelect

@@ -63,3 +63,26 @@ export function recordGrammarMistake(m: { word: string; heard: string; ref: stri
     })
     .run()
 }
+
+/** Lỗi khi nói tự do (hội thoại, nói theo đề): word = cách nói đúng, heard = câu người học đã nói */
+export function recordSpeechMistakes(
+  source: 'conversation' | 'speaking',
+  list: Array<{ said: string; better: string; type: string; explanation: string }>,
+) {
+  for (const m of list) {
+    const word = m.better.trim().toLowerCase()
+    if (!word) continue
+    db.insert(mistakes)
+      .values({ word, heard: m.said || null, type: m.type, source, explanation: m.explanation })
+      .onConflictDoUpdate({
+        target: [mistakes.word, mistakes.type, mistakes.source],
+        set: {
+          count: sql`${mistakes.count} + 1`,
+          heard: m.said || null,
+          explanation: m.explanation,
+          lastSeenAt: sql`(unixepoch())`,
+        },
+      })
+      .run()
+  }
+}
