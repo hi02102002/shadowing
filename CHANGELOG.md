@@ -2,6 +2,24 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.33 — 2026-11-03
+
+### Mới
+
+- **Luyện nghe theo cấp độ A1–C1** (mục "Luyện nghe" trên thanh điều hướng)
+  - Chọn bài từ thư viện Cambridge IELTS Listening (đầy đủ 4 section, audio và bài tập gốc), Tactics for Listening, Breaking News English, Essential English Blog và hội thoại thực tế ELLLO.
+  - Trình phát audio chuyên dụng: đổi tốc độ phát 0.5x–2.0x, tua nhanh/lùi 5 giây, lặp lại đoạn hoặc bài; tích hợp trình phát video Vimeo với các bài có video.
+  - Xem hoặc ẩn lời thoại (transcript); AI hỗ trợ bóc băng và soạn bài tập trắc nghiệm, điền từ, True/False cho các bài chưa có sẵn câu hỏi.
+  - Xem điểm số, đáp án chi tiết và giải thích tiếng Việt sau khi nộp; các câu trả lời sai tự động được lưu vào Sổ lỗi.
+  - Tab Từ vựng hỗ trợ tra từ, nghe phát âm và lưu từ vựng theo khung CEFR.
+- **Thanh điều hướng co giãn linh hoạt**
+  - Thêm menu dạng ngăn kéo/thu gọn trên các màn hình có chiều rộng hẹp hơn, giúp chuyển đổi nhanh và không bị tràn thanh điều hướng.
+
+### Thay đổi
+
+- Lượt luyện nghe được tính vào chuỗi ngày học (streak) và hiển thị trong biểu đồ hoạt động ở trang Thống kê.
+- Trang Sổ lỗi bổ sung phân loại và xem lại các câu nghe đã làm sai.
+
 ## 0.0.32 — 2026-11-03
 
 ### Mới
