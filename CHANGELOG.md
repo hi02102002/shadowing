@@ -2,6 +2,19 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.32 — 2026-11-03
+
+### Mới
+
+- **Đọc hiểu theo trình độ A2–C1** (mục "Đọc hiểu" trên thanh điều hướng)
+  - Chọn bài từ thư viện Reading for the Real World, Cambridge IELTS 14–18, Breaking News English, OneStopEnglish và Linguapress; bài có đề gốc dùng luôn câu hỏi và đáp án gốc.
+  - Để AI viết bài theo chủ đề có sẵn hoặc tự chọn, hay dán bài của bạn rồi nhờ AI soạn câu hỏi. Chọn dạng Cơ bản, IELTS Academic hoặc TOEIC Part 7 và số câu muốn luyện.
+  - Hỗ trợ trắc nghiệm, True / False / Not Given, Yes / No / Not Given, nối tiêu đề, điền từ, trả lời ngắn và câu chọn nhiều đáp án trong đề gốc.
+  - Sau khi nộp, xem điểm, đáp án, giải thích tiếng Việt và câu trong bài làm căn cứ; câu sai được lưu vào Sổ lỗi và hoạt động đọc được tính trong Thống kê.
+- **Công cụ học ngay trên bài đọc**
+  - Bôi đen để tô màu bằng bốn màu và tự lưu; nhấp đúp để tra từ nhanh.
+  - Tab Từ vựng phân loại từ trong bài theo CEFR, phát âm, lưu vào bộ thẻ và tìm cụm từ / từ loại theo ngữ cảnh bằng AI khi bạn bấm yêu cầu.
+
 ## 0.0.31 — 2026-10-29
 
 ### Mới
