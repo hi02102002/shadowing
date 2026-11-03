@@ -12,6 +12,7 @@ const KINDS = [
   { key: 'grammar', label: 'Ngữ pháp' },
   { key: 'conversation', label: 'Hội thoại' },
   { key: 'speaking', label: 'Nói theo đề' },
+  { key: 'reading', label: 'Đọc hiểu' },
 ] as const
 
 const WEEKDAYS = ['T2', '', 'T4', '', 'T6', '', '']

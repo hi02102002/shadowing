@@ -1,22 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
-import { asc, eq, sql } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
-import { cards, lookups, segments, videos } from '#/db/schema.ts'
+import { lookups, segments, videos } from '#/db/schema.ts'
 import type { DictEntry } from '../dunno.ts'
-import type { VocabLevel } from '#/lib/levels.ts'
-import { VIDEO_PHRASES_SYSTEM, VideoPhrasesSchema, videoPhrasesPrompt } from '../ai/prompts.ts'
-import type { VideoPhrases } from '../ai/prompts.ts'
-import { structured } from '../ai/provider.ts'
-import { sentenceWords, wordLevel } from '../cefr/levels.ts'
-import { getConfig, hasLlm } from '../config.ts'
 import { googleTranslateLines } from '../translate.ts'
+import { collectWords, findPhrases, savedFronts } from '../vocab-words.ts'
+import type { PhrasesResult, VocabWord } from '../vocab-words.ts'
 
-/** transcript gửi AI mỗi lượt gọi; video dài chia thành nhiều phần gọi song song */
-const CHUNK_CHARS = 15_000
-/** số lượt gọi AI tối đa cho một video (video 1–2 giờ) */
-const MAX_CHUNKS = 8
+export type { VocabWord }
 
 function videoSegments(youtubeId: string) {
   const video = db.select({ id: videos.id }).from(videos).where(eq(videos.youtubeId, youtubeId)).get()
@@ -29,91 +22,12 @@ function videoSegments(youtubeId: string) {
     .all()
 }
 
-/** mặt trước các thẻ đã có (chữ thường) để đánh dấu từ đã lưu */
-const savedFronts = () =>
-  new Set(
-    db
-      .select({ front: sql<string>`lower(${cards.front})` })
-      .from(cards)
-      .all()
-      .map((c) => c.front),
-  )
-
-export interface VocabWord {
-  lemma: string
-  level: VocabLevel
-  /** từ loại theo CEFR-J (tiếng Anh: noun, verb…) */
-  pos: string[]
-  /** số lần xuất hiện trong video */
-  count: number
-  /** câu đầu tiên chứa từ và dạng từ trong câu đó, vd. lemma "negotiate", surface "negotiating" */
-  segIdx: number
-  surface: string
-  saved: boolean
-}
-
-/** từ đơn (theo dạng gốc) trong các câu, theo thứ tự xuất hiện */
-function collectWords(segs: Array<{ idx: number; text: string }>, saved: Set<string>) {
-  const words = new Map<string, VocabWord>()
-  for (const seg of segs) {
-    for (const surface of sentenceWords(seg.text)) {
-      const hit = wordLevel(surface)
-      if (!hit) continue
-      const word = words.get(hit.lemma)
-      if (word) word.count++
-      else
-        words.set(hit.lemma, {
-          ...hit,
-          count: 1,
-          segIdx: seg.idx,
-          surface,
-          saved: saved.has(hit.lemma) || saved.has(surface.toLowerCase()),
-        })
-    }
-  }
-  return [...words.values()]
-}
-
 /** từ đơn trong transcript kèm cấp CEFR (CEFR-J + Octanove), theo thứ tự xuất hiện */
 export const videoVocab = createServerFn({ method: 'GET' })
   .validator(z.object({ youtubeId: z.string() }))
   .handler(async ({ data }): Promise<VocabWord[]> => collectWords(videoSegments(data.youtubeId), savedFronts()))
 
-export type VocabPhrase = VideoPhrases['phrases'][number] & { saved: boolean }
-
-/** chia transcript thành các phần ≤ CHUNK_CHARS (mỗi dòng "[idx] câu") */
-export function chunkSegments(segs: Array<{ idx: number; text: string }>) {
-  const chunks: Array<typeof segs> = [[]]
-  let size = 0
-  for (const s of segs) {
-    const len = s.text.length + 8
-    if (size + len > CHUNK_CHARS && chunks[chunks.length - 1].length) {
-      if (chunks.length === MAX_CHUNKS) break
-      chunks.push([])
-      size = 0
-    }
-    chunks[chunks.length - 1].push(s)
-    size += len
-  }
-  return chunks
-}
-
-/** một lượt AI cho một phần transcript: cụm từ + từ loại theo ngữ cảnh của các từ từ A2 trở lên xuất hiện lần đầu ở phần này */
-function askChunk(chunk: Array<{ idx: number; text: string }>, seen: Set<string>) {
-  const lines = chunk.map((s) => `[${s.idx}] ${s.text.replace(/\s+/g, ' ').trim()}`).join('\n')
-  const words = collectWords(chunk, new Set())
-    .filter((w) => w.level !== 'A1' && !seen.has(w.lemma))
-    .map((w) => {
-      seen.add(w.lemma)
-      return `${w.lemma} | ${w.surface} | ${w.segIdx}`
-    })
-    .join('\n')
-  return structured({
-    system: VIDEO_PHRASES_SYSTEM,
-    prompt: videoPhrasesPrompt(lines, words),
-    schema: VideoPhrasesSchema,
-  })
-}
+export type { VocabPhrase } from '../vocab-words.ts'
 
 /**
  * Cụm từ (phrasal verb, thành ngữ, collocation) trong video và từ loại theo ngữ cảnh của từ đơn, do AI chọn;
@@ -124,51 +38,8 @@ function askChunk(chunk: Array<{ idx: number; text: string }>, seen: Set<string>
 export const videoPhrases = createServerFn({ method: 'POST' })
   .validator(z.object({ youtubeId: z.string(), generate: z.boolean().default(false) }))
   .handler(
-    async ({
-      data,
-    }): Promise<
-      | {
-          status: 'ready'
-          phrases: VocabPhrase[]
-          /** dạng gốc → từ loại theo ngữ cảnh (noun, verb…) */
-          wordPos: Record<string, string>
-        }
-      /** chưa tìm lần nào */
-      | { status: 'idle' }
-      | { status: 'no-ai' }
-    > => {
-      const key = `phrases2|${data.youtubeId}`
-      const segs = videoSegments(data.youtubeId)
-
-      let result: VideoPhrases | null = null
-      const cached = db.select().from(lookups).where(eq(lookups.key, key)).get()
-      if (cached) {
-        const parsed = VideoPhrasesSchema.safeParse(JSON.parse(cached.json))
-        if (parsed.success) result = parsed.data
-      }
-      if (!result) {
-        if (!hasLlm(getConfig())) return { status: 'no-ai' }
-        if (!data.generate) return { status: 'idle' }
-        const seen = new Set<string>()
-        const parts = await Promise.all(chunkSegments(segs).map((chunk) => askChunk(chunk, seen)))
-        result = { phrases: parts.flatMap((p) => p.phrases), words: parts.flatMap((p) => p.words) }
-        const json = JSON.stringify(result)
-        db.insert(lookups).values({ key, json }).onConflictDoUpdate({ target: lookups.key, set: { json } }).run()
-      }
-
-      const text = new Map(segs.map((s) => [s.idx, s.text.toLowerCase()]))
-      const saved = savedFronts()
-      const seen = new Set<string>()
-      const phrases = result.phrases.flatMap((p) => {
-        const sentence = text.get(p.segment)
-        const phrase = p.phrase.trim()
-        if (!sentence || !phrase || seen.has(phrase.toLowerCase())) return []
-        seen.add(phrase.toLowerCase())
-        const surface = [p.surface, phrase].map((s) => s.trim()).find((s) => s && sentence.includes(s.toLowerCase()))
-        return [{ ...p, phrase, surface: surface ?? '', saved: saved.has(phrase.toLowerCase()) }]
-      })
-      const wordPos = Object.fromEntries(result.words.map((w) => [w.word.trim().toLowerCase(), w.pos]))
-      return { status: 'ready', phrases, wordPos }
+    async ({ data }): Promise<PhrasesResult> => {
+      return findPhrases(`phrases2|${data.youtubeId}`, videoSegments(data.youtubeId), data.generate)
     },
   )
 

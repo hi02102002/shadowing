@@ -1,0 +1,1 @@
+ALTER TABLE `reading_passages` ADD `highlights` text DEFAULT '[]' NOT NULL;

@@ -13,6 +13,8 @@ import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { activityStats } from '#/server/fns/stats.ts'
 import { getConversation, listConversations } from '#/server/fns/conversation.ts'
 import { getSpeakingAttempt, listSpeakingAttempts } from '#/server/fns/speaking.ts'
+import { getReading, listReadings, readingLibrary, readingPhrases, readingVocab } from '#/server/fns/reading.ts'
+import type { LibrarySource } from './reading-topics.ts'
 import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
@@ -168,3 +170,35 @@ export const speakingAttemptsQuery = () =>
 
 export const speakingAttemptQuery = (id: number) =>
   queryOptions({ queryKey: ['speaking-attempt', id], queryFn: () => getSpeakingAttempt({ data: { id } }) })
+
+export const readingsQuery = () =>
+  queryOptions({ queryKey: ['readings'], queryFn: () => listReadings() })
+
+export const readingQuery = (id: number) =>
+  queryOptions({ queryKey: ['reading', id], queryFn: () => getReading({ data: { id } }) })
+
+/** mục lục nguồn bài đọc: server cache 6 giờ */
+export const readingLibraryQuery = (source: LibrarySource) =>
+  queryOptions({ queryKey: ['reading-library', source], queryFn: () => readingLibrary({ data: { source } }), staleTime: 10 * 60 * 1000 })
+
+export const readingVocabQuery = (id: number) =>
+  queryOptions({ queryKey: ['reading-vocab', id], queryFn: () => readingVocab({ data: { id } }) })
+
+/** cụm từ AI đã tìm trong bài đọc (chỉ đọc cache, không gọi AI) */
+export const readingPhrasesQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['reading-phrases', id],
+    queryFn: () => readingPhrases({ data: { id, generate: false } }),
+    staleTime: Infinity,
+    retry: false,
+  })
+
+/** nghĩa ngắn cho danh sách từ của bài đọc */
+export const readingMeaningsQuery = (id: number, words: string[]) =>
+  queryOptions({
+    queryKey: ['reading-meanings', id, words.length],
+    queryFn: () => vocabMeanings({ data: { words } }),
+    enabled: words.length > 0,
+    staleTime: Infinity,
+    retry: false,
+  })

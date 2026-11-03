@@ -45,6 +45,8 @@
 }
 
 .dark {
+  /* thanh cuộn, ô nhập gốc của trình duyệt theo nền tối */
+  color-scheme: dark;
   --background: oklch(0.17 0.015 260);
   --foreground: oklch(0.93 0.01 260);
   --card: oklch(0.21 0.018 260);

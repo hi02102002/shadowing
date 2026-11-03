@@ -1,0 +1,1 @@
+ALTER TABLE `reading_passages` ADD `format` text DEFAULT 'standard' NOT NULL;

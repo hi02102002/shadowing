@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('#/db/index.ts', () => ({ db: {} }))
-const { chunkSegments } = await import('./vocab')
+const { chunkSegments } = await import('../vocab-words')
 
 const seg = (idx: number, len: number) => ({ idx, text: 'x'.repeat(len) })
 

@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import type { AlignToken } from '#/lib/align.ts'
 import type { TalkLevel } from '#/lib/conversation.ts'
+import { AI_QUESTION_TYPES } from '#/lib/reading-topics.ts'
+import type { AiQuestionType, ReadingFormat, ReadingLevel } from '#/lib/reading-topics.ts'
 import type { SpeakingTarget } from '#/lib/speaking-topics.ts'
 import type { Accent } from '#/lib/speech.ts'
 
@@ -39,10 +41,13 @@ export const MISTAKE_TYPE_LABELS: Record<
   other: 'Khác',
 }
 
+/** loại lỗi không do AI phân loại: câu đọc hiểu trả lời sai */
+const OTHER_TYPE_LABELS: Record<string, string | undefined> = { reading: 'Đọc hiểu' }
+
 /** Nhãn tiếng Việt cho type lỗi (type lạ từ DB cũ thì trả nguyên) */
 export function mistakeLabel(type: string): string {
   return (
-    (MISTAKE_TYPE_LABELS as Record<string, string | undefined>)[type] ?? type
+    (MISTAKE_TYPE_LABELS as Record<string, string | undefined>)[type] ?? OTHER_TYPE_LABELS[type] ?? type
   )
 }
 
@@ -534,4 +539,108 @@ Bài nói của người học:
 """
 ${opts.transcript}
 """`
+}
+
+export const READING_SYSTEM = `Bạn là giáo viên tiếng Anh giàu kinh nghiệm, soạn bài đọc hiểu cho người Việt theo chuẩn CEFR và đúng dạng đề IELTS Reading, TOEIC Reading.
+- Bài đọc viết bằng tiếng Anh tự nhiên, chính xác về nội dung, có thông tin cụ thể (số liệu, ví dụ, ý kiến) để ra câu hỏi.
+- Giải thích đáp án bằng tiếng Việt, ngắn gọn, chỉ ra vì sao đúng và vì sao phương án dễ nhầm là sai.`
+
+const READING_LEVEL_DESC: Record<ReadingLevel, string> = {
+  A2: 'A2: khoảng 150–200 từ, 3 đoạn, câu ngắn, từ vựng thông dụng, thì hiện tại / quá khứ đơn',
+  B1: 'B1: khoảng 250–300 từ, 4 đoạn, có câu ghép và mệnh đề quan hệ, từ vựng đời sống và công việc',
+  B2: 'B2: khoảng 350–400 từ, 4–5 đoạn, câu phức, lập luận và quan điểm trái chiều, collocation học thuật nhẹ',
+  C1: 'C1: khoảng 450–500 từ, 5 đoạn, văn phong báo chí / học thuật, ý ngầm, từ vựng ít phổ biến',
+}
+
+const READING_TYPE_DESC: Record<AiQuestionType, string> = {
+  choice:
+    '"choice" — trắc nghiệm: prompt là câu hỏi tiếng Anh (không có ___), options đúng 4 phương án, answers là đúng một phương án chép nguyên văn',
+  tfng: '"tfng" — True / False / Not Given (thông tin trong bài): prompt là một nhận định tiếng Anh, options rỗng, answers là đúng một trong "True", "False", "Not Given" (có ít nhất một câu Not Given nếu ra từ 3 câu dạng này)',
+  ynng: '"ynng" — Yes / No / Not Given (quan điểm, nhận định của tác giả, chỉ dùng khi bài có ý kiến tác giả): prompt là một nhận định tiếng Anh, options rỗng, answers là đúng một trong "Yes", "No", "Not Given"',
+  heading:
+    '"heading" — nối tiêu đề với đoạn: mỗi câu là một đoạn, prompt là "Paragraph X" (X là chữ đánh dấu đoạn A, B, C… như trong bài đưa bên dưới); options là CÙNG MỘT danh sách tiêu đề tiếng Anh cho mọi câu dạng này, nhiều hơn số đoạn hỏi 2–3 tiêu đề gây nhiễu; answers là đúng một tiêu đề chép nguyên văn; evidence là câu chủ đề của đoạn',
+  gap: '"gap" — hoàn thành câu: prompt là câu tóm tắt ý trong bài, viết lại khác bài, có đúng một ___; answers là từ / cụm 1–2 từ lấy NGUYÊN VĂN trong bài (thêm các dạng viết khác nếu cũng đúng), options rỗng',
+  short:
+    '"short" — trả lời ngắn: prompt là câu hỏi Wh- tiếng Anh (không có ___), answers là cụm 1–3 từ lấy NGUYÊN VĂN trong bài (thêm các cách viết khác nếu cũng đúng), options rỗng',
+}
+
+const READING_FORMAT_RULES: Record<ReadingFormat, { passage: string; questions: string }> = {
+  standard: {
+    passage: 'bài đọc thông thường (báo, tạp chí phổ thông)',
+    questions: '- Xếp câu hỏi theo thứ tự thông tin xuất hiện trong bài.',
+  },
+  ielts: {
+    passage:
+      'bài đọc kiểu IELTS Academic Reading: văn phong học thuật / báo chí chuyên đề, mỗi đoạn một ý chính rõ ràng để làm được dạng nối tiêu đề, có cả dữ kiện lẫn quan điểm',
+    questions: `- Làm đúng như đề IELTS Academic Reading: câu cùng dạng đứng liền nhau thành nhóm (nhóm nối tiêu đề đứng đầu nếu có), trong mỗi nhóm (trừ nối tiêu đề) xếp theo thứ tự thông tin trong bài.
+- Bẫy kiểu IELTS: paraphrase, đồng nghĩa, phân biệt False với Not Given.`,
+  },
+  toeic: {
+    passage:
+      'văn bản kiểu TOEIC Reading Part 7, chọn một dạng hợp chủ đề: email / thư công việc, thông báo nội bộ, quảng cáo, thông cáo, bài báo kinh doanh ngắn, chuỗi tin nhắn; ngữ cảnh công sở, có tên người, công ty, ngày giờ, số liệu cụ thể',
+    questions: `- Làm đúng như đề TOEIC Part 7: mọi câu là trắc nghiệm 4 phương án (A–D), gồm các kiểu: mục đích văn bản ("What is the purpose of the e-mail?"), chi tiết, suy luận ("What is suggested about…?", "What is most likely true…?"), câu phủ định ("What is NOT mentioned…?"), từ đồng nghĩa trong ngữ cảnh ('In paragraph 1, line 2, the word "…" is closest in meaning to'); xếp theo thứ tự thông tin trong bài.`,
+  },
+}
+
+export const ReadingPassageSchema = z.object({
+  title: z.string(),
+  paragraphs: z.array(z.string()).describe('các đoạn văn của bài đọc, mỗi phần tử một đoạn, không ghi chữ đánh dấu đoạn'),
+  glossary: z
+    .array(z.object({ en: z.string().describe('từ / cụm từ chép nguyên văn trong bài'), vi: z.string().describe('nghĩa tiếng Việt trong ngữ cảnh') }))
+    .describe('6–10 từ / cụm từ khó nhất trong bài so với trình độ'),
+  questions: z
+    .array(
+      z.object({
+        type: z.enum(AI_QUESTION_TYPES),
+        prompt: z.string(),
+        options: z.array(z.string()).describe('dạng choice: 4 phương án; dạng heading: danh sách tiêu đề chung; các dạng khác là mảng rỗng'),
+        answers: z.array(z.string()),
+        evidence: z.string().describe('một câu (hoặc một đoạn câu) chép NGUYÊN VĂN từ bài làm căn cứ cho đáp án; với Not Given là câu gần nhất liên quan'),
+        explanation: z.string().describe('giải thích tiếng Việt 1–2 câu'),
+      }),
+    )
+    .describe('đúng số câu được yêu cầu'),
+})
+export type ReadingPassage = z.infer<typeof ReadingPassageSchema>
+
+function questionRules(opts: { count: number; types: readonly AiQuestionType[]; format: ReadingFormat }) {
+  return `Chỉ dùng các dạng sau, chia đều số câu (dạng nối tiêu đề: tối đa một câu cho mỗi đoạn):
+${opts.types.map((t) => `- ${READING_TYPE_DESC[t]}`).join('\n')}
+Yêu cầu:
+- Mỗi câu hỏi chỉ có một đáp án đúng, trả lời được (hoặc kết luận Not Given) chỉ dựa vào bài.
+- Câu hỏi diễn đạt lại (paraphrase), không chép nguyên câu trong bài; hỏi cả ý chính lẫn chi tiết, rải đều khắp bài.
+- Phương án sai của trắc nghiệm phải hợp lý, có nhắc tới thông tin trong bài.
+${READING_FORMAT_RULES[opts.format].questions}`
+}
+
+/** đoạn văn kèm chữ đánh dấu A, B, C… để câu nối tiêu đề gọi tên được */
+const lettered = (paragraphs: string[]) => paragraphs.map((p, i) => `${String.fromCharCode(65 + i)}. ${p}`).join('\n\n')
+
+export function readingPrompt(opts: { topic: string; level: ReadingLevel; count: number; types: readonly AiQuestionType[]; format: ReadingFormat }) {
+  return `Chủ đề: ${opts.topic}
+Trình độ: ${READING_LEVEL_DESC[opts.level]}
+Dạng bài: ${READING_FORMAT_RULES[opts.format].passage}
+Hãy viết một bài đọc mới về chủ đề trên đúng trình độ và dạng bài, có tiêu đề, rồi soạn ${opts.count} câu hỏi đọc hiểu.
+Đoạn văn được đánh chữ A, B, C… theo thứ tự trong mảng paragraphs.
+${questionRules(opts)}`
+}
+
+/** chỉ soạn câu hỏi cho bài đọc có sẵn (lấy từ nguồn ngoài) */
+export const ReadingQuestionsSchema = ReadingPassageSchema.pick({ glossary: true, questions: true })
+export type ReadingQuestions = z.infer<typeof ReadingQuestionsSchema>
+
+export function readingQuestionsPrompt(opts: {
+  title: string
+  paragraphs: string[]
+  level: ReadingLevel
+  count: number
+  types: readonly AiQuestionType[]
+  format: ReadingFormat
+}) {
+  return `Bài đọc (trình độ ${READING_LEVEL_DESC[opts.level].split(':')[0]}): ${opts.title}
+"""
+${lettered(opts.paragraphs)}
+"""
+Hãy soạn ${opts.count} câu hỏi đọc hiểu cho bài trên (không sửa bài, evidence chép nguyên văn không kèm chữ đánh dấu đoạn), độ khó vừa trình độ.
+${questionRules(opts)}`
 }

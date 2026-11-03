@@ -99,6 +99,34 @@
       "when": 1793291309373,
       "tag": "0013_speaking_audio",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1793713930039,
+      "tag": "0014_reading",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1793714867412,
+      "tag": "0015_reading_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1793716480792,
+      "tag": "0016_reading_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793716864708,
+      "tag": "0017_reading_highlights",
+      "breakpoints": true
     }
   ]
 }

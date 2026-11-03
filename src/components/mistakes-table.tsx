@@ -41,6 +41,7 @@ const SOURCE_LABEL: Record<string, string | undefined> = {
   grammar: 'Ngữ pháp',
   conversation: 'Hội thoại',
   speaking: 'Nói theo đề',
+  reading: 'Đọc hiểu',
 }
 
 const helper = createColumnHelper<typeof features, MistakeRow>()

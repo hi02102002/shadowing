@@ -98,6 +98,9 @@ function StatsPage() {
         <Tile label="Câu ngữ pháp đã làm" sub={`${totals.grammar.correct ?? 0} câu đúng`}>
           {totals.grammar.n}
         </Tile>
+        <Tile label="Bài đọc đã làm" sub={`${totals.reading.correct ?? 0} câu đúng`}>
+          {totals.reading.n}
+        </Tile>
         <Tile label="Lượt ôn thẻ">{totals.reviews}</Tile>
         <Tile label="Lỗi trong sổ">{totals.mistakes}</Tile>
         <Tile label="Video trong thư viện">{totals.videos}</Tile>

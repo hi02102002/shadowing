@@ -84,7 +84,7 @@ export const mistakes = sqliteTable(
     word: text().notNull(),
     heard: text(),
     type: text().notNull(),
-    /** dictation | pronunciation | grammar | conversation | speaking */
+    /** dictation | pronunciation | grammar | conversation | speaking | reading */
     source: text().notNull(),
     segmentId: integer('segment_id').references(() => segments.id, {
       onDelete: 'set null',
@@ -314,3 +314,55 @@ export const grammarAnswers = sqliteTable(
   },
   (t) => [uniqueIndex('grammar_answers_unit_item_idx').on(t.unitId, t.itemKey)],
 )
+
+/** Bài đọc hiểu (trang /reading): AI viết theo chủ đề và trình độ, hoặc lấy từ nguồn bài đọc chia cấp độ */
+export const readingPassages = sqliteTable('reading_passages', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  /** ai | british-council | breaking-news | onestop | linguapress (READING_SOURCES) */
+  source: text().notNull().default('ai'),
+  /** trang gốc của bài lấy từ nguồn ngoài, null với bài AI viết */
+  sourceUrl: text('source_url'),
+  /** chủ đề người học chọn hoặc tự nhập */
+  topic: text().notNull(),
+  /** A2 | B1 | B2 | C1 (READING_LEVELS) */
+  level: text().notNull(),
+  /** dạng đề của bộ câu hỏi: standard | ielts | toeic (READING_FORMATS) */
+  format: text().notNull().default('standard'),
+  title: text().notNull(),
+  /** các đoạn văn */
+  paragraphs: text({ mode: 'json' }).notNull().$type<string[]>(),
+  /** từ khó trong bài kèm nghĩa tiếng Việt */
+  glossary: text({ mode: 'json' }).notNull().$type<Array<{ en: string; vi: string }>>(),
+  questions: text({ mode: 'json' }).notNull().$type<ReadingQuestion[]>(),
+  /** câu trả lời lần nộp gần nhất, theo thứ tự câu hỏi; null = chưa nộp */
+  answers: text({ mode: 'json' }).$type<string[]>(),
+  /** số câu đúng lần nộp gần nhất */
+  score: integer(),
+  /** chỗ người học bôi màu trong bài (ReadingHighlight), giữ qua các lần làm */
+  highlights: text({ mode: 'json' }).notNull().default([]).$type<ReadingHighlight[]>(),
+  answeredAt: integer('answered_at', { mode: 'timestamp' }),
+  createdAt: createdAt(),
+})
+
+/** đoạn bôi màu: vị trí ký tự [start, end) trong đoạn văn thứ p */
+export interface ReadingHighlight {
+  p: number
+  start: number
+  end: number
+  /** cùng danh sách với HIGHLIGHT_COLORS (src/lib/highlights.ts) */
+  color: 'yellow' | 'green' | 'pink' | 'blue'
+}
+
+/** cùng cấu trúc với câu hỏi trong ReadingPassageSchema (src/server/ai/prompts.ts) sau khi lọc */
+export interface ReadingQuestion {
+  /** choice | tfng | ynng | heading | gap | short | multi (READING_QUESTION_TYPES) */
+  type: string
+  prompt: string
+  options: string[]
+  answers: string[]
+  /** câu trích nguyên văn trong bài làm căn cứ cho đáp án */
+  evidence: string
+  explanation: string
+  /** hướng dẫn chung của nhóm câu trong đề gốc (vd. "Which paragraph contains…"), các câu liền nhau cùng hướng dẫn là một nhóm */
+  instruction?: string
+}

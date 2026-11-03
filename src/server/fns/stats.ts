@@ -28,7 +28,7 @@ export const activityStats = createServerFn({ method: 'GET' }).handler(async () 
   const daily = dailyActivity(start)
   const days: Array<{ day: string } & Record<ActivityKind, number> & { total: number }> = []
   for (let d = start; d <= today; d = addDays(d, 1)) {
-    const c = daily.get(d) ?? { dictation: 0, pronunciation: 0, review: 0, grammar: 0, conversation: 0, speaking: 0 }
+    const c = daily.get(d) ?? { dictation: 0, pronunciation: 0, review: 0, grammar: 0, conversation: 0, speaking: 0, reading: 0 }
     days.push({ day: d, ...c, total: ACTIVITY_KINDS.reduce((n, k) => n + c[k], 0) })
   }
 
@@ -69,6 +69,9 @@ export const activityStats = createServerFn({ method: 'GET' }).handler(async () 
     cardsTotal: one<{ n: number }>(sql`select count(*) as n from cards`).n,
     grammar: one<{ n: number; correct: number | null }>(
       sql`select count(*) as n, sum(correct) as correct from grammar_answers`,
+    ),
+    reading: one<{ n: number; correct: number | null }>(
+      sql`select count(*) as n, sum(score) as correct from reading_passages where answers is not null`,
     ),
     mistakes: one<{ n: number }>(sql`select count(*) as n from mistakes`).n,
     videos: one<{ n: number }>(sql`select count(*) as n from videos`).n,

@@ -64,6 +64,24 @@ export function recordGrammarMistake(m: { word: string; heard: string; ref: stri
     .run()
 }
 
+/** Câu đọc hiểu trả lời sai: word = câu hỏi, heard = câu người học trả lời */
+export function recordReadingMistake(m: { question: string; answer: string; explanation: string }) {
+  const word = m.question.trim().toLowerCase()
+  if (!word) return
+  db.insert(mistakes)
+    .values({ word, heard: m.answer || null, type: 'reading', source: 'reading', explanation: m.explanation })
+    .onConflictDoUpdate({
+      target: [mistakes.word, mistakes.type, mistakes.source],
+      set: {
+        count: sql`${mistakes.count} + 1`,
+        heard: m.answer || null,
+        explanation: m.explanation,
+        lastSeenAt: sql`(unixepoch())`,
+      },
+    })
+    .run()
+}
+
 /** Lỗi khi nói tự do (hội thoại, nói theo đề): word = cách nói đúng, heard = câu người học đã nói */
 export function recordSpeechMistakes(
   source: 'conversation' | 'speaking',
