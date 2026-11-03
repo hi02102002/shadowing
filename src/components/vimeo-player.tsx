@@ -15,13 +15,18 @@ interface VimeoApi {
   getTextTracks: () => Promise<Array<{ language: string; kind: string }>>
   enableTextTrack: (language: string, kind?: string) => Promise<unknown>
   disableTextTrack: () => Promise<void>
-  on: (event: string, cb: (data: { seconds?: number; playbackRate?: number }) => void) => void
+  on: (
+    event: string,
+    cb: (data: { seconds?: number; playbackRate?: number }) => void,
+  ) => void
   destroy: () => Promise<void>
 }
 
 declare global {
   interface Window {
-    Vimeo?: { Player: new (el: HTMLElement, opts: Record<string, unknown>) => VimeoApi }
+    Vimeo?: {
+      Player: new (el: HTMLElement, opts: Record<string, unknown>) => VimeoApi
+    }
   }
 }
 
@@ -52,7 +57,10 @@ const noop = () => {}
  * Vimeo chỉ báo thời gian qua sự kiện `timeupdate` (~4 lần/giây) → nội suy theo đồng hồ
  * để vòng poll dừng đúng cuối câu như YouTube.
  */
-function adaptVimeo(p: VimeoApi): YTPlayer {
+function adaptVimeo(
+  p: VimeoApi,
+  callbacks?: { onPlay?: () => void; onEnded?: () => void },
+): YTPlayer {
   let state: number = PLAYER_STATE.CUED
   let rate = 1
   let base = 0
@@ -65,7 +73,9 @@ function adaptVimeo(p: VimeoApi): YTPlayer {
     baseAt = performance.now()
   }
   const current = () =>
-    state === PLAYER_STATE.PLAYING ? base + ((performance.now() - baseAt) / 1000) * rate : base
+    state === PLAYER_STATE.PLAYING
+      ? base + ((performance.now() - baseAt) / 1000) * rate
+      : base
 
   p.on('timeupdate', (d) => {
     if (performance.now() < seekingUntil) return
@@ -77,6 +87,7 @@ function adaptVimeo(p: VimeoApi): YTPlayer {
     sync(d.seconds)
   })
   p.on('play', (d) => {
+    callbacks?.onPlay?.()
     sync(current())
     state = PLAYER_STATE.PLAYING
     if (performance.now() >= seekingUntil) sync(d.seconds)
@@ -88,6 +99,7 @@ function adaptVimeo(p: VimeoApi): YTPlayer {
   })
   p.on('ended', () => {
     state = PLAYER_STATE.ENDED
+    callbacks?.onEnded?.()
   })
   p.on('bufferstart', () => {
     if (state !== PLAYER_STATE.PLAYING) return
@@ -131,7 +143,9 @@ function adaptVimeo(p: VimeoApi): YTPlayer {
 async function setVimeoCaptions(p: VimeoApi, on: boolean) {
   try {
     if (!on) return await p.disableTextTrack()
-    const track = (await p.getTextTracks()).find((t) => t.language.startsWith('en'))
+    const track = (await p.getTextTracks()).find((t) =>
+      t.language.startsWith('en'),
+    )
     if (track) await p.enableTextTrack(track.language, track.kind)
   } catch {
     /* player chưa sẵn sàng */
@@ -143,13 +157,26 @@ interface Props {
   className?: string
   /** chế độ chép chính tả: tắt phụ đề Vimeo và che vùng phụ đề */
   hideCaptions?: boolean
+  /** Ẩn controls gốc để màn luyện nghe dùng controls giới hạn của app. */
+  nativeControls?: boolean
+  onPlay?: () => void
+  onEnded?: () => void
 }
 
-export function VimeoPlayer({ vimeoId, className, hideCaptions = false }: Props) {
+export function VimeoPlayer({
+  vimeoId,
+  className,
+  hideCaptions = false,
+  nativeControls = true,
+  onPlay,
+  onEnded,
+}: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<VimeoApi | null>(null)
   const hideRef = useRef(hideCaptions)
   hideRef.current = hideCaptions
+  const callbacksRef = useRef({ onPlay, onEnded })
+  callbacksRef.current = { onPlay, onEnded }
   const [coverOff, setCoverOff] = useState(false)
 
   const publish = useThrottledCallback(
@@ -177,8 +204,12 @@ export function VimeoPlayer({ vimeoId, className, hideCaptions = false }: Props)
           byline: false,
           portrait: false,
           dnt: true,
+          controls: nativeControls,
         })
-        player = adaptVimeo(api)
+        player = adaptVimeo(api, {
+          onPlay: () => callbacksRef.current.onPlay?.(),
+          onEnded: () => callbacksRef.current.onEnded?.(),
+        })
         return api.ready()
       })
       .then(() => {
@@ -189,7 +220,10 @@ export function VimeoPlayer({ vimeoId, className, hideCaptions = false }: Props)
         timer = setInterval(() => {
           if (!player) return
           const ms = Math.round(player.getCurrentTime() * 1000)
-          const { playing, changed } = playerActions.tick(ms, player.getPlayerState())
+          const { playing, changed } = playerActions.tick(
+            ms,
+            player.getPlayerState(),
+          )
           if (changed) playerActions.setPlayback(ms, playing)
           else publish(ms, playing)
         }, POLL_MS)
@@ -203,7 +237,7 @@ export function VimeoPlayer({ vimeoId, className, hideCaptions = false }: Props)
       apiRef.current = null
       player?.destroy()
     }
-  }, [vimeoId, publish])
+  }, [vimeoId, publish, nativeControls])
 
   useEffect(() => {
     if (apiRef.current) void setVimeoCaptions(apiRef.current, !hideCaptions)

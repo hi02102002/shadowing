@@ -13,6 +13,7 @@ const KINDS = [
   { key: 'conversation', label: 'Hội thoại' },
   { key: 'speaking', label: 'Nói theo đề' },
   { key: 'reading', label: 'Đọc hiểu' },
+  { key: 'listening', label: 'Luyện nghe' },
 ] as const
 
 const WEEKDAYS = ['T2', '', 'T4', '', 'T6', '', '']
@@ -25,14 +26,21 @@ export function heatLevel(total: number, goal: number) {
 }
 
 const fmtDay = (day: string) =>
-  new Date(`${day}T12:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' })
+  new Date(`${day}T12:00:00`).toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+  })
 
 /**
  * Lịch hoạt động kiểu GitHub: mỗi cột một tuần (thứ Hai → Chủ nhật), màu đậm dần theo số lượt luyện so với mục tiêu.
  * Rê chuột vào ô để xem chi tiết từng loại; bảng 30 ngày gần nhất bên dưới cho bàn phím / trình đọc màn hình.
  */
 export function ActivityHeatmap({ days, goal }: { days: Day[]; goal: number }) {
-  const [hover, setHover] = useState<{ day: Day; x: number; y: number } | null>(null)
+  const [hover, setHover] = useState<{ day: Day; x: number; y: number } | null>(
+    null,
+  )
   const weeks: Day[][] = []
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7))
 
@@ -50,12 +58,17 @@ export function ActivityHeatmap({ days, goal }: { days: Day[]; goal: number }) {
         <div
           className="grid min-w-[560px] gap-[3px]"
           // cột nhãn thứ cùng cỡ với cột ô để các hàng thẳng nhau
-          style={{ gridTemplateColumns: `repeat(${weeks.length + 1}, minmax(8px, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${weeks.length + 1}, minmax(8px, 1fr))`,
+          }}
         >
           <div className="flex flex-col gap-[3px] text-[10px] text-muted-foreground">
             <span className="h-3.5" />
             {WEEKDAYS.map((d, i) => (
-              <span key={i} className="flex aspect-square items-center leading-none">
+              <span
+                key={i}
+                className="flex aspect-square items-center leading-none"
+              >
                 {d}
               </span>
             ))}
@@ -85,7 +98,9 @@ export function ActivityHeatmap({ days, goal }: { days: Day[]; goal: number }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>Mỗi ô là một ngày; đậm nhất là ngày đạt mục tiêu {goal} lượt.</span>
+        <span>
+          Mỗi ô là một ngày; đậm nhất là ngày đạt mục tiêu {goal} lượt.
+        </span>
         <span className="flex items-center gap-1">
           Ít
           {[0, 1, 2, 3, 4].map((l) => (
@@ -102,7 +117,9 @@ export function ActivityHeatmap({ days, goal }: { days: Day[]; goal: number }) {
           style={{ left: hover.x, top: hover.y - 6 }}
         >
           <div className="text-sm font-semibold">{hover.day.total} lượt</div>
-          <div className="text-muted-foreground first-letter:uppercase">{fmtDay(hover.day.day)}</div>
+          <div className="text-muted-foreground first-letter:uppercase">
+            {fmtDay(hover.day.day)}
+          </div>
           {hover.day.total > 0 && (
             <ul className="mt-1">
               {KINDS.filter((k) => hover.day[k.key] > 0).map((k) => (
@@ -138,13 +155,17 @@ export function ActivityHeatmap({ days, goal }: { days: Day[]; goal: number }) {
               .reverse()
               .map((d) => (
                 <tr key={d.day} className="border-t">
-                  <td className="py-1">{d.day.split('-').reverse().join('/')}</td>
+                  <td className="py-1">
+                    {d.day.split('-').reverse().join('/')}
+                  </td>
                   {KINDS.map((k) => (
                     <td key={k.key} className="py-1 text-right tabular-nums">
                       {d[k.key] || '–'}
                     </td>
                   ))}
-                  <td className="py-1 text-right font-medium tabular-nums">{d.total}</td>
+                  <td className="py-1 text-right font-medium tabular-nums">
+                    {d.total}
+                  </td>
                 </tr>
               ))}
           </tbody>

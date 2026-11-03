@@ -1,8 +1,18 @@
-import { sqliteTable, integer, text, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import {
+  sqliteTable,
+  integer,
+  text,
+  real,
+  index,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
+import type { ListeningSection } from '#/lib/listening'
 
 const createdAt = () =>
-  integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
+  integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`)
 
 export const videos = sqliteTable(
   'videos',
@@ -84,7 +94,7 @@ export const mistakes = sqliteTable(
     word: text().notNull(),
     heard: text(),
     type: text().notNull(),
-    /** dictation | pronunciation | grammar | conversation | speaking | reading */
+    /** dictation | pronunciation | grammar | conversation | speaking | reading | listening */
     source: text().notNull(),
     segmentId: integer('segment_id').references(() => segments.id, {
       onDelete: 'set null',
@@ -99,7 +109,9 @@ export const mistakes = sqliteTable(
       .notNull()
       .default(sql`(unixepoch())`),
   },
-  (t) => [uniqueIndex('mistakes_word_type_source_idx').on(t.word, t.type, t.source)],
+  (t) => [
+    uniqueIndex('mistakes_word_type_source_idx').on(t.word, t.type, t.source),
+  ],
 )
 
 export const settings = sqliteTable('settings', {
@@ -142,7 +154,12 @@ export const conversationTurns = sqliteTable(
 /** nhận xét cuối buổi hội thoại, cùng cấu trúc với ConversationFeedbackSchema (src/server/ai/prompts.ts) */
 export interface ConversationFeedback {
   summary: string
-  corrections: Array<{ said: string; better: string; type: string; explanation: string }>
+  corrections: Array<{
+    said: string
+    better: string
+    type: string
+    explanation: string
+  }>
   phrases: Array<{ en: string; vi: string }>
   /** band ước lượng, chỉ có ở buổi luyện IELTS Speaking Part 1 / Part 3 */
   band?: number | null
@@ -172,14 +189,26 @@ export interface SpeakingFeedback {
   criteria: Array<{ name: string; band: number; comment: string }>
   covered: Array<{ point: string; done: boolean }>
   summary: string
-  corrections: Array<{ said: string; better: string; type: string; explanation: string }>
+  corrections: Array<{
+    said: string
+    better: string
+    type: string
+    explanation: string
+  }>
   vocabulary: Array<{ en: string; vi: string }>
   sample: string
   /** chỉ có khi chấm bằng model nghe được audio */
   pronunciation?: {
     band: number
     comment: string
-    mistakes: Array<{ word: string; heard: string; type: string; ipa: string; explanation: string; tip: string }>
+    mistakes: Array<{
+      word: string
+      heard: string
+      type: string
+      ipa: string
+      explanation: string
+      tip: string
+    }>
   }
 }
 
@@ -252,13 +281,17 @@ export const cards = sqliteTable(
     /** từ loại, ví dụ, cụm từ, họ từ… tra bổ sung cùng lúc với meaningVi; null = chưa tra */
     info: text({ mode: 'json' }).$type<CardInfo>(),
     // ngữ cảnh khi lưu từ transcript
-    segmentId: integer('segment_id').references(() => segments.id, { onDelete: 'set null' }),
+    segmentId: integer('segment_id').references(() => segments.id, {
+      onDelete: 'set null',
+    }),
     sentence: text(),
     clipStartMs: integer('clip_start_ms'),
     clipEndMs: integer('clip_end_ms'),
     ankiGuid: text('anki_guid'),
     // trạng thái FSRS
-    due: integer({ mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    due: integer({ mode: 'timestamp' })
+      .notNull()
+      .default(sql`(unixepoch())`),
     stability: real().notNull().default(0),
     difficulty: real().notNull().default(0),
     elapsedDays: integer('elapsed_days').notNull().default(0),
@@ -291,7 +324,9 @@ export const reviewLogs = sqliteTable(
     stability: real().notNull(),
     difficulty: real().notNull(),
     elapsedDays: integer('elapsed_days').notNull(),
-    reviewedAt: integer('reviewed_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    reviewedAt: integer('reviewed_at', { mode: 'timestamp' })
+      .notNull()
+      .default(sql`(unixepoch())`),
   },
   (t) => [index('review_logs_card_idx').on(t.cardId)],
 )
@@ -310,7 +345,9 @@ export const grammarAnswers = sqliteTable(
     itemKey: text('item_key').notNull(),
     answer: text().notNull(),
     correct: integer({ mode: 'boolean' }).notNull(),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .notNull()
+      .default(sql`(unixepoch())`),
   },
   (t) => [uniqueIndex('grammar_answers_unit_item_idx').on(t.unitId, t.itemKey)],
 )
@@ -332,14 +369,36 @@ export const readingPassages = sqliteTable('reading_passages', {
   /** các đoạn văn */
   paragraphs: text({ mode: 'json' }).notNull().$type<string[]>(),
   /** từ khó trong bài kèm nghĩa tiếng Việt */
-  glossary: text({ mode: 'json' }).notNull().$type<Array<{ en: string; vi: string }>>(),
+  glossary: text({ mode: 'json' })
+    .notNull()
+    .$type<Array<{ en: string; vi: string }>>(),
   questions: text({ mode: 'json' }).notNull().$type<ReadingQuestion[]>(),
   /** câu trả lời lần nộp gần nhất, theo thứ tự câu hỏi; null = chưa nộp */
   answers: text({ mode: 'json' }).$type<string[]>(),
   /** số câu đúng lần nộp gần nhất */
   score: integer(),
   /** chỗ người học bôi màu trong bài (ReadingHighlight), giữ qua các lần làm */
-  highlights: text({ mode: 'json' }).notNull().default([]).$type<ReadingHighlight[]>(),
+  highlights: text({ mode: 'json' })
+    .notNull()
+    .default([])
+    .$type<ReadingHighlight[]>(),
+  answeredAt: integer('answered_at', { mode: 'timestamp' }),
+  createdAt: createdAt(),
+})
+
+/** Bài luyện nghe: nội dung được chia theo section, câu trả lời lưu phẳng theo thứ tự toàn bài. */
+export const listeningPassages = sqliteTable('listening_passages', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  source: text().notNull(),
+  sourceUrl: text('source_url').notNull(),
+  title: text().notNull(),
+  level: text().notNull(),
+  topic: text().notNull(),
+  /** standard | ielts */
+  format: text().notNull().default('standard'),
+  sections: text({ mode: 'json' }).notNull().$type<ListeningSection[]>(),
+  answers: text({ mode: 'json' }).$type<string[]>(),
+  score: integer(),
   answeredAt: integer('answered_at', { mode: 'timestamp' }),
   createdAt: createdAt(),
 })

@@ -13,7 +13,11 @@ interface MistakeInput {
 }
 
 /** Ghi lỗi vào sổ lỗi: cùng từ + loại + nguồn thì tăng count và cập nhật giải thích mới nhất */
-export function recordMistakes(source: 'dictation' | 'pronunciation' | 'speaking', segmentId: number | null, list: MistakeInput[]) {
+export function recordMistakes(
+  source: 'dictation' | 'pronunciation' | 'speaking',
+  segmentId: number | null,
+  list: MistakeInput[],
+) {
   for (const m of list) {
     const word = m.word.trim().toLowerCase()
     if (!word) continue
@@ -45,11 +49,23 @@ export function recordMistakes(source: 'dictation' | 'pronunciation' | 'speaking
 }
 
 /** Lỗi bài tập ngữ pháp: word = đáp án đúng, heard = câu người học trả lời, ref trỏ về câu trong sách */
-export function recordGrammarMistake(m: { word: string; heard: string; ref: string; explanation: string }) {
+export function recordGrammarMistake(m: {
+  word: string
+  heard: string
+  ref: string
+  explanation: string
+}) {
   const word = m.word.trim().toLowerCase()
   if (!word) return
   db.insert(mistakes)
-    .values({ word, heard: m.heard || null, type: 'grammar', source: 'grammar', grammarRef: m.ref, explanation: m.explanation })
+    .values({
+      word,
+      heard: m.heard || null,
+      type: 'grammar',
+      source: 'grammar',
+      grammarRef: m.ref,
+      explanation: m.explanation,
+    })
     .onConflictDoUpdate({
       target: [mistakes.word, mistakes.type, mistakes.source],
       set: {
@@ -65,11 +81,49 @@ export function recordGrammarMistake(m: { word: string; heard: string; ref: stri
 }
 
 /** Câu đọc hiểu trả lời sai: word = câu hỏi, heard = câu người học trả lời */
-export function recordReadingMistake(m: { question: string; answer: string; explanation: string }) {
+export function recordReadingMistake(m: {
+  question: string
+  answer: string
+  explanation: string
+}) {
   const word = m.question.trim().toLowerCase()
   if (!word) return
   db.insert(mistakes)
-    .values({ word, heard: m.answer || null, type: 'reading', source: 'reading', explanation: m.explanation })
+    .values({
+      word,
+      heard: m.answer || null,
+      type: 'reading',
+      source: 'reading',
+      explanation: m.explanation,
+    })
+    .onConflictDoUpdate({
+      target: [mistakes.word, mistakes.type, mistakes.source],
+      set: {
+        count: sql`${mistakes.count} + 1`,
+        heard: m.answer || null,
+        explanation: m.explanation,
+        lastSeenAt: sql`(unixepoch())`,
+      },
+    })
+    .run()
+}
+
+/** Câu nghe hiểu trả lời sai: cùng cách lưu với đọc hiểu nhưng nguồn riêng để lọc trong Sổ lỗi. */
+export function recordListeningMistake(m: {
+  question: string
+  answer: string
+  explanation: string
+}) {
+  const word = m.question.trim().toLowerCase()
+  if (!word) return
+  db.insert(mistakes)
+    .values({
+      word,
+      heard: m.answer || null,
+      type: 'listening',
+      source: 'listening',
+      explanation: m.explanation,
+    })
     .onConflictDoUpdate({
       target: [mistakes.word, mistakes.type, mistakes.source],
       set: {
@@ -85,13 +139,24 @@ export function recordReadingMistake(m: { question: string; answer: string; expl
 /** Lỗi khi nói tự do (hội thoại, nói theo đề): word = cách nói đúng, heard = câu người học đã nói */
 export function recordSpeechMistakes(
   source: 'conversation' | 'speaking',
-  list: Array<{ said: string; better: string; type: string; explanation: string }>,
+  list: Array<{
+    said: string
+    better: string
+    type: string
+    explanation: string
+  }>,
 ) {
   for (const m of list) {
     const word = m.better.trim().toLowerCase()
     if (!word) continue
     db.insert(mistakes)
-      .values({ word, heard: m.said || null, type: m.type, source, explanation: m.explanation })
+      .values({
+        word,
+        heard: m.said || null,
+        type: m.type,
+        source,
+        explanation: m.explanation,
+      })
       .onConflictDoUpdate({
         target: [mistakes.word, mistakes.type, mistakes.source],
         set: {

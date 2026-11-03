@@ -11,10 +11,30 @@ import { getEssentialBook, listEssentialBooks } from '#/server/fns/essential.ts'
 import { listCards, listDecks, studyQueue } from '#/server/fns/flashcards.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
 import { activityStats } from '#/server/fns/stats.ts'
-import { getConversation, listConversations } from '#/server/fns/conversation.ts'
-import { getSpeakingAttempt, listSpeakingAttempts } from '#/server/fns/speaking.ts'
-import { getReading, listReadings, readingLibrary, readingPhrases, readingVocab } from '#/server/fns/reading.ts'
+import {
+  getConversation,
+  listConversations,
+} from '#/server/fns/conversation.ts'
+import {
+  getSpeakingAttempt,
+  listSpeakingAttempts,
+} from '#/server/fns/speaking.ts'
+import {
+  getReading,
+  listReadings,
+  readingLibrary,
+  readingPhrases,
+  readingVocab,
+} from '#/server/fns/reading.ts'
+import {
+  getListening,
+  listListenings,
+  listeningLibrary,
+  listeningPhrases,
+  listeningVocab,
+} from '#/server/fns/listening.ts'
 import type { LibrarySource } from './reading-topics.ts'
+import type { ListeningSource } from './listening.ts'
 import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
@@ -160,29 +180,51 @@ export const activityStatsQuery = () =>
   })
 
 export const conversationsQuery = () =>
-  queryOptions({ queryKey: ['conversations'], queryFn: () => listConversations() })
+  queryOptions({
+    queryKey: ['conversations'],
+    queryFn: () => listConversations(),
+  })
 
 export const conversationQuery = (id: number) =>
-  queryOptions({ queryKey: ['conversation', id], queryFn: () => getConversation({ data: { id } }) })
+  queryOptions({
+    queryKey: ['conversation', id],
+    queryFn: () => getConversation({ data: { id } }),
+  })
 
 export const speakingAttemptsQuery = () =>
-  queryOptions({ queryKey: ['speaking-attempts'], queryFn: () => listSpeakingAttempts() })
+  queryOptions({
+    queryKey: ['speaking-attempts'],
+    queryFn: () => listSpeakingAttempts(),
+  })
 
 export const speakingAttemptQuery = (id: number) =>
-  queryOptions({ queryKey: ['speaking-attempt', id], queryFn: () => getSpeakingAttempt({ data: { id } }) })
+  queryOptions({
+    queryKey: ['speaking-attempt', id],
+    queryFn: () => getSpeakingAttempt({ data: { id } }),
+  })
 
 export const readingsQuery = () =>
   queryOptions({ queryKey: ['readings'], queryFn: () => listReadings() })
 
 export const readingQuery = (id: number) =>
-  queryOptions({ queryKey: ['reading', id], queryFn: () => getReading({ data: { id } }) })
+  queryOptions({
+    queryKey: ['reading', id],
+    queryFn: () => getReading({ data: { id } }),
+  })
 
 /** mục lục nguồn bài đọc: server cache 6 giờ */
 export const readingLibraryQuery = (source: LibrarySource) =>
-  queryOptions({ queryKey: ['reading-library', source], queryFn: () => readingLibrary({ data: { source } }), staleTime: 10 * 60 * 1000 })
+  queryOptions({
+    queryKey: ['reading-library', source],
+    queryFn: () => readingLibrary({ data: { source } }),
+    staleTime: 10 * 60 * 1000,
+  })
 
 export const readingVocabQuery = (id: number) =>
-  queryOptions({ queryKey: ['reading-vocab', id], queryFn: () => readingVocab({ data: { id } }) })
+  queryOptions({
+    queryKey: ['reading-vocab', id],
+    queryFn: () => readingVocab({ data: { id } }),
+  })
 
 /** cụm từ AI đã tìm trong bài đọc (chỉ đọc cache, không gọi AI) */
 export const readingPhrasesQuery = (id: number) =>
@@ -197,6 +239,45 @@ export const readingPhrasesQuery = (id: number) =>
 export const readingMeaningsQuery = (id: number, words: string[]) =>
   queryOptions({
     queryKey: ['reading-meanings', id, words.length],
+    queryFn: () => vocabMeanings({ data: { words } }),
+    enabled: words.length > 0,
+    staleTime: Infinity,
+    retry: false,
+  })
+
+export const listeningsQuery = () =>
+  queryOptions({ queryKey: ['listenings'], queryFn: () => listListenings() })
+
+export const listeningQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['listening', id],
+    queryFn: () => getListening({ data: { id } }),
+  })
+
+export const listeningLibraryQuery = (source: ListeningSource) =>
+  queryOptions({
+    queryKey: ['listening-library', source],
+    queryFn: () => listeningLibrary({ data: { source } }),
+    staleTime: 10 * 60 * 1000,
+  })
+
+export const listeningVocabQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['listening-vocab', id],
+    queryFn: () => listeningVocab({ data: { id } }),
+  })
+
+export const listeningPhrasesQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['listening-phrases', id],
+    queryFn: () => listeningPhrases({ data: { id, generate: false } }),
+    staleTime: Infinity,
+    retry: false,
+  })
+
+export const listeningMeaningsQuery = (id: number, words: string[]) =>
+  queryOptions({
+    queryKey: ['listening-meanings', id, words.length],
     queryFn: () => vocabMeanings({ data: { words } }),
     enabled: words.length > 0,
     staleTime: Infinity,

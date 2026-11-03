@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExploreRouteImport } from './routes/explore'
+import { Route as ListeningRouteImport } from './routes/listening'
 import { Route as ReadingRouteImport } from './routes/reading'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -40,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
 const ExploreRoute = ExploreRouteImport.update({
   id: '/explore',
   path: '/explore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ListeningRoute = ListeningRouteImport.update({
+  id: '/listening',
+  path: '/listening',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReadingRoute = ReadingRouteImport.update({
@@ -146,6 +152,7 @@ const VideosVideoIdVocabRoute = VideosVideoIdVocabRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
+  '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
+  '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/explore': typeof ExploreRoute
+  '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/explore'
+    | '/listening'
     | '/reading'
     | '/review'
     | '/settings'
@@ -244,6 +254,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/explore'
+    | '/listening'
     | '/reading'
     | '/review'
     | '/settings'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/explore'
+    | '/listening'
     | '/reading'
     | '/review'
     | '/settings'
@@ -292,6 +304,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ExploreRoute: typeof ExploreRoute
+  ListeningRoute: typeof ListeningRoute
   ReadingRoute: typeof ReadingRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
@@ -323,6 +336,13 @@ declare module '@tanstack/react-router' {
       path: '/explore'
       fullPath: '/explore'
       preLoaderRoute: typeof ExploreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/listening': {
+      id: '/listening'
+      path: '/listening'
+      fullPath: '/listening'
+      preLoaderRoute: typeof ListeningRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reading': {
@@ -491,6 +511,7 @@ const VideosVideoIdRouteWithChildren = VideosVideoIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ExploreRoute: ExploreRoute,
+  ListeningRoute: ListeningRoute,
   ReadingRoute: ReadingRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,

@@ -3,7 +3,16 @@ import { sql } from 'drizzle-orm'
 
 import { db } from '#/db/index.ts'
 
-export const ACTIVITY_KINDS = ['dictation', 'pronunciation', 'review', 'grammar', 'conversation', 'speaking', 'reading'] as const
+export const ACTIVITY_KINDS = [
+  'dictation',
+  'pronunciation',
+  'review',
+  'grammar',
+  'conversation',
+  'speaking',
+  'reading',
+  'listening',
+] as const
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number]
 
 /**
@@ -18,12 +27,15 @@ const EVENTS = sql`
   union all select 'grammar', updated_at from grammar_answers
   union all select 'conversation', created_at from conversation_turns where role = 'user'
   union all select 'speaking', created_at from speaking_attempts
-  union all select 'reading', answered_at from reading_passages, json_each(reading_passages.answers) where answered_at is not null`
+  union all select 'reading', answered_at from reading_passages, json_each(reading_passages.answers) where answered_at is not null
+  union all select 'listening', answered_at from listening_passages, json_each(listening_passages.answers) where answered_at is not null`
 
 /** các ngày có học (YYYY-MM-DD), toàn bộ lịch sử */
 export const activeDays = () =>
   db
-    .all<{ day: string }>(sql`select distinct date(at, 'unixepoch', 'localtime') as day from (${EVENTS})`)
+    .all<{ day: string }>(
+      sql`select distinct date(at, 'unixepoch', 'localtime') as day from (${EVENTS})`,
+    )
     .map((r) => r.day)
 
 /** số lượt luyện mỗi ngày theo từng loại, từ ngày `since` (YYYY-MM-DD) */
@@ -34,7 +46,16 @@ export function dailyActivity(since: string) {
   )
   const days = new Map<string, Record<ActivityKind, number>>()
   for (const r of rows) {
-    const d = days.get(r.day) ?? { dictation: 0, pronunciation: 0, review: 0, grammar: 0, conversation: 0, speaking: 0, reading: 0 }
+    const d = days.get(r.day) ?? {
+      dictation: 0,
+      pronunciation: 0,
+      review: 0,
+      grammar: 0,
+      conversation: 0,
+      speaking: 0,
+      reading: 0,
+      listening: 0,
+    }
     d[r.kind] = r.n
     days.set(r.day, d)
   }

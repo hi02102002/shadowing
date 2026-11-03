@@ -5,16 +5,26 @@
 import { HTMLElement, parse } from 'node-html-parser'
 
 import type { ReadingQuestion } from '#/db/schema.ts'
-import { EE_SITE, clean, coverQuestions, textOf, titleCase } from './essential.ts'
+import {
+  EE_SITE,
+  clean,
+  coverQuestions,
+  textOf,
+  titleCase,
+} from './essential.ts'
 import type { LibraryArticle, LibraryItem } from './sources.ts'
 
 export const IELTS_BOOKS = [14, 15, 16, 17, 18]
 export const IELTS_BASE = `${EE_SITE}apps-data/ielts-academic-`
 
-export const ieltsDataUrl = (book: number) => `${IELTS_BASE}${book}/data/data.json`
+export const ieltsDataUrl = (book: number) =>
+  `${IELTS_BASE}${book}/data/data.json`
 
-interface IeltsData {
-  flashcard: Array<{ en: string; reading?: Array<{ en: string; story?: string }> | string | null }>
+export interface IeltsData {
+  flashcard: Array<{
+    en: string
+    reading?: Array<{ en: string; story?: string }> | string | null
+  }>
 }
 
 export function parseIeltsData(text: string): IeltsData {
@@ -25,7 +35,9 @@ export function parseIeltsData(text: string): IeltsData {
 function readingTests(data: IeltsData) {
   return data.flashcard.flatMap((unit) => {
     const test = /^Test\s+(\d+)/i.exec(unit.en)?.[1]
-    const story = Array.isArray(unit.reading) ? unit.reading.find((b) => b.en === 'Reading')?.story : undefined
+    const story = Array.isArray(unit.reading)
+      ? unit.reading.find((b) => b.en === 'Reading')?.story
+      : undefined
     return test && story ? [{ test: Number(test), html: story }] : []
   })
 }
@@ -36,12 +48,16 @@ interface Passage {
   questions: ReadingQuestion[]
 }
 
-const isQuestionsHeading = (el: HTMLElement) => el.tagName === 'P' && /^Questions\s+\d/i.test(textOf(el))
+const isQuestionsHeading = (el: HTMLElement) =>
+  el.tagName === 'P' && /^Questions\s+\d/i.test(textOf(el))
 const isCover = (el: HTMLElement) => el.classList.contains('word-free-cover')
 
 /** đoạn văn của bài: <p>, hoặc <ol> mỗi mục là một đoạn đánh chữ A, B, C…; bỏ gạch chú thích và dòng "*" */
 function passageParagraphs(el: HTMLElement): string[] {
-  if (el.tagName === 'OL') return el.querySelectorAll('li').map((li, i) => `${String.fromCharCode(65 + i)}. ${textOf(li)}`)
+  if (el.tagName === 'OL')
+    return el
+      .querySelectorAll('li')
+      .map((li, i) => `${String.fromCharCode(65 + i)}. ${textOf(li)}`)
   const text = textOf(el).replace(/^_{3,}\s*/, '')
   return text && !text.startsWith('*') ? [text] : []
 }
@@ -51,8 +67,12 @@ function instructionText(els: HTMLElement[]): string {
   return els
     .flatMap((el) => {
       if (el.tagName === 'OL' || el.tagName === 'UL')
-        return el.querySelectorAll('li').map((li, i) => `${String.fromCharCode(65 + i)}  ${textOf(li)}`)
-      return parse(el.innerHTML.replace(/\s+/g, ' ').replace(/<br\s*\/?>/gi, '\n')).text.split('\n')
+        return el
+          .querySelectorAll('li')
+          .map((li, i) => `${String.fromCharCode(65 + i)}  ${textOf(li)}`)
+      return parse(
+        el.innerHTML.replace(/\s+/g, ' ').replace(/<br\s*\/?>/gi, '\n'),
+      ).text.split('\n')
     })
     .map((line) =>
       clean(line)
@@ -74,18 +94,41 @@ function blocks(node: HTMLElement): HTMLElement[] {
   return node.childNodes
     .filter((n) => n instanceof HTMLElement)
     .flatMap((el) => {
-      if (el.classList.contains('section-rotate') || BLOCK_TAGS.has(el.tagName)) return [el]
+      if (el.classList.contains('section-rotate') || BLOCK_TAGS.has(el.tagName))
+        return [el]
       if (isCover(el)) {
         // khung câu hỏi có thể nuốt luôn phần sau nó (bài tiếp theo, nhóm câu tiếp theo)
         const inner = el.childNodes.filter((n) => n instanceof HTMLElement)
-        const cut = inner.findIndex((n) => n.classList.contains('section-rotate') || isQuestionsHeading(n) || isCover(n))
+        const cut = inner.findIndex(
+          (n) =>
+            n.classList.contains('section-rotate') ||
+            isQuestionsHeading(n) ||
+            isCover(n),
+        )
         if (cut < 0) return [el]
         const rest = inner.slice(cut)
         rest.forEach((n) => n.remove())
-        return [el, ...rest.flatMap((n) => (BLOCK_TAGS.has(n.tagName) || isCover(n) || n.classList.contains('section-rotate') ? [n] : blocks(n)))]
+        return [
+          el,
+          ...rest.flatMap((n) =>
+            BLOCK_TAGS.has(n.tagName) ||
+            isCover(n) ||
+            n.classList.contains('section-rotate')
+              ? [n]
+              : blocks(n),
+          ),
+        ]
       }
       // div chỉ có chữ (vd. tiêu đề hộp "List of Timber Cuts") giữ như một đoạn
-      return el.childNodes.some((n) => n instanceof HTMLElement && n.tagName !== 'STRONG' && n.tagName !== 'EM' && n.tagName !== 'BR') ? blocks(el) : [el]
+      return el.childNodes.some(
+        (n) =>
+          n instanceof HTMLElement &&
+          n.tagName !== 'STRONG' &&
+          n.tagName !== 'EM' &&
+          n.tagName !== 'BR',
+      )
+        ? blocks(el)
+        : [el]
     })
 }
 
@@ -94,7 +137,11 @@ export function parseIeltsTest(html: string): Passage[] {
   const nodes = blocks(parse(html))
   const passages: Array<{ nodes: HTMLElement[] }> = []
   for (const el of nodes) {
-    if (el.classList.contains('section-rotate') && /reading passage/i.test(el.text)) passages.push({ nodes: [] })
+    if (
+      el.classList.contains('section-rotate') &&
+      /reading passage/i.test(el.text)
+    )
+      passages.push({ nodes: [] })
     else passages.at(-1)?.nodes.push(el)
   }
   return passages.map(({ nodes: els }) => {
@@ -106,10 +153,15 @@ export function parseIeltsTest(html: string): Passage[] {
     const body = els.slice(start, end)
     const questions: ReadingQuestion[] = []
     let pending: HTMLElement[] = []
-    for (const el of [...els.slice(0, heading ? start - 1 : 0), ...els.slice(end)]) {
+    for (const el of [
+      ...els.slice(0, heading ? start - 1 : 0),
+      ...els.slice(end),
+    ]) {
       if (isQuestionsHeading(el)) pending = []
       else if (isCover(el)) {
-        questions.push(...coverQuestions(el, instructionText(pending) || undefined))
+        questions.push(
+          ...coverQuestions(el, instructionText(pending) || undefined),
+        )
         pending = []
       } else pending.push(el)
     }
@@ -143,9 +195,14 @@ export function parseIeltsUrl(url: string) {
   return { book: Number(m[1]), test: Number(m[2]), passage: Number(m[3]) }
 }
 
-export function ieltsArticle(data: IeltsData, test: number, passage: number): LibraryArticle {
+export function ieltsArticle(
+  data: IeltsData,
+  test: number,
+  passage: number,
+): LibraryArticle {
   const html = readingTests(data).find((t) => t.test === test)?.html
   const p = html ? parseIeltsTest(html)[passage - 1] : undefined
-  if (!p?.paragraphs.length) throw new Error('Không tìm thấy bài đọc trong đề IELTS')
+  if (!p?.paragraphs.length)
+    throw new Error('Không tìm thấy bài đọc trong đề IELTS')
   return p
 }

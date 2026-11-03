@@ -15,7 +15,14 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table'
-import { ArrowDown, ArrowUp, ArrowUpDown, Dumbbell, Search, Trash2 } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Dumbbell,
+  Search,
+  Trash2,
+} from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -31,8 +38,15 @@ const features = tableFeatures({
   rowSortingFeature,
   filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
-  filterFns: { includesString: filterFn_includesString, equalsString: filterFn_equalsString },
-  sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, text: sortFn_text },
+  filterFns: {
+    includesString: filterFn_includesString,
+    equalsString: filterFn_equalsString,
+  },
+  sortFns: {
+    alphanumeric: sortFn_alphanumeric,
+    basic: sortFn_basic,
+    text: sortFn_text,
+  },
 })
 
 const SOURCE_LABEL: Record<string, string | undefined> = {
@@ -42,6 +56,7 @@ const SOURCE_LABEL: Record<string, string | undefined> = {
   conversation: 'Hội thoại',
   speaking: 'Nói theo đề',
   reading: 'Đọc hiểu',
+  listening: 'Luyện nghe',
 }
 
 const helper = createColumnHelper<typeof features, MistakeRow>()
@@ -64,7 +79,11 @@ export function MistakesTable({ data, onDelete }: Props) {
           cell: ({ row }) => (
             <div className="flex flex-col">
               <span className="font-semibold">{row.original.word}</span>
-              {row.original.ipa && <span className="ipa text-xs text-muted-foreground">{row.original.ipa}</span>}
+              {row.original.ipa && (
+                <span className="ipa text-xs text-muted-foreground">
+                  {row.original.ipa}
+                </span>
+              )}
             </div>
           ),
         }),
@@ -72,7 +91,11 @@ export function MistakesTable({ data, onDelete }: Props) {
           header: 'Bạn nghe/nói',
           enableSorting: false,
           cell: ({ getValue }) =>
-            getValue() ? <span className="text-bad line-through">{getValue()}</span> : <span className="text-muted-foreground">—</span>,
+            getValue() ? (
+              <span className="text-bad line-through">{getValue()}</span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            ),
         }),
         helper.accessor('type', {
           header: 'Loại lỗi',
@@ -93,7 +116,11 @@ export function MistakesTable({ data, onDelete }: Props) {
           cell: ({ row }) => (
             <div className="max-w-md text-sm">
               <p>{row.original.explanation}</p>
-              {row.original.tip && <p className="mt-1 text-muted-foreground">💡 {row.original.tip}</p>}
+              {row.original.tip && (
+                <p className="mt-1 text-muted-foreground">
+                  💡 {row.original.tip}
+                </p>
+              )}
             </div>
           ),
         }),
@@ -101,7 +128,14 @@ export function MistakesTable({ data, onDelete }: Props) {
           header: 'Số lần',
           sortFn: 'basic',
           cell: ({ getValue }) => (
-            <span className={cn('font-mono', getValue() >= 3 && 'font-semibold text-bad')}>×{getValue()}</span>
+            <span
+              className={cn(
+                'font-mono',
+                getValue() >= 3 && 'font-semibold text-bad',
+              )}
+            >
+              ×{getValue()}
+            </span>
           ),
         }),
         helper.accessor((r) => new Date(r.lastSeenAt).getTime(), {
@@ -109,7 +143,11 @@ export function MistakesTable({ data, onDelete }: Props) {
           header: 'Gần nhất',
           sortFn: 'basic',
           enableGlobalFilter: false,
-          cell: ({ row }) => <span className="text-xs text-muted-foreground">{relativeTime(row.original.lastSeenAt)}</span>,
+          cell: ({ row }) => (
+            <span className="text-xs text-muted-foreground">
+              {relativeTime(row.original.lastSeenAt)}
+            </span>
+          ),
         }),
         helper.display({
           id: 'actions',
@@ -117,16 +155,40 @@ export function MistakesTable({ data, onDelete }: Props) {
           cell: ({ row }) => (
             <div className="flex justify-end gap-1">
               {row.original.grammarRef && (
-                <Button size="icon" variant="ghost" className="size-8" asChild title="Làm lại bài tập">
-                  <Link to="/grammar/$unitId" params={{ unitId: row.original.grammarRef.split('#')[0] }} search={{ tab: row.original.grammarRef.endsWith('#ai') ? 'ai' : 'exercises' }}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-8"
+                  asChild
+                  title="Làm lại bài tập"
+                >
+                  <Link
+                    to="/grammar/$unitId"
+                    params={{ unitId: row.original.grammarRef.split('#')[0] }}
+                    search={{
+                      tab: row.original.grammarRef.endsWith('#ai')
+                        ? 'ai'
+                        : 'exercises',
+                    }}
+                  >
                     <Dumbbell />
                   </Link>
                 </Button>
               )}
               {row.original.youtubeId && row.original.segmentIdx != null && (
-                <Button size="icon" variant="ghost" className="size-8" asChild title="Luyện lại câu chứa lỗi">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-8"
+                  asChild
+                  title="Luyện lại câu chứa lỗi"
+                >
                   <Link
-                    to={row.original.source === 'dictation' ? '/videos/$videoId/dictation' : '/videos/$videoId/pronounce'}
+                    to={
+                      row.original.source === 'dictation'
+                        ? '/videos/$videoId/dictation'
+                        : '/videos/$videoId/pronounce'
+                    }
                     params={{ videoId: row.original.youtubeId }}
                     search={{ seg: row.original.segmentIdx }}
                   >
@@ -155,11 +217,15 @@ export function MistakesTable({ data, onDelete }: Props) {
     columns,
     data,
     globalFilterFn: 'includesString',
-    getColumnCanGlobalFilter: (column) => !['actions', 'count', 'lastSeenAt'].includes(column.id),
+    getColumnCanGlobalFilter: (column) =>
+      !['actions', 'count', 'lastSeenAt'].includes(column.id),
     initialState: { sorting: [{ id: 'count', desc: true }] },
   })
 
-  const types = useMemo(() => [...new Set(data.map((d) => d.type))].sort(), [data])
+  const types = useMemo(
+    () => [...new Set(data.map((d) => d.type))].sort(),
+    [data],
+  )
 
   const applyColumnFilter = (id: 'type' | 'source', value: string) => {
     table.getColumn(id)?.setFilterValue(value || undefined)
@@ -219,7 +285,10 @@ export function MistakesTable({ data, onDelete }: Props) {
                   const sorted = header.column.getIsSorted()
                   const canSort = header.column.getCanSort()
                   return (
-                    <th key={header.id} className="px-3 py-2 text-left font-medium text-muted-foreground">
+                    <th
+                      key={header.id}
+                      className="px-3 py-2 text-left font-medium text-muted-foreground"
+                    >
                       {header.isPlaceholder ? null : canSort ? (
                         <button
                           type="button"
@@ -246,7 +315,10 @@ export function MistakesTable({ data, onDelete }: Props) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b align-top last:border-0 hover:bg-muted/30">
+              <tr
+                key={row.id}
+                className="border-b align-top last:border-0 hover:bg-muted/30"
+              >
                 {row.getAllCells().map((cell) => (
                   <td key={cell.id} className="px-3 py-2.5">
                     <table.FlexRender cell={cell} />
@@ -256,7 +328,10 @@ export function MistakesTable({ data, onDelete }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="px-3 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={columns.length}
+                  className="px-3 py-10 text-center text-muted-foreground"
+                >
                   Không có lỗi nào khớp bộ lọc.
                 </td>
               </tr>

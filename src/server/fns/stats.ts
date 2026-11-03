@@ -22,71 +22,97 @@ const mondayOf = (day: string) => {
 const one = <T>(q: ReturnType<typeof sql>) => db.get<T>(q)
 
 /** Thống kê cho trang /stats: chuỗi ngày, lịch hoạt động, xu hướng điểm theo tuần, tổng số */
-export const activityStats = createServerFn({ method: 'GET' }).handler(async () => {
-  const today = dayKey(new Date())
-  const start = addDays(mondayOf(today), -(HEATMAP_WEEKS - 1) * 7)
-  const daily = dailyActivity(start)
-  const days: Array<{ day: string } & Record<ActivityKind, number> & { total: number }> = []
-  for (let d = start; d <= today; d = addDays(d, 1)) {
-    const c = daily.get(d) ?? { dictation: 0, pronunciation: 0, review: 0, grammar: 0, conversation: 0, speaking: 0, reading: 0 }
-    days.push({ day: d, ...c, total: ACTIVITY_KINDS.reduce((n, k) => n + c[k], 0) })
-  }
+export const activityStats = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const today = dayKey(new Date())
+    const start = addDays(mondayOf(today), -(HEATMAP_WEEKS - 1) * 7)
+    const daily = dailyActivity(start)
+    const days: Array<
+      { day: string } & Record<ActivityKind, number> & { total: number }
+    > = []
+    for (let d = start; d <= today; d = addDays(d, 1)) {
+      const c = daily.get(d) ?? {
+        dictation: 0,
+        pronunciation: 0,
+        review: 0,
+        grammar: 0,
+        conversation: 0,
+        speaking: 0,
+        reading: 0,
+        listening: 0,
+      }
+      days.push({
+        day: d,
+        ...c,
+        total: ACTIVITY_KINDS.reduce((n, k) => n + c[k], 0),
+      })
+    }
 
-  const all = activeDays()
-  const streak = computeStreak(all, today)
+    const all = activeDays()
+    const streak = computeStreak(all, today)
 
-  // điểm trung bình mỗi tuần (thứ Hai đầu tuần) của chép chính tả và phát âm
-  const trendStart = addDays(mondayOf(today), -(TREND_WEEKS - 1) * 7)
-  const weekly = (table: string, column: string) =>
-    new Map(
-      db
-        .all<{ week: string; avg: number; n: number }>(
-          sql`select date(created_at, 'unixepoch', 'localtime', 'weekday 0', '-6 days') as week,
+    // điểm trung bình mỗi tuần (thứ Hai đầu tuần) của chép chính tả và phát âm
+    const trendStart = addDays(mondayOf(today), -(TREND_WEEKS - 1) * 7)
+    const weekly = (table: string, column: string) =>
+      new Map(
+        db
+          .all<{ week: string; avg: number; n: number }>(
+            sql`select date(created_at, 'unixepoch', 'localtime', 'weekday 0', '-6 days') as week,
                 avg(${sql.raw(column)}) as avg, count(*) as n
               from ${sql.raw(table)}
               where date(created_at, 'unixepoch', 'localtime') >= ${trendStart}
               group by week`,
-        )
-        .map((r) => [r.week, { avg: Math.round(r.avg), n: r.n }]),
-    )
-  const dict = weekly('dictation_attempts', 'score')
-  const pron = weekly('pronunciation_attempts', 'accuracy')
-  const trend = Array.from({ length: TREND_WEEKS }, (_, i) => {
-    const week = addDays(trendStart, i * 7)
-    return { week, dictation: dict.get(week) ?? null, pronunciation: pron.get(week) ?? null }
-  })
+          )
+          .map((r) => [r.week, { avg: Math.round(r.avg), n: r.n }]),
+      )
+    const dict = weekly('dictation_attempts', 'score')
+    const pron = weekly('pronunciation_attempts', 'accuracy')
+    const trend = Array.from({ length: TREND_WEEKS }, (_, i) => {
+      const week = addDays(trendStart, i * 7)
+      return {
+        week,
+        dictation: dict.get(week) ?? null,
+        pronunciation: pron.get(week) ?? null,
+      }
+    })
 
-  const totals = {
-    dictation: one<{ n: number; avg: number | null }>(
-      sql`select count(*) as n, round(avg(score)) as avg from dictation_attempts`,
-    ),
-    pronunciation: one<{ n: number; avg: number | null }>(
-      sql`select count(*) as n, round(avg(accuracy)) as avg from pronunciation_attempts`,
-    ),
-    reviews: one<{ n: number }>(sql`select count(*) as n from review_logs`).n,
-    // thẻ đã vào giai đoạn ôn dài hạn (FSRS state Review)
-    cardsLearned: one<{ n: number }>(sql`select count(*) as n from cards where state = 2`).n,
-    cardsTotal: one<{ n: number }>(sql`select count(*) as n from cards`).n,
-    grammar: one<{ n: number; correct: number | null }>(
-      sql`select count(*) as n, sum(correct) as correct from grammar_answers`,
-    ),
-    reading: one<{ n: number; correct: number | null }>(
-      sql`select count(*) as n, sum(score) as correct from reading_passages where answers is not null`,
-    ),
-    mistakes: one<{ n: number }>(sql`select count(*) as n from mistakes`).n,
-    videos: one<{ n: number }>(sql`select count(*) as n from videos`).n,
-  }
+    const totals = {
+      dictation: one<{ n: number; avg: number | null }>(
+        sql`select count(*) as n, round(avg(score)) as avg from dictation_attempts`,
+      ),
+      pronunciation: one<{ n: number; avg: number | null }>(
+        sql`select count(*) as n, round(avg(accuracy)) as avg from pronunciation_attempts`,
+      ),
+      reviews: one<{ n: number }>(sql`select count(*) as n from review_logs`).n,
+      // thẻ đã vào giai đoạn ôn dài hạn (FSRS state Review)
+      cardsLearned: one<{ n: number }>(
+        sql`select count(*) as n from cards where state = 2`,
+      ).n,
+      cardsTotal: one<{ n: number }>(sql`select count(*) as n from cards`).n,
+      grammar: one<{ n: number; correct: number | null }>(
+        sql`select count(*) as n, sum(correct) as correct from grammar_answers`,
+      ),
+      reading: one<{ n: number; correct: number | null }>(
+        sql`select count(*) as n, sum(score) as correct from reading_passages where answers is not null`,
+      ),
+      listening: one<{ n: number; correct: number | null }>(
+        sql`select count(*) as n, sum(score) as correct from listening_passages where answers is not null`,
+      ),
+      mistakes: one<{ n: number }>(sql`select count(*) as n from mistakes`).n,
+      videos: one<{ n: number }>(sql`select count(*) as n from videos`).n,
+    }
 
-  return {
-    today,
-    goal: getConfig().dailyGoal,
-    streak,
-    activeDays: all.length,
-    days,
-    trend,
-    totals,
-  }
-})
+    return {
+      today,
+      goal: getConfig().dailyGoal,
+      streak,
+      activeDays: all.length,
+      days,
+      trend,
+      totals,
+    }
+  },
+)
 
 export type ActivityStats = Awaited<ReturnType<typeof activityStats>>
 

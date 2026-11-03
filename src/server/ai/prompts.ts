@@ -2,9 +2,14 @@ import { z } from 'zod'
 import type { AlignToken } from '#/lib/align.ts'
 import type { TalkLevel } from '#/lib/conversation.ts'
 import { AI_QUESTION_TYPES } from '#/lib/reading-topics.ts'
-import type { AiQuestionType, ReadingFormat, ReadingLevel } from '#/lib/reading-topics.ts'
+import type {
+  AiQuestionType,
+  ReadingFormat,
+  ReadingLevel,
+} from '#/lib/reading-topics.ts'
 import type { SpeakingTarget } from '#/lib/speaking-topics.ts'
 import type { Accent } from '#/lib/speech.ts'
+import type { ListeningLevel } from '#/lib/listening.ts'
 
 export const MISTAKE_TYPES = [
   'weak_form', // dạng yếu: to → /tə/, and → /ən/
@@ -42,12 +47,17 @@ export const MISTAKE_TYPE_LABELS: Record<
 }
 
 /** loại lỗi không do AI phân loại: câu đọc hiểu trả lời sai */
-const OTHER_TYPE_LABELS: Record<string, string | undefined> = { reading: 'Đọc hiểu' }
+const OTHER_TYPE_LABELS: Record<string, string | undefined> = {
+  reading: 'Đọc hiểu',
+  listening: 'Luyện nghe',
+}
 
 /** Nhãn tiếng Việt cho type lỗi (type lạ từ DB cũ thì trả nguyên) */
 export function mistakeLabel(type: string): string {
   return (
-    (MISTAKE_TYPE_LABELS as Record<string, string | undefined>)[type] ?? OTHER_TYPE_LABELS[type] ?? type
+    (MISTAKE_TYPE_LABELS as Record<string, string | undefined>)[type] ??
+    OTHER_TYPE_LABELS[type] ??
+    type
   )
 }
 
@@ -231,11 +241,17 @@ Câu ngữ cảnh: "${sentence}"`
 }
 
 export const GrammarExplainSchema = z.object({
-  summary: z.string().describe('ý chính của mục ngữ pháp này trong 1-2 câu tiếng Việt'),
+  summary: z
+    .string()
+    .describe('ý chính của mục ngữ pháp này trong 1-2 câu tiếng Việt'),
   points: z
     .array(
       z.object({
-        rule: z.string().describe('một quy tắc / cách dùng, giải thích bằng tiếng Việt dễ hiểu'),
+        rule: z
+          .string()
+          .describe(
+            'một quy tắc / cách dùng, giải thích bằng tiếng Việt dễ hiểu',
+          ),
         examples: z
           .array(z.object({ en: z.string(), vi: z.string() }))
           .describe('1-2 câu ví dụ tiếng Anh ngắn, tự đặt, kèm bản dịch'),
@@ -244,14 +260,18 @@ export const GrammarExplainSchema = z.object({
     .describe('2-5 điểm chính'),
   pitfalls: z
     .array(z.string())
-    .describe('lỗi người Việt hay mắc với cấu trúc này (tiếng Việt), có thể rỗng'),
+    .describe(
+      'lỗi người Việt hay mắc với cấu trúc này (tiếng Việt), có thể rỗng',
+    ),
 })
 export type GrammarExplain = z.infer<typeof GrammarExplainSchema>
 
 export const GrammarMistakeSchema = z.object({
   explanation: z
     .string()
-    .describe('vì sao câu trả lời của người học sai và vì sao đáp án đúng, bằng tiếng Việt, 2-4 câu'),
+    .describe(
+      'vì sao câu trả lời của người học sai và vì sao đáp án đúng, bằng tiếng Việt, 2-4 câu',
+    ),
   tip: z.string().describe('mẹo ngắn để lần sau không sai, bằng tiếng Việt'),
 })
 export type GrammarMistake = z.infer<typeof GrammarMistakeSchema>
@@ -261,7 +281,11 @@ export const GRAMMAR_SYSTEM = `Bạn là giáo viên ngữ pháp tiếng Anh gi�
 - So sánh với tiếng Việt khi giúp người học hiểu (tiếng Việt không chia thì, không có mạo từ…).
 - Ví dụ phải là câu do bạn tự đặt, không chép nguyên văn từ sách.`
 
-export function grammarSectionPrompt(unitTitle: string, label: string, text: string) {
+export function grammarSectionPrompt(
+  unitTitle: string,
+  label: string,
+  text: string,
+) {
   return `Bài: ${unitTitle}
 Mục ${label} trong sách (tiếng Anh):
 """
@@ -299,7 +323,13 @@ const DRILL_LEVEL_DESC: Record<DrillLevel, string> = {
 }
 
 /** dạng bài tập AI tạo */
-export const DRILL_TYPES = ['fill', 'choice', 'fix', 'order', 'rewrite'] as const
+export const DRILL_TYPES = [
+  'fill',
+  'choice',
+  'fix',
+  'order',
+  'rewrite',
+] as const
 export type DrillType = (typeof DRILL_TYPES)[number]
 
 const DRILL_TYPE_DESC: Record<DrillType, string> = {
@@ -320,13 +350,19 @@ export const GrammarDrillSchema = z.object({
         type: z.enum(DRILL_TYPES),
         prompt: z.string(),
         hint: z.string().describe('rỗng nếu dạng bài không cần'),
-        options: z.array(z.string()).describe('chỉ dạng choice, các dạng khác là mảng rỗng'),
+        options: z
+          .array(z.string())
+          .describe('chỉ dạng choice, các dạng khác là mảng rỗng'),
         wrong: z.string().describe('chỉ dạng fix, các dạng khác là chuỗi rỗng'),
         answers: z.array(z.string()),
-        explanation: z.string().describe('giải thích tiếng Việt 1–2 câu vì sao đáp án đúng'),
+        explanation: z
+          .string()
+          .describe('giải thích tiếng Việt 1–2 câu vì sao đáp án đúng'),
       }),
     )
-    .describe('đúng số câu được yêu cầu, chia đều các dạng được yêu cầu, xếp xen kẽ'),
+    .describe(
+      'đúng số câu được yêu cầu, chia đều các dạng được yêu cầu, xếp xen kẽ',
+    ),
 })
 export type GrammarDrill = z.infer<typeof GrammarDrillSchema>
 
@@ -352,28 +388,55 @@ Yêu cầu chung:
 - Mỗi câu chỉ có một cách hiểu đúng (trừ các dạng viết tương đương liệt kê trong answers, kể cả dạng rút gọn như "'s gone").`
 }
 
-export const PHRASE_KINDS = ['phrasal verb', 'idiom', 'collocation', 'expression'] as const
+export const PHRASE_KINDS = [
+  'phrasal verb',
+  'idiom',
+  'collocation',
+  'expression',
+] as const
 /** từ loại theo ngữ cảnh câu (khớp nhãn POS_VI trong src/lib/levels.ts) */
-export const WORD_POS = ['noun', 'verb', 'adjective', 'adverb', 'pronoun', 'preposition', 'conjunction', 'determiner', 'interjection'] as const
+export const WORD_POS = [
+  'noun',
+  'verb',
+  'adjective',
+  'adverb',
+  'pronoun',
+  'preposition',
+  'conjunction',
+  'determiner',
+  'interjection',
+] as const
 
 export const VideoPhrasesSchema = z.object({
   phrases: z
     .array(
       z.object({
-        phrase: z.string().describe('dạng từ điển của cụm, vd. "pick up", "make a decision", "break the ice"'),
+        phrase: z
+          .string()
+          .describe(
+            'dạng từ điển của cụm, vd. "pick up", "make a decision", "break the ice"',
+          ),
         kind: z.enum(PHRASE_KINDS),
-        level: z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']).describe('cấp CEFR ước lượng của cụm'),
-        meaningVi: z.string().describe('nghĩa tiếng Việt ngắn gọn, đúng theo ngữ cảnh câu'),
+        level: z
+          .enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'])
+          .describe('cấp CEFR ước lượng của cụm'),
+        meaningVi: z
+          .string()
+          .describe('nghĩa tiếng Việt ngắn gọn, đúng theo ngữ cảnh câu'),
         segment: z.number().int().describe('số thứ tự [n] của câu chứa cụm'),
         surface: z
           .string()
-          .describe('nguyên văn cụm đúng như trong câu đó (giữ dạng chia), vd. "picked you up"'),
+          .describe(
+            'nguyên văn cụm đúng như trong câu đó (giữ dạng chia), vd. "picked you up"',
+          ),
       }),
     )
     .describe('tối đa 30 cụm đáng học, theo thứ tự xuất hiện'),
   words: z
     .array(z.object({ word: z.string(), pos: z.enum(WORD_POS) }))
-    .describe('từ loại của MỖI từ trong danh sách "Từ cần xác định từ loại", theo nghĩa trong câu đã cho'),
+    .describe(
+      'từ loại của MỖI từ trong danh sách "Từ cần xác định từ loại", theo nghĩa trong câu đã cho',
+    ),
 })
 export type VideoPhrases = z.infer<typeof VideoPhrasesSchema>
 
@@ -400,12 +463,17 @@ export const ConversationReplySchema = z.object({
   reply: z.string().describe('your next line in the role-play, in English'),
   hints: z
     .array(z.string())
-    .describe('2 short, different English replies the learner could say next, at their level'),
+    .describe(
+      '2 short, different English replies the learner could say next, at their level',
+    ),
 })
 export type ConversationReply = z.infer<typeof ConversationReplySchema>
 
 /** vai AI trong buổi hội thoại; prompt viết tiếng Anh để AI trả lời tự nhiên bằng tiếng Anh */
-export const conversationSystem = (topic: string, level: TalkLevel) => `You are an English conversation partner for a Vietnamese learner, doing a spoken role-play.
+export const conversationSystem = (
+  topic: string,
+  level: TalkLevel,
+) => `You are an English conversation partner for a Vietnamese learner, doing a spoken role-play.
 Scenario: ${topic}
 Learner level: ${TALK_LEVEL_DESC[level]}
 Rules:
@@ -417,17 +485,27 @@ Rules:
 - No emojis, no markdown, no stage directions.`
 
 /** lịch sử hội thoại dạng kịch bản cho prompt */
-export function conversationTranscript(turns: Array<{ role: string; text: string }>) {
-  return turns.map((t) => `${t.role === 'ai' ? 'You' : 'Learner'}: ${t.text}`).join('\n')
+export function conversationTranscript(
+  turns: Array<{ role: string; text: string }>,
+) {
+  return turns
+    .map((t) => `${t.role === 'ai' ? 'You' : 'Learner'}: ${t.text}`)
+    .join('\n')
 }
 
-export function conversationPrompt(turns: Array<{ role: string; text: string }>) {
+export function conversationPrompt(
+  turns: Array<{ role: string; text: string }>,
+) {
   return turns.length
     ? `Conversation so far:\n${conversationTranscript(turns)}\n\nWrite your next line.`
     : 'Start the conversation with a natural opening line for this scenario.'
 }
 
-export const CONVERSATION_MISTAKE_TYPES = ['grammar', 'vocabulary', 'other'] as const
+export const CONVERSATION_MISTAKE_TYPES = [
+  'grammar',
+  'vocabulary',
+  'other',
+] as const
 
 /** band IELTS: 0–9, bước 0.5 */
 const band = () => z.number().min(0).max(9).describe('band IELTS 0-9, bước 0.5')
@@ -435,35 +513,50 @@ const band = () => z.number().min(0).max(9).describe('band IELTS 0-9, bước 0.
 export const ConversationFeedbackSchema = z.object({
   summary: z
     .string()
-    .describe('nhận xét tổng quan 2-3 câu bằng tiếng Việt: điểm tốt, điểm cần cải thiện'),
+    .describe(
+      'nhận xét tổng quan 2-3 câu bằng tiếng Việt: điểm tốt, điểm cần cải thiện',
+    ),
   corrections: z
     .array(
       z.object({
-        said: z.string().describe('nguyên văn phần người học nói sai hoặc chưa tự nhiên'),
+        said: z
+          .string()
+          .describe('nguyên văn phần người học nói sai hoặc chưa tự nhiên'),
         better: z.string().describe('cách nói đúng, tự nhiên bằng tiếng Anh'),
         type: z.enum(CONVERSATION_MISTAKE_TYPES),
         explanation: z.string().describe('giải thích ngắn bằng tiếng Việt'),
       }),
     )
-    .describe('tối đa 8 lỗi quan trọng nhất, theo thứ tự xuất hiện; rỗng nếu không có lỗi'),
+    .describe(
+      'tối đa 8 lỗi quan trọng nhất, theo thứ tự xuất hiện; rỗng nếu không có lỗi',
+    ),
   phrases: z
-    .array(z.object({ en: z.string(), vi: z.string().describe('nghĩa tiếng Việt') }))
-    .describe('3-6 cụm từ hữu ích cho tình huống này người học nên dùng lần sau'),
+    .array(
+      z.object({ en: z.string(), vi: z.string().describe('nghĩa tiếng Việt') }),
+    )
+    .describe(
+      '3-6 cụm từ hữu ích cho tình huống này người học nên dùng lần sau',
+    ),
 })
 
 /** buổi IELTS Part 1 / Part 3: thêm band ước lượng */
-export const IeltsConversationFeedbackSchema = ConversationFeedbackSchema.extend({
-  band: band().describe(
-    'band IELTS ước lượng cho phần nói này (trung bình Fluency & Coherence, Lexical Resource, Grammatical Range & Accuracy; không chấm Pronunciation), chấm khắt khe như thi thật',
-  ),
-})
+export const IeltsConversationFeedbackSchema =
+  ConversationFeedbackSchema.extend({
+    band: band().describe(
+      'band IELTS ước lượng cho phần nói này (trung bình Fluency & Coherence, Lexical Resource, Grammatical Range & Accuracy; không chấm Pronunciation), chấm khắt khe như thi thật',
+    ),
+  })
 
 export const CONVERSATION_FEEDBACK_SYSTEM = `${GRAMMAR_SYSTEM}
 - Bạn đang nhận xét một buổi hội thoại nhập vai bằng tiếng Anh của người học.
 - Lời người học được nhận dạng từ giọng nói nên có thể sai chính tả hoặc thiếu dấu câu: KHÔNG tính đó là lỗi, chỉ xét ngữ pháp, dùng từ và độ tự nhiên.
 - Chỉ nhận xét câu của người học (Learner), không nhận xét câu của AI.`
 
-export function conversationFeedbackPrompt(opts: { topic: string; level: TalkLevel; turns: Array<{ role: string; text: string }> }) {
+export function conversationFeedbackPrompt(opts: {
+  topic: string
+  level: TalkLevel
+  turns: Array<{ role: string; text: string }>
+}) {
   return `Tình huống: ${opts.topic}
 Trình độ người học: ${opts.level}
 Hội thoại:
@@ -472,44 +565,78 @@ ${conversationTranscript(opts.turns)}
 """`
 }
 
-
 export const SpeakingFeedbackSchema = z.object({
   overall: band(),
   criteria: z
-    .array(z.object({ name: z.string(), band: band(), comment: z.string().describe('nhận xét 1-2 câu bằng tiếng Việt') }))
-    .describe('đúng 3 tiêu chí theo thứ tự: "Fluency & Coherence", "Lexical Resource", "Grammatical Range & Accuracy"'),
+    .array(
+      z.object({
+        name: z.string(),
+        band: band(),
+        comment: z.string().describe('nhận xét 1-2 câu bằng tiếng Việt'),
+      }),
+    )
+    .describe(
+      'đúng 3 tiêu chí theo thứ tự: "Fluency & Coherence", "Lexical Resource", "Grammatical Range & Accuracy"',
+    ),
   covered: z
     .array(z.object({ point: z.string(), done: z.boolean() }))
-    .describe('mỗi gợi ý của đề (chép nguyên văn) và người học đã nói tới chưa'),
-  summary: z.string().describe('nhận xét tổng quan 2-3 câu bằng tiếng Việt: điểm tốt và việc cần làm để lên band'),
+    .describe(
+      'mỗi gợi ý của đề (chép nguyên văn) và người học đã nói tới chưa',
+    ),
+  summary: z
+    .string()
+    .describe(
+      'nhận xét tổng quan 2-3 câu bằng tiếng Việt: điểm tốt và việc cần làm để lên band',
+    ),
   corrections: z
     .array(
       z.object({
-        said: z.string().describe('nguyên văn phần người học nói sai hoặc chưa tự nhiên'),
+        said: z
+          .string()
+          .describe('nguyên văn phần người học nói sai hoặc chưa tự nhiên'),
         better: z.string().describe('cách nói đúng, tự nhiên bằng tiếng Anh'),
         type: z.enum(CONVERSATION_MISTAKE_TYPES),
         explanation: z.string().describe('giải thích ngắn bằng tiếng Việt'),
       }),
     )
-    .describe('tối đa 8 lỗi quan trọng nhất, theo thứ tự xuất hiện; rỗng nếu không có lỗi'),
+    .describe(
+      'tối đa 8 lỗi quan trọng nhất, theo thứ tự xuất hiện; rỗng nếu không có lỗi',
+    ),
   vocabulary: z
-    .array(z.object({ en: z.string(), vi: z.string().describe('nghĩa tiếng Việt') }))
-    .describe('4-8 từ / cụm từ hợp với đề này, vừa sức band mục tiêu (cao hơn trình độ hiện tại một chút)'),
+    .array(
+      z.object({ en: z.string(), vi: z.string().describe('nghĩa tiếng Việt') }),
+    )
+    .describe(
+      '4-8 từ / cụm từ hợp với đề này, vừa sức band mục tiêu (cao hơn trình độ hiện tại một chút)',
+    ),
   sample: z
     .string()
-    .describe('bài nói mẫu đúng band mục tiêu bằng tiếng Anh, khoảng 200-250 từ, giữ ý tưởng của người học và trả lời đủ các gợi ý'),
+    .describe(
+      'bài nói mẫu đúng band mục tiêu bằng tiếng Anh, khoảng 200-250 từ, giữ ý tưởng của người học và trả lời đủ các gợi ý',
+    ),
 })
 
 /** chấm thêm Pronunciation khi model nghe được bản ghi */
 export const SpeakingAudioFeedbackSchema = SpeakingFeedbackSchema.extend({
   pronunciation: z.object({
     band: band(),
-    comment: z.string().describe('nhận xét 1-2 câu bằng tiếng Việt về phát âm, ngữ điệu, trọng âm, nối âm'),
-    mistakes: z.array(MistakeSchema).describe('tối đa 8 lỗi phát âm rõ nhất nghe được trong bản ghi; rỗng nếu không có'),
+    comment: z
+      .string()
+      .describe(
+        'nhận xét 1-2 câu bằng tiếng Việt về phát âm, ngữ điệu, trọng âm, nối âm',
+      ),
+    mistakes: z
+      .array(MistakeSchema)
+      .describe(
+        'tối đa 8 lỗi phát âm rõ nhất nghe được trong bản ghi; rỗng nếu không có',
+      ),
   }),
 })
 
-export const speakingFeedbackSystem = (accent: Accent, withAudio: boolean) => `Bạn là giám khảo IELTS Speaking giàu kinh nghiệm, chấm bài Part 2 của người Việt.
+export const speakingFeedbackSystem = (
+  accent: Accent,
+  withAudio: boolean,
+) => `Bạn là giám khảo IELTS Speaking giàu kinh nghiệm, chấm bài Part 2 của người Việt.
 - Chấm theo band descriptors chính thức, khắt khe như giám khảo thật; không nâng điểm để khích lệ.
 ${
   withAudio
@@ -529,7 +656,13 @@ const SPEAKING_TARGET_DESC: Record<SpeakingTarget, string> = {
   '7': 'band 7+: cấu trúc linh hoạt, idiom và collocation ít phổ biến dùng đúng chỗ, mạch lạc tự nhiên',
 }
 
-export function speakingFeedbackPrompt(opts: { title: string; bullets: string[]; transcript: string; durationSec: number; target: string }) {
+export function speakingFeedbackPrompt(opts: {
+  title: string
+  bullets: string[]
+  transcript: string
+  durationSec: number
+  target: string
+}) {
   const words = opts.transcript.split(/\s+/).filter(Boolean).length
   return `Band mục tiêu: ${SPEAKING_TARGET_DESC[opts.target as SpeakingTarget]}
 Đề: ${opts.title}
@@ -564,7 +697,10 @@ const READING_TYPE_DESC: Record<AiQuestionType, string> = {
     '"short" — trả lời ngắn: prompt là câu hỏi Wh- tiếng Anh (không có ___), answers là cụm 1–3 từ lấy NGUYÊN VĂN trong bài (thêm các cách viết khác nếu cũng đúng), options rỗng',
 }
 
-const READING_FORMAT_RULES: Record<ReadingFormat, { passage: string; questions: string }> = {
+const READING_FORMAT_RULES: Record<
+  ReadingFormat,
+  { passage: string; questions: string }
+> = {
   standard: {
     passage: 'bài đọc thông thường (báo, tạp chí phổ thông)',
     questions: '- Xếp câu hỏi theo thứ tự thông tin xuất hiện trong bài.',
@@ -584,18 +720,35 @@ const READING_FORMAT_RULES: Record<ReadingFormat, { passage: string; questions: 
 
 export const ReadingPassageSchema = z.object({
   title: z.string(),
-  paragraphs: z.array(z.string()).describe('các đoạn văn của bài đọc, mỗi phần tử một đoạn, không ghi chữ đánh dấu đoạn'),
+  paragraphs: z
+    .array(z.string())
+    .describe(
+      'các đoạn văn của bài đọc, mỗi phần tử một đoạn, không ghi chữ đánh dấu đoạn',
+    ),
   glossary: z
-    .array(z.object({ en: z.string().describe('từ / cụm từ chép nguyên văn trong bài'), vi: z.string().describe('nghĩa tiếng Việt trong ngữ cảnh') }))
+    .array(
+      z.object({
+        en: z.string().describe('từ / cụm từ chép nguyên văn trong bài'),
+        vi: z.string().describe('nghĩa tiếng Việt trong ngữ cảnh'),
+      }),
+    )
     .describe('6–10 từ / cụm từ khó nhất trong bài so với trình độ'),
   questions: z
     .array(
       z.object({
         type: z.enum(AI_QUESTION_TYPES),
         prompt: z.string(),
-        options: z.array(z.string()).describe('dạng choice: 4 phương án; dạng heading: danh sách tiêu đề chung; các dạng khác là mảng rỗng'),
+        options: z
+          .array(z.string())
+          .describe(
+            'dạng choice: 4 phương án; dạng heading: danh sách tiêu đề chung; các dạng khác là mảng rỗng',
+          ),
         answers: z.array(z.string()),
-        evidence: z.string().describe('một câu (hoặc một đoạn câu) chép NGUYÊN VĂN từ bài làm căn cứ cho đáp án; với Not Given là câu gần nhất liên quan'),
+        evidence: z
+          .string()
+          .describe(
+            'một câu (hoặc một đoạn câu) chép NGUYÊN VĂN từ bài làm căn cứ cho đáp án; với Not Given là câu gần nhất liên quan',
+          ),
         explanation: z.string().describe('giải thích tiếng Việt 1–2 câu'),
       }),
     )
@@ -603,7 +756,11 @@ export const ReadingPassageSchema = z.object({
 })
 export type ReadingPassage = z.infer<typeof ReadingPassageSchema>
 
-function questionRules(opts: { count: number; types: readonly AiQuestionType[]; format: ReadingFormat }) {
+function questionRules(opts: {
+  count: number
+  types: readonly AiQuestionType[]
+  format: ReadingFormat
+}) {
   return `Chỉ dùng các dạng sau, chia đều số câu (dạng nối tiêu đề: tối đa một câu cho mỗi đoạn):
 ${opts.types.map((t) => `- ${READING_TYPE_DESC[t]}`).join('\n')}
 Yêu cầu:
@@ -614,9 +771,16 @@ ${READING_FORMAT_RULES[opts.format].questions}`
 }
 
 /** đoạn văn kèm chữ đánh dấu A, B, C… để câu nối tiêu đề gọi tên được */
-const lettered = (paragraphs: string[]) => paragraphs.map((p, i) => `${String.fromCharCode(65 + i)}. ${p}`).join('\n\n')
+const lettered = (paragraphs: string[]) =>
+  paragraphs.map((p, i) => `${String.fromCharCode(65 + i)}. ${p}`).join('\n\n')
 
-export function readingPrompt(opts: { topic: string; level: ReadingLevel; count: number; types: readonly AiQuestionType[]; format: ReadingFormat }) {
+export function readingPrompt(opts: {
+  topic: string
+  level: ReadingLevel
+  count: number
+  types: readonly AiQuestionType[]
+  format: ReadingFormat
+}) {
   return `Chủ đề: ${opts.topic}
 Trình độ: ${READING_LEVEL_DESC[opts.level]}
 Dạng bài: ${READING_FORMAT_RULES[opts.format].passage}
@@ -626,7 +790,10 @@ ${questionRules(opts)}`
 }
 
 /** chỉ soạn câu hỏi cho bài đọc có sẵn (lấy từ nguồn ngoài) */
-export const ReadingQuestionsSchema = ReadingPassageSchema.pick({ glossary: true, questions: true })
+export const ReadingQuestionsSchema = ReadingPassageSchema.pick({
+  glossary: true,
+  questions: true,
+})
 export type ReadingQuestions = z.infer<typeof ReadingQuestionsSchema>
 
 export function readingQuestionsPrompt(opts: {
@@ -643,4 +810,25 @@ ${lettered(opts.paragraphs)}
 """
 Hãy soạn ${opts.count} câu hỏi đọc hiểu cho bài trên (không sửa bài, evidence chép nguyên văn không kèm chữ đánh dấu đoạn), độ khó vừa trình độ.
 ${questionRules(opts)}`
+}
+
+export const LISTENING_SYSTEM = `Bạn là giáo viên tiếng Anh soạn câu hỏi luyện nghe hiểu cho người Việt theo chuẩn CEFR và dạng IELTS Listening.
+Câu hỏi phải kiểm tra nội dung người học nghe được, không hỏi kiến thức ngoài lời thoại. Giải thích bằng tiếng Việt, còn câu hỏi và phương án bằng tiếng Anh.`
+
+/** Soạn câu hỏi cho lời thoại có sẵn; dùng cùng schema và bộ lọc với bài đọc. */
+export function listeningQuestionsPrompt(opts: {
+  title: string
+  transcript: string[]
+  level: ListeningLevel
+  count: number
+  format: 'standard' | 'ielts'
+}) {
+  const types: readonly AiQuestionType[] = ['choice', 'gap', 'short']
+  return `Bài nghe (trình độ ${opts.level}): ${opts.title}
+Lời thoại:
+"""
+${opts.transcript.join('\n')}
+"""
+Hãy soạn ${opts.count} câu hỏi nghe hiểu cho bài trên. Câu hỏi xếp theo thứ tự thông tin xuất hiện; evidence chép nguyên văn từ lời thoại.
+${questionRules({ count: opts.count, types, format: opts.format })}`
 }

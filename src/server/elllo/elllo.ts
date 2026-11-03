@@ -3,6 +3,10 @@ import { createWriteStream } from 'node:fs'
 import type { IncomingMessage } from 'node:http'
 import https from 'node:https'
 import { pipeline } from 'node:stream/promises'
+import { parse } from 'node-html-parser'
+
+import type { ListeningSection } from '#/lib/listening.ts'
+import type { ReadingQuestion } from '#/db/schema.ts'
 
 export interface EllloLesson {
   /** bài video; không có thì là bài chỉ có audio (`audioUrl`) */
@@ -18,7 +22,10 @@ const decode = (s: string) =>
     .replace(/&quot;|&ldquo;|&rdquo;/g, '"')
     .replace(/&nbsp;/g, ' ')
 
-export function parseEllloPage(html: string, pageUrl = 'https://elllo.org/'): EllloLesson | null {
+export function parseEllloPage(
+  html: string,
+  pageUrl = 'https://elllo.org/',
+): EllloLesson | null {
   const vimeoId = /player\.vimeo\.com\/video\/(\d+)/.exec(html)?.[1]
   // audio chính của bài nằm trong thư mục /Audio/ (các mp3 khác là đoạn giải nghĩa từ vựng)
   const audio = /src="([^"]*\/Audio\/[^"]+\.mp3)"/i.exec(html)?.[1]
@@ -26,7 +33,11 @@ export function parseEllloPage(html: string, pageUrl = 'https://elllo.org/'): El
   const title = decode(/<title>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '')
     .replace(/\s+/g, ' ')
     .trim()
-  return { vimeoId, audioUrl: audio ? new URL(audio, pageUrl).toString() : undefined, title }
+  return {
+    vimeoId,
+    audioUrl: audio ? new URL(audio, pageUrl).toString() : undefined,
+    title,
+  }
 }
 
 /**
@@ -45,22 +56,46 @@ export async function getHtml(url: string): Promise<string> {
 }
 
 /** Tải file (mp3 bài nghe) về `dest` */
-export async function downloadEllloFile(url: string, dest: string, signal?: AbortSignal) {
+export async function downloadEllloFile(
+  url: string,
+  dest: string,
+  signal?: AbortSignal,
+) {
   const res = await open(url, 3, signal)
   await pipeline(res, createWriteStream(dest), { signal })
   return dest
 }
 
-function open(url: string, redirects: number, signal?: AbortSignal): Promise<IncomingMessage> {
+function open(
+  url: string,
+  redirects: number,
+  signal?: AbortSignal,
+): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
-      { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 20_000, signal, ...CONNECT_OPTS },
+      {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        timeout: 20_000,
+        signal,
+        ...CONNECT_OPTS,
+      },
       (res) => {
         const status = res.statusCode ?? 0
-        if (status >= 300 && status < 400 && res.headers.location && redirects > 0) {
+        if (
+          status >= 300 &&
+          status < 400 &&
+          res.headers.location &&
+          redirects > 0
+        ) {
           res.resume()
-          resolve(open(new URL(res.headers.location, url).toString(), redirects - 1, signal))
+          resolve(
+            open(
+              new URL(res.headers.location, url).toString(),
+              redirects - 1,
+              signal,
+            ),
+          )
           return
         }
         if (status !== 200) {
@@ -71,14 +106,17 @@ function open(url: string, redirects: number, signal?: AbortSignal): Promise<Inc
         resolve(res)
       },
     )
-    req.on('timeout', () => req.destroy(new Error('Trang elllo phản hồi quá lâu')))
+    req.on('timeout', () =>
+      req.destroy(new Error('Trang elllo phản hồi quá lâu')),
+    )
     req.on('error', reject)
   })
 }
 
 export async function fetchEllloLesson(url: string): Promise<EllloLesson> {
   const lesson = parseEllloPage(await getHtml(url), url)
-  if (!lesson) throw new Error('Trang elllo này không có video hay audio bài nghe.')
+  if (!lesson)
+    throw new Error('Trang elllo này không có video hay audio bài nghe.')
   return lesson
 }
 
@@ -90,29 +128,149 @@ export interface EllloIndexItem {
 }
 
 /** thư mục mục Videos của elllo theo cấp độ CEFR */
-export const ELLLO_LEVEL_DIR = { A1: 'A1BEG', A2: 'A2BEG', B1: 'B1INT', B2: 'B2INT', C1: 'C1ADV' } as const
+export const ELLLO_LEVEL_DIR = {
+  A1: 'A1BEG',
+  A2: 'A2BEG',
+  B1: 'B1INT',
+  B2: 'B2INT',
+  C1: 'C1ADV',
+} as const
 
 // HTML viết tay, không đồng nhất: neo vào "Video 50<br /> <a href="bài">Tiêu đề</a>"
 // rồi lấy ảnh bìa gần nhất phía trước (bỏ ảnh cờ quốc gia)
-const INDEX_ITEM = /Video\s*(\d+)\s*<br\s*\/?>\s*<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
+const INDEX_ITEM =
+  /Video\s*(\d+)\s*<br\s*\/?>\s*<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
 const IMG_SRC = /<img\s[^>]*?src="([^"]+)"/g
 
-export function parseEllloIndex(html: string, baseUrl: string): EllloIndexItem[] {
+export function parseEllloIndex(
+  html: string,
+  baseUrl: string,
+): EllloIndexItem[] {
   return [...html.matchAll(INDEX_ITEM)].map((m) => {
     const before = html.slice(Math.max(0, m.index - 600), m.index)
-    const img = [...before.matchAll(IMG_SRC)].map((i) => i[1]).filter((src) => !src.includes('/flags/')).at(-1)
+    const img = [...before.matchAll(IMG_SRC)]
+      .map((i) => i[1])
+      .filter((src) => !src.includes('/flags/'))
+      .at(-1)
     return {
       url: new URL(m[2], baseUrl).toString(),
       thumbnail: img ? new URL(img, baseUrl).toString() : undefined,
-      title: decode(m[3].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim(),
+      title: decode(m[3].replace(/<[^>]+>/g, ''))
+        .replace(/\s+/g, ' ')
+        .trim(),
       number: Number(m[1]),
     }
   })
 }
 
-export async function fetchEllloLevel(level: keyof typeof ELLLO_LEVEL_DIR): Promise<EllloIndexItem[]> {
+export async function fetchEllloLevel(
+  level: keyof typeof ELLLO_LEVEL_DIR,
+): Promise<EllloIndexItem[]> {
   const url = `https://elllo.org/video/${ELLLO_LEVEL_DIR[level]}/index.htm`
   return parseEllloIndex(await getHtml(url), url)
+}
+
+const jsString = (s: string) => {
+  try {
+    return JSON.parse(`"${s.replace(/"/g, '\\"')}"`) as string
+  } catch {
+    return decode(s.replace(/\\'/g, "'").replace(/\\"/g, '"'))
+  }
+}
+
+/** Quiz ELLLO cũ lưu trong JS: questions[i], choices[i][j], answers[i] (đếm từ 0). */
+export function parseEllloQuiz(script: string): ReadingQuestion[] {
+  const questions = new Map<number, string>()
+  const choices = new Map<number, Map<number, string>>()
+  const answers = new Map<number, number>()
+  for (const m of script.matchAll(
+    /questions\s*\[\s*(\d+)\s*]\s*=\s*["']([\s\S]*?)["']\s*;/g,
+  ))
+    questions.set(Number(m[1]), jsString(m[2]))
+  for (const m of script.matchAll(
+    /choices\s*\[\s*(\d+)\s*]\s*\[\s*(\d+)\s*]\s*=\s*["']([\s\S]*?)["']\s*;/g,
+  )) {
+    const row = choices.get(Number(m[1])) ?? new Map<number, string>()
+    row.set(
+      Number(m[2]),
+      jsString(m[3])
+        .replace(/^[a-z][.)]\s*/i, '')
+        .trim(),
+    )
+    choices.set(Number(m[1]), row)
+  }
+  for (const m of script.matchAll(/answers\s*\[\s*(\d+)\s*]\s*=\s*(\d+)\s*;/g))
+    answers.set(Number(m[1]), Number(m[2]))
+  return [...questions]
+    .sort(([a], [b]) => a - b)
+    .flatMap(([i, prompt]) => {
+      const options = [...(choices.get(i) ?? [])]
+        .sort(([a], [b]) => a - b)
+        .map(([, v]) => v)
+      const answer = options[answers.get(i) ?? -1]
+      return answer && options.length >= 2
+        ? [
+            {
+              type: 'choice',
+              prompt: decode(prompt).trim(),
+              options,
+              answers: [answer],
+              evidence: '',
+              explanation: '',
+            },
+          ]
+        : []
+    })
+}
+
+export function parseEllloTranscript(html: string): string[] | null {
+  const root = parse(html)
+  const box =
+    root.querySelector('div.transcript') ??
+    root.querySelector('#transcript') ??
+    root.querySelector('div.script')
+  if (!box) return null
+  const lines = box
+    .querySelectorAll('p')
+    .map((p) => decode(p.text).replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  return lines.length
+    ? lines
+    : [decode(box.text).replace(/\s+/g, ' ').trim()].filter(Boolean)
+}
+
+/** Đọc trọn bài nghe ELLLO; đường dẫn JS quiz được lấy từ chính trang, không đoán tên file. */
+export async function fetchEllloListening(
+  url: string,
+): Promise<{ title: string; sections: ListeningSection[] }> {
+  const html = await getHtml(url)
+  const lesson = parseEllloPage(html, url)
+  if (!lesson) throw new Error('Trang ELLLO này không có audio hay Vimeo')
+  const scripts = [
+    ...html.matchAll(/<script\b[^>]*src=["']([^"']+)["'][^>]*><\/script>/gi),
+  ]
+    .map((m) => new URL(m[1], url).toString())
+    .filter((src) => /quiz|question/i.test(src))
+  const js = await Promise.all(
+    scripts.map((src) => getHtml(src).catch(() => '')),
+  )
+  const questions = parseEllloQuiz([html, ...js].join('\n'))
+  const media = lesson.audioUrl
+    ? { kind: 'audio' as const, url: lesson.audioUrl }
+    : lesson.vimeoId
+      ? { kind: 'vimeo' as const, id: lesson.vimeoId }
+      : null
+  return {
+    title: lesson.title,
+    sections: [
+      {
+        title: lesson.title,
+        media,
+        transcript: parseEllloTranscript(html),
+        questions,
+      },
+    ],
+  }
 }
 
 export interface EllloBookLesson {
@@ -124,21 +282,32 @@ export interface EllloBookLesson {
 
 // <a href="A1/A1-01-Be-Verbs-Introductions.html"><strong>Be Verbs - Introductions</strong></a>
 // (có bài đánh số kiểu "C1-20A-…")
-const BOOK_ITEM = /<a href="((A1|A2|B1|B2|C1)\/\2-(\d+)[A-Za-z]?-[^"]+)"[^>]*>([\s\S]*?)<\/a>/g
+const BOOK_ITEM =
+  /<a href="((A1|A2|B1|B2|C1)\/\2-(\d+)[A-Za-z]?-[^"]+)"[^>]*>([\s\S]*?)<\/a>/g
 
 /** Sách ngữ pháp elllo: mỗi bài là một video Vimeo kèm audio luyện nghe */
-export function parseEllloBook(html: string, baseUrl: string): EllloBookLesson[] {
+export function parseEllloBook(
+  html: string,
+  baseUrl: string,
+): EllloBookLesson[] {
   // trang viết tay: một bài có thể có vài link (link rỗng, link lặp) → gộp theo URL
   const byUrl = new Map<string, EllloBookLesson>()
   for (const m of html.matchAll(BOOK_ITEM)) {
     const url = new URL(m[1], baseUrl).toString()
-    const title = decode(m[4].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim()
+    const title = decode(m[4].replace(/<[^>]+>/g, ''))
+      .replace(/\s+/g, ' ')
+      .trim()
     const prev = byUrl.get(url)
     if (prev) {
       if (!prev.title) prev.title = title
       continue
     }
-    byUrl.set(url, { level: m[2] as EllloBookLesson['level'], url, number: Number(m[3]), title })
+    byUrl.set(url, {
+      level: m[2] as EllloBookLesson['level'],
+      url,
+      number: Number(m[3]),
+      title,
+    })
   }
   return [...byUrl.values()]
 }
@@ -163,14 +332,20 @@ export const ELLLO_VIEWS_LEVELS = ['A2', 'B1', 'B2', 'C1'] as const
 const VIEWS_ITEM =
   /(\d{3,4})\s*(?:<strong>\s*)?<a href="([^"]*english\/[^"]+)"[^>]*>([\s\S]*?)<\/a>\s*(?:<br\s*\/?>)?\s*(?:<\/strong>)?([\s\S]*?)<\/div>/g
 
-export function parseEllloViews(html: string, baseUrl: string): EllloViewsLesson[] {
+export function parseEllloViews(
+  html: string,
+  baseUrl: string,
+): EllloViewsLesson[] {
   const seen = new Set<string>()
   const out: EllloViewsLesson[] = []
   for (const m of html.matchAll(VIEWS_ITEM)) {
     const url = new URL(m[2], baseUrl).toString()
     if (seen.has(url)) continue
     seen.add(url)
-    const clean = (s: string) => decode(s.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim()
+    const clean = (s: string) =>
+      decode(s.replace(/<[^>]+>/g, ''))
+        .replace(/\s+/g, ' ')
+        .trim()
     const name = clean(m[3])
     const question = clean(m[4])
     // ảnh bìa gần nhất phía trước (bỏ ảnh cờ quốc gia)
@@ -190,7 +365,9 @@ export function parseEllloViews(html: string, baseUrl: string): EllloViewsLesson
   return out
 }
 
-export async function fetchEllloViews(level: (typeof ELLLO_VIEWS_LEVELS)[number]): Promise<EllloViewsLesson[]> {
+export async function fetchEllloViews(
+  level: (typeof ELLLO_VIEWS_LEVELS)[number],
+): Promise<EllloViewsLesson[]> {
   const url = `https://elllo.org/levels/views/${level}-views.html`
   return parseEllloViews(await getHtml(url), url)
 }
