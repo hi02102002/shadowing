@@ -2,6 +2,15 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.36 — 2026-11-04
+
+### Thay đổi
+
+- **Chỉnh thời gian khi luyện nói với AI**
+  - Nói theo đề: chọn thời gian chuẩn bị (không chuẩn bị đến 5 phút) và thời gian nói tối đa (30 giây đến 10 phút), mặc định vẫn như phòng thi: 1 phút chuẩn bị, nói 2 phút.
+  - Nhập vai và IELTS Part 1 / Part 3: chọn thời gian tối đa mỗi lượt nói (10 giây đến 10 phút, mặc định 45 giây).
+  - Bấm "Khác…" để tự nhập số giây; lựa chọn được nhớ cho lần sau.
+
 ## 0.0.35 — 2026-11-04
 
 ### Mới
