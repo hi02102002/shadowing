@@ -2,6 +2,22 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.34 — 2026-11-04
+
+### Mới
+
+- **Luyện phản xạ nói A1–C1** (mục "Phản xạ" trên thanh điều hướng)
+  - 4 dạng bài: Dịch nói Việt → Anh, Hỏi nhanh – đáp nhanh (AI đọc to câu hỏi), Phản xạ tình huống và Phản xạ mẫu câu (ghép từ gợi ý vào mẫu).
+  - Chọn nguồn đề: bộ câu soạn sẵn theo cấp độ, hơn 30.000 cặp câu Việt–Anh từ Tatoeba, hàng nghìn câu hỏi hội thoại theo hơn 200 chủ đề từ iTESLj, hoặc để AI soạn theo chủ đề bạn muốn.
+  - Đề hiện ra là micro bật ngay, đồng hồ đếm ngược 3–30 giây mỗi câu (mặc định theo dạng bài và cấp độ); phím Enter để bắt đầu, dừng và sang câu tiếp.
+  - AI chấm từng câu ngay: điểm 0–10, đúng ý hay chưa, câu nên nói (nghe được), lỗi cần sửa kèm giải thích tiếng Việt, và thời gian bạn bắt đầu nói. Bấm "Nói lại" để thử lại câu đó.
+  - Cuối buổi xem điểm trung bình, thời gian phản xạ trung bình và các câu cần luyện lại; xem lại hoặc xoá các buổi trước.
+
+### Thay đổi
+
+- Lỗi khi luyện phản xạ được lưu vào Sổ lỗi; bộ lọc nguồn trong Sổ lỗi có thêm Hội thoại, Nói theo đề, Đọc hiểu, Luyện nghe và Phản xạ.
+- Lượt luyện phản xạ được tính vào chuỗi ngày học và biểu đồ hoạt động; trang Thống kê có thêm ô "Câu phản xạ đã nói".
+
 ## 0.0.33 — 2026-11-03
 
 ### Mới
