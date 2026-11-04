@@ -17,6 +17,7 @@ import {
   Settings,
   Speech,
   Sun,
+  Zap,
 } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
@@ -27,6 +28,7 @@ const NAV = [
   { to: '/', label: 'Thư viện', icon: Library },
   { to: '/explore', label: 'Khám phá', icon: Compass },
   { to: '/talk', label: 'Nói với AI', icon: MessagesSquare },
+  { to: '/reflex', label: 'Phản xạ', icon: Zap },
   { to: '/ipa', label: 'Luyện IPA', icon: Speech },
   { to: '/reading', label: 'Đọc hiểu', icon: BookOpenText },
   { to: '/listening', label: 'Luyện nghe', icon: Headphones },

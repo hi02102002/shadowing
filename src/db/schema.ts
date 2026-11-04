@@ -94,7 +94,7 @@ export const mistakes = sqliteTable(
     word: text().notNull(),
     heard: text(),
     type: text().notNull(),
-    /** dictation | pronunciation | grammar | conversation | speaking | reading | listening */
+    /** dictation | pronunciation | grammar | conversation | speaking | reading | listening | reflex */
     source: text().notNull(),
     segmentId: integer('segment_id').references(() => segments.id, {
       onDelete: 'set null',
@@ -424,4 +424,65 @@ export interface ReadingQuestion {
   explanation: string
   /** hướng dẫn chung của nhóm câu trong đề gốc (vd. "Which paragraph contains…"), các câu liền nhau cùng hướng dẫn là một nhóm */
   instruction?: string
+}
+
+/** Buổi luyện phản xạ nói (trang /reflex) */
+export const reflexSessions = sqliteTable('reflex_sessions', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  /** translate | qa | situation | pattern (src/lib/reflex.ts) */
+  mode: text().notNull(),
+  /** bank | tatoeba | iteslj | ai */
+  source: text().notNull(),
+  /** A1 | A2 | B1 | B2 | C1 */
+  level: text().notNull(),
+  /** chủ đề người học chọn (AI) hoặc tên chủ đề iTESLj */
+  topic: text(),
+  /** số giây được nói mỗi câu */
+  answerSeconds: integer('answer_seconds').notNull(),
+  createdAt: createdAt(),
+  finishedAt: integer('finished_at', { mode: 'timestamp' }),
+})
+
+export const reflexItems = sqliteTable(
+  'reflex_items',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    sessionId: integer('session_id')
+      .notNull()
+      .references(() => reflexSessions.id, { onDelete: 'cascade' }),
+    position: integer().notNull(),
+    prompt: text().notNull(),
+    /** vi | en: câu hỏi tiếng Anh thì đọc to */
+    promptLang: text('prompt_lang').notNull(),
+    hint: text(),
+    /** câu mẫu */
+    reference: text(),
+    /** ghi nguồn câu (Tatoeba: tác giả + giấy phép) */
+    attribution: text(),
+    /** lời người học (nhận dạng giọng nói), null = chưa làm */
+    transcript: text(),
+    /** từ lúc hiện đề đến lúc bắt đầu nói */
+    latencyMs: integer('latency_ms'),
+    /** 0–10 */
+    score: real(),
+    feedback: text({ mode: 'json' }).$type<ReflexFeedback>(),
+    /** bỏ qua câu này */
+    skipped: integer({ mode: 'boolean' }).notNull().default(false),
+    answeredAt: integer('answered_at', { mode: 'timestamp' }),
+  },
+  (t) => [index('reflex_items_session_idx').on(t.sessionId)],
+)
+
+/** chấm một câu phản xạ, cùng cấu trúc với ReflexGradeSchema (src/server/ai/prompts.ts) */
+export interface ReflexFeedback {
+  score: number
+  meaningOk: boolean
+  better: string
+  corrections: Array<{
+    said: string
+    better: string
+    type: string
+    explanation: string
+  }>
+  tip: string
 }

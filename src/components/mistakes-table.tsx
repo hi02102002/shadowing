@@ -57,6 +57,7 @@ const SOURCE_LABEL: Record<string, string | undefined> = {
   speaking: 'Nói theo đề',
   reading: 'Đọc hiểu',
   listening: 'Luyện nghe',
+  reflex: 'Phản xạ',
 }
 
 const helper = createColumnHelper<typeof features, MistakeRow>()
@@ -272,6 +273,11 @@ export function MistakesTable({ data, onDelete }: Props) {
           <option value="dictation">Chép chính tả</option>
           <option value="pronunciation">Phát âm</option>
           <option value="grammar">Ngữ pháp</option>
+          <option value="conversation">Hội thoại</option>
+          <option value="speaking">Nói theo đề</option>
+          <option value="reading">Đọc hiểu</option>
+          <option value="listening">Luyện nghe</option>
+          <option value="reflex">Phản xạ</option>
         </select>
         <span className="text-sm text-muted-foreground">{rows.length} lỗi</span>
       </div>

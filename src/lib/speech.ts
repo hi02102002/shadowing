@@ -11,7 +11,7 @@ let player: HTMLAudioElement | null = null
 export function speak(
   text: string,
   /** giọng chuẩn lấy từ Cài đặt (useAccent) */
-  opts: { accent: Accent; rate?: number },
+  opts: { accent: Accent; rate?: number; onEnd?: () => void },
 ) {
   if (typeof window === 'undefined') return false
   if ('speechSynthesis' in window) window.speechSynthesis.cancel()
@@ -20,15 +20,16 @@ export function speak(
     `/api/tts?${new URLSearchParams({ text, accent: opts.accent })}`,
   )
   player.playbackRate = opts.rate ?? 1
+  if (opts.onEnd) player.onended = opts.onEnd
   player.play().catch(() => speakWithBrowser(text, opts))
   return true
 }
 
 function speakWithBrowser(
   text: string,
-  opts: { accent: Accent; rate?: number },
+  opts: { accent: Accent; rate?: number; onEnd?: () => void },
 ) {
-  if (!('speechSynthesis' in window)) return
+  if (!('speechSynthesis' in window)) return opts.onEnd?.()
   const lang = LANG[opts.accent]
   const synth = window.speechSynthesis
   synth.cancel()
@@ -44,7 +45,29 @@ function speakWithBrowser(
     voices.find((v) => v.lang === lang) ??
     voices.find((v) => v.lang.startsWith('en'))
   if (voice) u.voice = voice
+  if (opts.onEnd) {
+    u.onend = opts.onEnd
+    u.onerror = opts.onEnd
+  }
   synth.speak(u)
+}
+
+/** đọc xong (hoặc lỗi, hoặc quá `maxMs`) mới resolve — để bắt đầu ghi âm sau khi đọc câu hỏi */
+export function speakAndWait(
+  text: string,
+  opts: { accent: Accent; rate?: number; maxMs?: number },
+) {
+  return new Promise<void>((resolve) => {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(finish, opts.maxMs ?? 15_000)
+    if (!speak(text, { ...opts, onEnd: finish })) finish()
+  })
 }
 
 export const canSpeak = () => typeof window !== 'undefined'

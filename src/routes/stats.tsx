@@ -151,6 +151,16 @@ function StatsPage() {
         >
           {totals.listening.n}
         </Tile>
+        <Tile
+          label="Câu phản xạ đã nói"
+          sub={
+            totals.reflex.avg != null
+              ? `điểm TB ${totals.reflex.avg}/10`
+              : undefined
+          }
+        >
+          {totals.reflex.n}
+        </Tile>
         <Tile label="Lượt ôn thẻ">{totals.reviews}</Tile>
         <Tile label="Lỗi trong sổ">{totals.mistakes}</Tile>
         <Tile label="Video trong thư viện">{totals.videos}</Tile>

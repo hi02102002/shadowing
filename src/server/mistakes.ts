@@ -136,9 +136,9 @@ export function recordListeningMistake(m: {
     .run()
 }
 
-/** Lỗi khi nói tự do (hội thoại, nói theo đề): word = cách nói đúng, heard = câu người học đã nói */
+/** Lỗi khi nói tự do (hội thoại, nói theo đề, luyện phản xạ): word = cách nói đúng, heard = câu người học đã nói */
 export function recordSpeechMistakes(
-  source: 'conversation' | 'speaking',
+  source: 'conversation' | 'speaking' | 'reflex',
   list: Array<{
     said: string
     better: string

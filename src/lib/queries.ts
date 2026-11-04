@@ -16,6 +16,11 @@ import {
   listConversations,
 } from '#/server/fns/conversation.ts'
 import {
+  getReflexSession,
+  listReflexSessions,
+  listReflexTopics,
+} from '#/server/fns/reflex.ts'
+import {
   getSpeakingAttempt,
   listSpeakingAttempts,
 } from '#/server/fns/speaking.ts'
@@ -282,4 +287,24 @@ export const listeningMeaningsQuery = (id: number, words: string[]) =>
     enabled: words.length > 0,
     staleTime: Infinity,
     retry: false,
+  })
+
+export const reflexSessionsQuery = () =>
+  queryOptions({
+    queryKey: ['reflex-sessions'],
+    queryFn: () => listReflexSessions(),
+  })
+
+export const reflexSessionQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['reflex-session', id],
+    queryFn: () => getReflexSession({ data: { id } }),
+  })
+
+/** chủ đề iTESLj: ít đổi nên giữ lâu */
+export const reflexTopicsQuery = () =>
+  queryOptions({
+    queryKey: ['reflex-topics'],
+    queryFn: () => listReflexTopics(),
+    staleTime: 6 * 60 * 60 * 1000,
   })

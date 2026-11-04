@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as ListeningRouteImport } from './routes/listening'
 import { Route as ReadingRouteImport } from './routes/reading'
+import { Route as ReflexRouteImport } from './routes/reflex'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SpeakingRouteImport } from './routes/speaking'
@@ -51,6 +52,11 @@ const ListeningRoute = ListeningRouteImport.update({
 const ReadingRoute = ReadingRouteImport.update({
   id: '/reading',
   path: '/reading',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReflexRoute = ReflexRouteImport.update({
+  id: '/reflex',
+  path: '/reflex',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
+  '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/speaking': typeof SpeakingRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
+  '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/speaking': typeof SpeakingRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
+  '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/speaking': typeof SpeakingRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/explore'
     | '/listening'
     | '/reading'
+    | '/reflex'
     | '/review'
     | '/settings'
     | '/speaking'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/explore'
     | '/listening'
     | '/reading'
+    | '/reflex'
     | '/review'
     | '/settings'
     | '/speaking'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/explore'
     | '/listening'
     | '/reading'
+    | '/reflex'
     | '/review'
     | '/settings'
     | '/speaking'
@@ -306,6 +318,7 @@ export interface RootRouteChildren {
   ExploreRoute: typeof ExploreRoute
   ListeningRoute: typeof ListeningRoute
   ReadingRoute: typeof ReadingRoute
+  ReflexRoute: typeof ReflexRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
   SpeakingRoute: typeof SpeakingRoute
@@ -350,6 +363,13 @@ declare module '@tanstack/react-router' {
       path: '/reading'
       fullPath: '/reading'
       preLoaderRoute: typeof ReadingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reflex': {
+      id: '/reflex'
+      path: '/reflex'
+      fullPath: '/reflex'
+      preLoaderRoute: typeof ReflexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -513,6 +533,7 @@ const rootRouteChildren: RootRouteChildren = {
   ExploreRoute: ExploreRoute,
   ListeningRoute: ListeningRoute,
   ReadingRoute: ReadingRoute,
+  ReflexRoute: ReflexRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
   SpeakingRoute: SpeakingRoute,

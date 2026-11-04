@@ -14,6 +14,7 @@ const KINDS = [
   { key: 'speaking', label: 'Nói theo đề' },
   { key: 'reading', label: 'Đọc hiểu' },
   { key: 'listening', label: 'Luyện nghe' },
+  { key: 'reflex', label: 'Phản xạ' },
 ] as const
 
 const WEEKDAYS = ['T2', '', 'T4', '', 'T6', '', '']

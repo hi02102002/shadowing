@@ -12,12 +12,13 @@ export const ACTIVITY_KINDS = [
   'speaking',
   'reading',
   'listening',
+  'reflex',
 ] as const
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number]
 
 /**
  * mọi lượt luyện: câu chép chính tả, lượt nói, lượt ôn thẻ, câu ngữ pháp, lượt nói trong hội thoại, bài nói theo đề,
- * câu đọc hiểu
+ * câu đọc hiểu, câu nghe hiểu, câu luyện phản xạ
  * (ngữ pháp chỉ giữ lần làm gần nhất mỗi câu nên tính theo lúc làm lại)
  */
 const EVENTS = sql`
@@ -28,7 +29,8 @@ const EVENTS = sql`
   union all select 'conversation', created_at from conversation_turns where role = 'user'
   union all select 'speaking', created_at from speaking_attempts
   union all select 'reading', answered_at from reading_passages, json_each(reading_passages.answers) where answered_at is not null
-  union all select 'listening', answered_at from listening_passages, json_each(listening_passages.answers) where answered_at is not null`
+  union all select 'listening', answered_at from listening_passages, json_each(listening_passages.answers) where answered_at is not null
+  union all select 'reflex', answered_at from reflex_items where answered_at is not null`
 
 /** các ngày có học (YYYY-MM-DD), toàn bộ lịch sử */
 export const activeDays = () =>
@@ -55,6 +57,7 @@ export function dailyActivity(since: string) {
       speaking: 0,
       reading: 0,
       listening: 0,
+      reflex: 0,
     }
     d[r.kind] = r.n
     days.set(r.day, d)

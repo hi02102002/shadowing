@@ -40,6 +40,7 @@ export const activityStats = createServerFn({ method: 'GET' }).handler(
         speaking: 0,
         reading: 0,
         listening: 0,
+        reflex: 0,
       }
       days.push({
         day: d,
@@ -97,6 +98,9 @@ export const activityStats = createServerFn({ method: 'GET' }).handler(
       ),
       listening: one<{ n: number; correct: number | null }>(
         sql`select count(*) as n, sum(score) as correct from listening_passages where answers is not null`,
+      ),
+      reflex: one<{ n: number; avg: number | null }>(
+        sql`select count(*) as n, round(avg(score), 1) as avg from reflex_items where answered_at is not null`,
       ),
       mistakes: one<{ n: number }>(sql`select count(*) as n from mistakes`).n,
       videos: one<{ n: number }>(sql`select count(*) as n from videos`).n,

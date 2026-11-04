@@ -10,6 +10,7 @@ import type {
 import type { SpeakingTarget } from '#/lib/speaking-topics.ts'
 import type { Accent } from '#/lib/speech.ts'
 import type { ListeningLevel } from '#/lib/listening.ts'
+import type { ReflexLevel, ReflexMode } from '#/lib/reflex.ts'
 
 export const MISTAKE_TYPES = [
   'weak_form', // dạng yếu: to → /tə/, and → /ən/
@@ -831,4 +832,101 @@ ${opts.transcript.join('\n')}
 """
 Hãy soạn ${opts.count} câu hỏi nghe hiểu cho bài trên. Câu hỏi xếp theo thứ tự thông tin xuất hiện; evidence chép nguyên văn từ lời thoại.
 ${questionRules({ count: opts.count, types, format: opts.format })}`
+}
+
+/* ---------- Luyện phản xạ nói (/reflex) ---------- */
+
+const REFLEX_TASK: Record<ReflexMode, string> = {
+  translate:
+    'prompt là một câu tiếng Việt tự nhiên, thường gặp trong đời sống; reference là câu tiếng Anh tự nhiên tương ứng. hint để trống.',
+  qa: 'prompt là một câu hỏi tiếng Anh ngắn, hỏi trực tiếp người học (về bản thân, thói quen, ý kiến); reference là câu trả lời mẫu 1-2 câu. hint để trống.',
+  situation:
+    'prompt là mô tả tình huống bằng tiếng Việt (1 câu, ngôi "Bạn…"), người học phải nói câu tiếng Anh phù hợp; reference là câu nói mẫu tự nhiên. hint: vài chữ gợi ý ý chính (tiếng Việt) hoặc để trống.',
+  pattern:
+    'prompt là một mẫu câu tiếng Anh có chỗ trống ___; hint là từ/cụm từ (nguyên mẫu) cần ghép vào, nhiều chỗ trống thì cách nhau bằng " / "; reference là câu hoàn chỉnh đã chia đúng ngữ pháp.',
+}
+
+export const ReflexSetSchema = z.object({
+  items: z.array(
+    z.object({
+      prompt: z.string(),
+      hint: z.string().nullable(),
+      reference: z.string(),
+    }),
+  ),
+})
+
+export const reflexSetSystem = (
+  mode: ReflexMode,
+) => `Bạn là giáo viên tiếng Anh soạn bài luyện phản xạ nói cho người Việt theo khung CEFR.
+Mỗi câu phải nói được trong vài giây, sát đời sống, không lặp ý, độ khó vừa đúng cấp độ (ngữ pháp và từ vựng).
+${REFLEX_TASK[mode]}`
+
+export const reflexSetPrompt = (opts: {
+  count: number
+  level: ReflexLevel
+  topic?: string
+}) =>
+  `Soạn ${opts.count} câu, cấp độ ${opts.level}${opts.topic ? `, chủ đề: ${opts.topic}` : ', chủ đề đa dạng'}.`
+
+export const ReflexGradeSchema = z.object({
+  score: z
+    .number()
+    .min(0)
+    .max(10)
+    .describe(
+      '0-10: đúng ý và phù hợp (6 điểm), ngữ pháp và từ vựng (3 điểm), tự nhiên (1 điểm); bỏ trống / lạc đề là 0',
+    ),
+  meaningOk: z
+    .boolean()
+    .describe('câu trả lời có truyền đạt đúng ý / đáp đúng yêu cầu không'),
+  better: z
+    .string()
+    .describe(
+      'câu tiếng Anh tự nhiên nhất người học nên nói, giữ ý của người học nếu họ đã đúng ý',
+    ),
+  corrections: z
+    .array(
+      z.object({
+        said: z.string().describe('nguyên văn phần người học nói sai'),
+        better: z.string().describe('cách nói đúng'),
+        type: z.enum(CONVERSATION_MISTAKE_TYPES),
+        explanation: z.string().describe('giải thích ngắn bằng tiếng Việt'),
+      }),
+    )
+    .describe('tối đa 3 lỗi quan trọng nhất; rỗng nếu không có lỗi'),
+  tip: z
+    .string()
+    .describe('một lời khuyên ngắn bằng tiếng Việt để nói nhanh và hay hơn'),
+})
+export type ReflexGrade = z.infer<typeof ReflexGradeSchema>
+
+const REFLEX_GRADE_TASK: Record<ReflexMode, string> = {
+  translate:
+    'Người học phải nói câu tiếng Anh có nghĩa tương đương câu tiếng Việt. Chấp nhận mọi cách diễn đạt đúng nghĩa, không bắt giống câu mẫu.',
+  qa: 'Người học phải trả lời câu hỏi. Chấp nhận mọi câu trả lời hợp lý, nội dung tuỳ ý; chấm cách nói chứ không chấm quan điểm.',
+  situation:
+    'Người học phải nói câu phù hợp với tình huống (đúng mục đích, đúng mức lịch sự). Chấp nhận mọi cách nói phù hợp.',
+  pattern:
+    'Người học phải nói câu hoàn chỉnh theo mẫu, ghép đúng từ gợi ý và chia đúng ngữ pháp.',
+}
+
+export const reflexGradeSystem = (mode: ReflexMode) => `${GRAMMAR_SYSTEM}
+- Bạn đang chấm một câu trong bài luyện phản xạ nói: người học có vài giây để nói ngay.
+- ${REFLEX_GRADE_TASK[mode]}
+- Lời người học được nhận dạng từ giọng nói nên có thể sai chính tả hoặc thiếu dấu câu: KHÔNG tính đó là lỗi.
+- Câu ngắn mà đúng vẫn được điểm cao; đây là luyện phản xạ, không đòi câu dài.
+- Nếu người học nói tiếng Việt hoặc không nói gì, cho 0 điểm và đưa câu mẫu.`
+
+export function reflexGradePrompt(opts: {
+  level: string
+  prompt: string
+  hint?: string | null
+  reference?: string | null
+  said: string
+  latencyMs?: number | null
+}) {
+  return `Cấp độ: ${opts.level}
+Đề: ${opts.prompt}${opts.hint ? `\nGợi ý: ${opts.hint}` : ''}${opts.reference ? `\nCâu mẫu tham khảo: ${opts.reference}` : ''}
+Người học nói: "${opts.said}"${opts.latencyMs != null ? `\nThời gian bắt đầu nói: ${(opts.latencyMs / 1000).toFixed(1)} giây` : ''}`
 }
