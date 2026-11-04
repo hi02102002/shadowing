@@ -9,7 +9,9 @@ import { SpeakTabs } from '#/components/speak-tabs'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
 import { Textarea } from '#/components/ui/textarea'
-import { useAccent } from '#/hooks/use-app-settings'
+import { useAccent, useTalkTurnSeconds } from '#/hooks/use-app-settings'
+import { TimeChoice } from '#/components/time-choice'
+import { TALK_TURN_CHOICES, TALK_TURN_LIMIT } from '#/lib/speaking-topics'
 import { useRecorder } from '#/hooks/use-recorder'
 import { useStoredToggle } from '#/hooks/use-stored-toggle'
 import { CUSTOM_SCENARIO, MAX_USER_TURNS, SCENARIOS, TALK_LEVELS, TALK_LEVEL_LABEL, scenarioLabel } from '#/lib/conversation'
@@ -218,8 +220,9 @@ function ConversationView({ id }: { id: number }) {
     },
   })
 
+  const [turnSeconds, setTurnSeconds] = useTalkTurnSeconds()
   const recorder = useRecorder({
-    maxMs: 45_000,
+    maxMs: turnSeconds * 1000,
     onStop: (blob) => {
       // bản ghi quá ngắn thường là bấm nhầm
       if (blob.size > 2_000) send.mutate({ audio: blob })
@@ -341,6 +344,15 @@ function ConversationView({ id }: { id: number }) {
               </Button>
             </form>
           </div>
+          <TimeChoice
+            label="Mỗi lượt nói tối đa"
+            value={turnSeconds}
+            choices={TALK_TURN_CHOICES}
+            onChange={setTurnSeconds}
+            min={10}
+            max={TALK_TURN_LIMIT}
+            disabled={recorder.recording}
+          />
 
           {(send.error || finish.error || recorder.error) && (
             <p role="alert" className="text-sm text-destructive">

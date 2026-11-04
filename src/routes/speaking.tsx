@@ -8,12 +8,13 @@ import { SpeakTabs } from '#/components/speak-tabs'
 import { Button } from '#/components/ui/button'
 import { Progress } from '#/components/ui/progress'
 import { Textarea } from '#/components/ui/textarea'
-import { useAccent } from '#/hooks/use-app-settings'
+import { useAccent, useSpeakMaxSeconds, useSpeakPrepSeconds } from '#/hooks/use-app-settings'
+import { TimeChoice, formatSeconds } from '#/components/time-choice'
 import { useRecorder } from '#/hooks/use-recorder'
 import { IELTS_PART1, IELTS_PART3 } from '#/lib/conversation'
 import type { TalkLevel } from '#/lib/conversation'
 import { speak, speakLong } from '#/lib/speech'
-import { CUSTOM_TOPIC, MAX_SPEAK_SECONDS, PREP_SECONDS, SPEAKING_TARGETS, SPEAKING_TARGET_LABEL, SPEAKING_TOPICS, parseCueCard } from '#/lib/speaking-topics'
+import { CUSTOM_TOPIC, PREP_CHOICES, PREP_LIMIT, SPEAK_CHOICES, SPEAK_SECONDS_LIMIT, SPEAKING_TARGETS, SPEAKING_TARGET_LABEL, SPEAKING_TOPICS, parseCueCard } from '#/lib/speaking-topics'
 import type { SpeakingTarget } from '#/lib/speaking-topics'
 import { conversationsQuery, speakingAttemptQuery, speakingAttemptsQuery, statsQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
@@ -121,7 +122,7 @@ function Picker({ onPick: pick }: { onPick: (t: Topic & { target: SpeakingTarget
           <Presentation className="size-6 text-primary" /> Nói theo đề
         </h1>
         <p className="text-sm text-muted-foreground">
-          Như IELTS Speaking Part 2: 1 phút chuẩn bị, nói tối đa 2 phút. AI ước lượng band, chỉ ra câu chưa đúng và viết bài mẫu từ ý của bạn.
+          Như IELTS Speaking Part 2 (thi thật: 1 phút chuẩn bị, nói tối đa 2 phút; chỉnh được bên dưới). AI ước lượng band, chỉ ra câu chưa đúng và viết bài mẫu từ ý của bạn.
         </p>
       </header>
 
@@ -145,6 +146,8 @@ function Picker({ onPick: pick }: { onPick: (t: Topic & { target: SpeakingTarget
         </div>
         <p className="text-xs text-muted-foreground">Điểm vẫn chấm như thi thật; mục tiêu chỉ đổi độ khó của bài mẫu, từ vựng gợi ý và lời khuyên.</p>
       </div>
+
+      <SpeakTimes />
 
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-5">
         <div>
@@ -253,7 +256,11 @@ function Practice({ topic, onCancel, onDone }: { topic: Topic & { target: Speaki
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [phase, setPhase] = useState<'prep' | 'speak'>('prep')
-  const [prepLeft, setPrepLeft] = useState(PREP_SECONDS)
+  const [prepSeconds] = useSpeakPrepSeconds()
+  const [maxSeconds] = useSpeakMaxSeconds()
+  // đếm số giây đã chuẩn bị (thay vì giây còn lại) để đổi thời gian giữa chừng vẫn đúng
+  const [prepUsed, setPrepUsed] = useState(0)
+  const prepLeft = Math.max(0, prepSeconds - prepUsed)
   const [notes, setNotes] = useState('')
   const startedAt = useRef(0)
 
@@ -277,7 +284,7 @@ function Practice({ topic, onCancel, onDone }: { topic: Topic & { target: Speaki
   })
 
   const recorder = useRecorder({
-    maxMs: MAX_SPEAK_SECONDS * 1000,
+    maxMs: maxSeconds * 1000,
     onStop: (blob) => {
       const durationSec = Math.round((performance.now() - startedAt.current) / 1000)
       if (blob.size > 2_000) submit.mutate({ blob, durationSec })
@@ -297,7 +304,7 @@ function Practice({ topic, onCancel, onDone }: { topic: Topic & { target: Speaki
       startSpeaking()
       return
     }
-    const t = setTimeout(() => setPrepLeft((s) => s - 1), 1000)
+    const t = setTimeout(() => setPrepUsed((s) => s + 1), 1000)
     return () => clearTimeout(t)
   }, [phase, prepLeft])
 
@@ -322,7 +329,7 @@ function Practice({ topic, onCancel, onDone }: { topic: Topic & { target: Speaki
               <Mic /> Bắt đầu nói ngay
             </Button>
           </div>
-          <Progress value={((PREP_SECONDS - prepLeft) / PREP_SECONDS) * 100} />
+          <Progress value={prepSeconds ? (prepUsed / prepSeconds) * 100 : 100} />
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Ghi ý chính (vài từ khoá cho mỗi gợi ý)…" />
         </section>
       ) : (
@@ -330,7 +337,7 @@ function Practice({ topic, onCancel, onDone }: { topic: Topic & { target: Speaki
           {notes && <p className="whitespace-pre-wrap rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">{notes}</p>}
           <div className="flex items-center justify-between gap-3">
             <span className={cn('font-mono text-3xl font-semibold tabular-nums', recorder.recording && 'text-rec')}>
-              {mmss(spoken)} <span className="text-base text-muted-foreground">/ {mmss(MAX_SPEAK_SECONDS)}</span>
+              {mmss(spoken)} <span className="text-base text-muted-foreground">/ {mmss(maxSeconds)}</span>
             </span>
             {recorder.recording ? (
               <Button variant="destructive" onClick={recorder.stop}>
@@ -346,10 +353,12 @@ function Practice({ topic, onCancel, onDone }: { topic: Topic & { target: Speaki
               </Button>
             )}
           </div>
-          <Progress value={(spoken / MAX_SPEAK_SECONDS) * 100} />
+          <Progress value={(spoken / maxSeconds) * 100} />
           {recorder.recording && (
             <p className="text-xs text-muted-foreground">
-              {spoken < 60 ? 'Cố nói ít nhất 1 phút, tốt nhất gần 2 phút.' : 'Tốt, tiếp tục đến khi hết ý (tự dừng ở 2:00).'}
+              {spoken < Math.min(60, maxSeconds / 2)
+                ? `Cố nói liên tục, tốt nhất gần hết ${formatSeconds(maxSeconds)}.`
+                : `Tốt, tiếp tục đến khi hết ý (tự dừng ở ${mmss(maxSeconds)}).`}
             </p>
           )}
           {(submit.error || recorder.error) && (
@@ -556,5 +565,17 @@ function Result({ id, onRetry }: { id: number; onRetry: (t: Topic & { target: Sp
         </>
       )}
     </>
+  )
+}
+
+/** thời gian chuẩn bị / nói tối đa, lưu trong Cài đặt */
+function SpeakTimes() {
+  const [prep, setPrep] = useSpeakPrepSeconds()
+  const [max, setMax] = useSpeakMaxSeconds()
+  return (
+    <div className="flex flex-col gap-2">
+      <TimeChoice label="Chuẩn bị" value={prep} choices={PREP_CHOICES} onChange={setPrep} max={PREP_LIMIT} />
+      <TimeChoice label="Nói tối đa" value={max} choices={SPEAK_CHOICES} onChange={setMax} min={30} max={SPEAK_SECONDS_LIMIT} />
+    </div>
   )
 }

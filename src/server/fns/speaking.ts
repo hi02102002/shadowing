@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { db } from '#/db/index.ts'
 import { speakingAttempts } from '#/db/schema.ts'
 import type { SpeakingFeedback } from '#/db/schema.ts'
-import { MAX_SPEAK_SECONDS, SPEAKING_TARGETS } from '#/lib/speaking-topics.ts'
+import { SPEAK_SECONDS_LIMIT, SPEAKING_TARGETS } from '#/lib/speaking-topics.ts'
 import { audioStructured } from '../ai/audio-assess.ts'
 import { SpeakingAudioFeedbackSchema, SpeakingFeedbackSchema, speakingFeedbackPrompt, speakingFeedbackSystem } from '../ai/prompts.ts'
 import { structured } from '../ai/provider.ts'
@@ -63,7 +63,7 @@ export const submitSpeaking = createServerFn({ method: 'POST' })
       title: z.string().trim().min(1).max(300).parse(form.get('title')),
       target: z.enum(SPEAKING_TARGETS).catch('6').parse(form.get('target')),
       bullets: z.array(z.string().max(200)).max(8).parse(JSON.parse(String(form.get('bullets') ?? '[]'))),
-      durationSec: z.coerce.number().int().min(0).max(MAX_SPEAK_SECONDS + 5).parse(form.get('durationSec')),
+      durationSec: z.coerce.number().int().min(0).max(SPEAK_SECONDS_LIMIT + 5).parse(form.get('durationSec')),
     }
   })
   .handler(async ({ data }) => {

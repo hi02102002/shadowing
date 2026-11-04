@@ -35,6 +35,12 @@ export const AppConfigSchema = z.object({
   wordsPerGroup: z.coerce.number().int().min(5).max(200),
   /** thống kê: số lượt luyện mỗi ngày để tính "đạt mục tiêu" (câu chép, lượt nói, lượt ôn thẻ, câu ngữ pháp) */
   dailyGoal: z.coerce.number().int().min(1).max(500),
+  /** Nói theo đề: giây chuẩn bị trước khi ghi âm (0 = nói ngay) */
+  speakPrepSeconds: z.coerce.number().int().min(0).max(300),
+  /** Nói theo đề: giây nói tối đa, hết giờ tự nộp bài */
+  speakMaxSeconds: z.coerce.number().int().min(30).max(600),
+  /** Nhập vai / IELTS Part 1, 3: giây tối đa mỗi lượt nói */
+  talkTurnSeconds: z.coerce.number().int().min(10).max(600),
 })
 export type AppConfig = z.infer<typeof AppConfigSchema>
 export type WhisperModel = (typeof WHISPER_MODELS)[number]
@@ -60,6 +66,9 @@ function fromEnv(): AppConfig {
     reviewsPerDay: 200,
     wordsPerGroup: 25,
     dailyGoal: 20,
+    speakPrepSeconds: 60,
+    speakMaxSeconds: 120,
+    talkTurnSeconds: 45,
   }
 }
 

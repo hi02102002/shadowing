@@ -1,13 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { settingsQuery } from '#/lib/queries'
+import {
+  MAX_SPEAK_SECONDS,
+  PREP_SECONDS,
+  TALK_TURN_SECONDS,
+} from '#/lib/speaking-topics'
 import type { PublicSettings } from '#/server/fns/settings'
 import { saveSettings } from '#/server/fns/settings'
 
 /** dữ liệu phụ thuộc giọng chuẩn → tải lại khi đổi giọng */
 export const ACCENT_DEPENDENT_KEYS = [['ipa']] as const
 
-type SettingKey = 'accent' | 'aiAnalysis'
+type SettingKey =
+  | 'accent'
+  | 'aiAnalysis'
+  | 'speakPrepSeconds'
+  | 'speakMaxSeconds'
+  | 'talkTurnSeconds'
 
 /** Đọc/ghi một cài đặt chung ngay tại chỗ dùng (không cần mở trang Cài đặt) */
 function useSetting<TKey extends SettingKey>(
@@ -47,4 +57,15 @@ export function useAccent() {
 export function useAiAnalysis() {
   const [value, set] = useSetting('aiAnalysis', 'on')
   return [value === 'on', (on: boolean) => set(on ? 'on' : 'off')] as const
+}
+
+/** thời gian luyện nói với AI, lưu trong Cài đặt nên giữ nguyên khi mở lại ứng dụng */
+export function useSpeakPrepSeconds() {
+  return useSetting('speakPrepSeconds', PREP_SECONDS)
+}
+export function useSpeakMaxSeconds() {
+  return useSetting('speakMaxSeconds', MAX_SPEAK_SECONDS)
+}
+export function useTalkTurnSeconds() {
+  return useSetting('talkTurnSeconds', TALK_TURN_SECONDS)
 }

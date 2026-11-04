@@ -48,8 +48,19 @@ export const SPEAKING_TARGET_LABEL: Record<SpeakingTarget, string> = {
 }
 
 /** thời gian chuẩn bị và nói tối đa như phòng thi */
+/** mặc định như phòng thi IELTS Part 2; người học chỉnh được (Cài đặt speakPrepSeconds / speakMaxSeconds) */
 export const PREP_SECONDS = 60
 export const MAX_SPEAK_SECONDS = 120
+/** giới hạn trên của thời gian nói có thể chọn (server kiểm tra durationSec theo mốc này) */
+export const SPEAK_SECONDS_LIMIT = 600
+
+export const PREP_LIMIT = 300
+export const PREP_CHOICES = [0, 15, 30, 60, 90, 120, 180] as const
+export const SPEAK_CHOICES = [60, 90, 120, 180, 300, 420, 600] as const
+/** Nhập vai / IELTS Part 1, 3: giây tối đa mỗi lượt nói */
+export const TALK_TURN_SECONDS = 45
+export const TALK_TURN_LIMIT = 600
+export const TALK_TURN_CHOICES = [20, 30, 45, 60, 90, 120, 180, 300] as const
 
 /**
  * Đọc đề người học dán vào: dòng đầu là đề, các dòng sau là gợi ý (bỏ "-", "•", "*" đầu dòng),
