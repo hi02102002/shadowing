@@ -2,6 +2,22 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.35 — 2026-11-04
+
+### Mới
+
+- **Kho Chunks A1–C1** (mục "Chunks" trên thanh điều hướng)
+  - Hơn 8.000 câu và cụm từ có nguồn Anh–Việt, dùng được offline: câu giao tiếp Tatoeba; phrasal verb, collocation, từ nối nhiều từ từ Open English WordNet kèm định nghĩa tiếng Anh; khung câu hay gặp như "I'd like to …", "Have you ever …".
+  - Mỗi cụm có đến 3 câu ví dụ Anh–Việt thật, ghi nguồn và tác giả từng câu. Lọc theo cấp độ, chủ đề, loại chunk hoặc tìm theo tiếng Anh / tiếng Việt.
+  - Bấm loa để nghe chunk và từng câu ví dụ, bấm micro để nói theo và được chấm phát âm từng từ, bấm "Lưu thẻ" để đưa vào bộ thẻ "Chunks" và ôn theo lịch.
+  - Trang "Nguồn & giấy phép" liệt kê giấy phép từng nguồn.
+- **Chunks của bạn**: nhập tài liệu PDF hoặc văn bản bạn đang có (vd. "The Book of Chunks"), AI lấy ra các chunk có trong tài liệu và gợi ý nghĩa tiếng Việt. Dữ liệu chỉ lưu trên máy bạn.
+- **Tab Chunks trong bài học**: bài đọc, bài nghe và video tự tìm các chunk xuất hiện trong bài (kể cả dạng chia như "gave up"). Bấm vào chunk để tô sáng trong bài đọc hoặc nghe lại đúng câu trong video.
+
+### Thay đổi
+
+- Luyện phản xạ có thêm nguồn "Kho Chunks": nhìn câu tiếng Việt, nói câu tiếng Anh dùng đúng cụm được gợi ý.
+
 ## 0.0.34 — 2026-11-04
 
 ### Mới
