@@ -44,12 +44,65 @@ import { getGrammarUnit, listGrammarUnits } from '#/server/fns/grammar.ts'
 import { getSettings } from '#/server/fns/settings.ts'
 import { getVideo, listVideos } from '#/server/fns/videos.ts'
 import { videoPhrases, videoVocab, vocabMeanings } from '#/server/fns/vocab.ts'
+import {
+  listChunks,
+  listChunkSources,
+  listUserChunkImports,
+  listUserChunks,
+} from '#/server/fns/chunks.ts'
+import type { ChunkKind, ChunkLevel, ChunkTopic } from './chunks.ts'
 import type { Level } from './levels.ts'
 
 export const videosQuery = () =>
   queryOptions({
     queryKey: ['videos'],
     queryFn: () => listVideos(),
+  })
+
+export const chunksQuery = (filters: {
+  level?: ChunkLevel
+  topic?: ChunkTopic
+  kind?: ChunkKind
+  q?: string
+  page: number
+}) =>
+  queryOptions({
+    queryKey: [
+      'chunks',
+      filters.level ?? 'all',
+      filters.topic ?? 'all',
+      filters.kind ?? 'all',
+      filters.q ?? '',
+      filters.page,
+    ],
+    queryFn: () => listChunks({ data: filters }),
+    staleTime: Infinity,
+  })
+
+/** tài liệu chunk người dùng tự nhập; đang xử lý thì hỏi lại mỗi 3 giây */
+export const userChunkImportsQuery = () =>
+  queryOptions({
+    queryKey: ['user-chunk-imports'],
+    queryFn: () => listUserChunkImports(),
+    refetchInterval: (query) =>
+      query.state.data?.some(
+        (row) => row.status === 'running' || row.status === 'queued',
+      )
+        ? 3000
+        : false,
+  })
+
+export const userChunksQuery = (filters: { importId?: number; q?: string }) =>
+  queryOptions({
+    queryKey: ['user-chunks', filters.importId ?? 'all', filters.q ?? ''],
+    queryFn: () => listUserChunks({ data: filters }),
+  })
+
+export const chunkSourcesQuery = () =>
+  queryOptions({
+    queryKey: ['chunk-sources'],
+    queryFn: () => listChunkSources(),
+    staleTime: Infinity,
   })
 
 export const videoQuery = (youtubeId: string) =>

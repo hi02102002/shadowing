@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { useSelector } from '@tanstack/react-store'
-import { BookA, Ear, FileText, Mic, PenLine } from 'lucide-react'
+import { Blocks, BookA, Ear, FileText, Mic, PenLine } from 'lucide-react'
 import { z } from 'zod'
 
 import { LocalPlayer } from '#/components/local-player'
@@ -57,6 +57,7 @@ const MODES = [
   { to: '/videos/$videoId/dictation', label: 'Chép chính tả', icon: PenLine },
   { to: '/videos/$videoId/pronounce', label: 'Phát âm', icon: Mic },
   { to: '/videos/$videoId/vocab', label: 'Từ vựng', icon: BookA },
+  { to: '/videos/$videoId/chunks', label: 'Chunks', icon: Blocks },
 ] as const
 
 function VideoLayout() {

@@ -10,6 +10,8 @@ import {
 } from './iteslj.ts'
 import type { IteslJTopic } from './iteslj.ts'
 import { parseTatoeba, tatoebaUrl } from './tatoeba.ts'
+import seed from '#/chunks-data/chunks.seed.json'
+import type { ChunkSeed } from '#/lib/chunks.ts'
 
 const CACHE_MS = 6 * 60 * 60 * 1000
 
@@ -128,4 +130,40 @@ export async function pickTatoeba(
   }
   if (!out.length) throw new Error('Tatoeba không trả về câu nào, hãy thử lại')
   return out.slice(0, count)
+}
+
+/**
+ * Kho Chunks: đề là câu ví dụ tiếng Việt (Tatoeba), gợi ý là cụm cần dùng, câu mẫu là câu tiếng Anh gốc.
+ * Ưu tiên cụm từ (phrasal verb, collocation, khung câu) rồi mới đến câu nguyên câu.
+ */
+export function pickChunks(level: ReflexLevel, count: number): ReflexPrompt[] {
+  const all = seed as ChunkSeed[]
+  const out: ReflexPrompt[] = []
+  for (const l of nearLevels(level).slice(0, 2)) {
+    const atLevel = all.filter((c) => c.level === l)
+    const phrases = atLevel.filter((c) => c.examples.length)
+    const sentences = atLevel.filter((c) => !c.examples.length)
+    for (const c of [
+      ...sample(phrases, count - out.length),
+      ...sample(sentences, count),
+    ]) {
+      if (out.length >= count) break
+      const example = c.examples.length ? sample(c.examples, 1)[0] : null
+      out.push({
+        prompt: example?.vi ?? c.exampleVi,
+        promptLang: 'vi',
+        hint: c.examples.length ? c.text : null,
+        reference: example?.en ?? c.exampleEn,
+        attribution: example
+          ? `Tatoeba #${example.enId} → #${example.viId} · CC BY 2.0 FR`
+          : c.attributions
+              .filter((a) => a.source === 'tatoeba')
+              .map((a) => `#${a.sourceId} (${a.author})`)
+              .join(' → ')
+              .replace(/^/, 'Tatoeba ') + ' · CC BY 2.0 FR',
+      })
+    }
+    if (out.length >= count) break
+  }
+  return out
 }

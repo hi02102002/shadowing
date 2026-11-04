@@ -115,3 +115,17 @@ describe('bộ câu sẵn', () => {
     expect(new Set(items.map((i) => i.prompt)).size).toBe(15)
   })
 })
+
+describe('nguồn Kho Chunks cho Phản xạ', () => {
+  it('đề tiếng Việt, gợi ý là cụm cần dùng, câu mẫu tiếng Anh có ghi nguồn', async () => {
+    const { pickChunks } = await import('./sources')
+    const items = pickChunks('A2', 8)
+    expect(items).toHaveLength(8)
+    for (const item of items) {
+      expect(item.promptLang).toBe('vi')
+      expect(item.reference).toBeTruthy()
+      expect(item.attribution).toMatch(/Tatoeba/)
+    }
+    expect(items.some((i) => i.hint)).toBe(true)
+  })
+})

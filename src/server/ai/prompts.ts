@@ -930,3 +930,50 @@ export function reflexGradePrompt(opts: {
 Đề: ${opts.prompt}${opts.hint ? `\nGợi ý: ${opts.hint}` : ''}${opts.reference ? `\nCâu mẫu tham khảo: ${opts.reference}` : ''}
 Người học nói: "${opts.said}"${opts.latencyMs != null ? `\nThời gian bắt đầu nói: ${(opts.latencyMs / 1000).toFixed(1)} giây` : ''}`
 }
+
+/* ---------- Tách chunk từ tài liệu người dùng tự nhập (/chunks/mine) ---------- */
+
+export const USER_CHUNK_KINDS = [
+  'formula',
+  'sentence-frame',
+  'collocation',
+  'phrasal-verb',
+  'discourse-marker',
+] as const
+
+export const UserChunkExtractSchema = z.object({
+  chunks: z.array(
+    z.object({
+      text: z
+        .string()
+        .describe(
+          'chunk tiếng Anh chép NGUYÊN VĂN như trong tài liệu (2-8 từ), không thêm bớt',
+        ),
+      kind: z.enum(USER_CHUNK_KINDS),
+      meaningVi: z.string().describe('nghĩa tiếng Việt ngắn gọn, tự nhiên'),
+      exampleEn: z
+        .string()
+        .nullable()
+        .describe(
+          'câu ví dụ chép nguyên văn từ tài liệu nếu tài liệu có, không thì null; KHÔNG tự đặt câu',
+        ),
+      page: z
+        .number()
+        .int()
+        .nullable()
+        .describe('số trang [Trang N] chứa chunk'),
+    }),
+  ),
+})
+
+export const USER_CHUNK_EXTRACT_SYSTEM = `Bạn giúp người Việt học tiếng Anh lấy ra các chunk (cụm từ cố định, khung câu, collocation, phrasal verb, từ nối) từ tài liệu học họ tự cung cấp.
+- Chỉ lấy chunk thực sự xuất hiện trong đoạn tài liệu; chép nguyên văn, không sửa, không tự nghĩ thêm chunk.
+- Bỏ qua tiêu đề, mục lục, lời giới thiệu, chú thích bản quyền, số trang và các từ đơn lẻ.
+- Nếu tài liệu là danh sách chunk, lấy từng mục trong danh sách.
+- formula: cụm cố định / câu giao tiếp; sentence-frame: khung câu để điền tiếp ("I'd like to ..."); collocation: từ hay đi cùng nhau; phrasal-verb: động từ + tiểu từ; discourse-marker: từ nối nhiều từ.`
+
+export const userChunkExtractPrompt = (text: string) => `Đoạn tài liệu:
+"""
+${text}
+"""
+Liệt kê mọi chunk trong đoạn trên.`

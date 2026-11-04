@@ -14,6 +14,7 @@ import { z } from 'zod'
 
 import { ListeningPlayer } from '#/components/listening-player'
 import { ReadingQuestions } from '#/components/reading-questions'
+import { LessonChunks } from '#/components/lesson-chunks'
 import { ReadingVocab } from '#/components/reading-vocab'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -242,7 +243,7 @@ function ListeningExercise({ id }: { id: number }) {
   const result = useQuery(listeningQuery(id))
   const data = result.data
   const [exam, setExam] = useStoredToggle('listening.exam-mode')
-  const [tab, setTab] = useState<'questions' | 'vocab'>('questions')
+  const [tab, setTab] = useState<'questions' | 'vocab' | 'chunks'>('questions')
   const [answers, setAnswers] = useState<string[]>([])
   const [checked, setChecked] = useState(false)
   const requested = useRef(false)
@@ -370,9 +371,19 @@ function ListeningExercise({ id }: { id: number }) {
           <TabsTrigger className="flex-1 sm:flex-none" value="vocab">
             Từ vựng
           </TabsTrigger>
+          <TabsTrigger className="flex-1 sm:flex-none" value="chunks">
+            Chunks
+          </TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab === 'vocab' ? (
+      {tab === 'chunks' ? (
+        <LessonChunks
+          text={data.sections
+            .flatMap((section) => section.transcript ?? [])
+            .join('\n')}
+          empty="Bài này chưa có lời thoại. Bấm “Tạo lời thoại bằng Whisper” ở tab Bài nghe rồi quay lại."
+        />
+      ) : tab === 'vocab' ? (
         <ReadingVocab id={id} kind="listening" onLocate={() => {}} />
       ) : (
         <div className="flex flex-col gap-8">

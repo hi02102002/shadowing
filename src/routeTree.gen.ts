@@ -21,6 +21,9 @@ import { Route as StatsRouteImport } from './routes/stats'
 import { Route as TalkRouteImport } from './routes/talk'
 import { Route as ApiAnkiUploadsRouteImport } from './routes/api/anki-uploads'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
+import { Route as ChunksIndexRouteImport } from './routes/chunks/index'
+import { Route as ChunksMineRouteImport } from './routes/chunks/mine'
+import { Route as ChunksSourcesRouteImport } from './routes/chunks/sources'
 import { Route as FlashcardsIndexRouteImport } from './routes/flashcards/index'
 import { Route as FlashcardsStudyRouteImport } from './routes/flashcards/study'
 import { Route as GrammarIndexRouteImport } from './routes/grammar/index'
@@ -29,6 +32,7 @@ import { Route as IpaIndexRouteImport } from './routes/ipa/index'
 import { Route as IpaSoundIdRouteImport } from './routes/ipa/$soundId'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
 import { Route as VideosVideoIdIndexRouteImport } from './routes/videos/$videoId/index'
+import { Route as VideosVideoIdChunksRouteImport } from './routes/videos/$videoId/chunks'
 import { Route as VideosVideoIdDictationRouteImport } from './routes/videos/$videoId/dictation'
 import { Route as VideosVideoIdPronounceRouteImport } from './routes/videos/$videoId/pronounce'
 import { Route as VideosVideoIdShadowRouteImport } from './routes/videos/$videoId/shadow'
@@ -94,6 +98,21 @@ const ApiUploadsRoute = ApiUploadsRouteImport.update({
   path: '/api/uploads',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChunksIndexRoute = ChunksIndexRouteImport.update({
+  id: '/chunks/',
+  path: '/chunks/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChunksMineRoute = ChunksMineRouteImport.update({
+  id: '/chunks/mine',
+  path: '/chunks/mine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChunksSourcesRoute = ChunksSourcesRouteImport.update({
+  id: '/chunks/sources',
+  path: '/chunks/sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FlashcardsIndexRoute = FlashcardsIndexRouteImport.update({
   id: '/flashcards/',
   path: '/flashcards/',
@@ -134,6 +153,11 @@ const VideosVideoIdIndexRoute = VideosVideoIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => VideosVideoIdRoute,
 } as any)
+const VideosVideoIdChunksRoute = VideosVideoIdChunksRouteImport.update({
+  id: '/chunks',
+  path: '/chunks',
+  getParentRoute: () => VideosVideoIdRoute,
+} as any)
 const VideosVideoIdDictationRoute = VideosVideoIdDictationRouteImport.update({
   id: '/dictation',
   path: '/dictation',
@@ -168,13 +192,17 @@ export interface FileRoutesByFullPath {
   '/talk': typeof TalkRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/chunks/mine': typeof ChunksMineRoute
+  '/chunks/sources': typeof ChunksSourcesRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
   '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
+  '/chunks/': typeof ChunksIndexRoute
   '/flashcards/': typeof FlashcardsIndexRoute
   '/grammar/': typeof GrammarIndexRoute
   '/ipa/': typeof IpaIndexRoute
+  '/videos/$videoId/chunks': typeof VideosVideoIdChunksRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
@@ -194,12 +222,16 @@ export interface FileRoutesByTo {
   '/talk': typeof TalkRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/chunks/mine': typeof ChunksMineRoute
+  '/chunks/sources': typeof ChunksSourcesRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
   '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
+  '/chunks': typeof ChunksIndexRoute
   '/flashcards': typeof FlashcardsIndexRoute
   '/grammar': typeof GrammarIndexRoute
   '/ipa': typeof IpaIndexRoute
+  '/videos/$videoId/chunks': typeof VideosVideoIdChunksRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
@@ -220,13 +252,17 @@ export interface FileRoutesById {
   '/talk': typeof TalkRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
+  '/chunks/mine': typeof ChunksMineRoute
+  '/chunks/sources': typeof ChunksSourcesRoute
   '/flashcards/study': typeof FlashcardsStudyRoute
   '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
+  '/chunks/': typeof ChunksIndexRoute
   '/flashcards/': typeof FlashcardsIndexRoute
   '/grammar/': typeof GrammarIndexRoute
   '/ipa/': typeof IpaIndexRoute
+  '/videos/$videoId/chunks': typeof VideosVideoIdChunksRoute
   '/videos/$videoId/dictation': typeof VideosVideoIdDictationRoute
   '/videos/$videoId/pronounce': typeof VideosVideoIdPronounceRoute
   '/videos/$videoId/shadow': typeof VideosVideoIdShadowRoute
@@ -248,13 +284,17 @@ export interface FileRouteTypes {
     | '/talk'
     | '/api/anki-uploads'
     | '/api/uploads'
+    | '/chunks/mine'
+    | '/chunks/sources'
     | '/flashcards/study'
     | '/grammar/$unitId'
     | '/ipa/$soundId'
     | '/videos/$videoId'
+    | '/chunks/'
     | '/flashcards/'
     | '/grammar/'
     | '/ipa/'
+    | '/videos/$videoId/chunks'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
@@ -274,12 +314,16 @@ export interface FileRouteTypes {
     | '/talk'
     | '/api/anki-uploads'
     | '/api/uploads'
+    | '/chunks/mine'
+    | '/chunks/sources'
     | '/flashcards/study'
     | '/grammar/$unitId'
     | '/ipa/$soundId'
+    | '/chunks'
     | '/flashcards'
     | '/grammar'
     | '/ipa'
+    | '/videos/$videoId/chunks'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
@@ -299,13 +343,17 @@ export interface FileRouteTypes {
     | '/talk'
     | '/api/anki-uploads'
     | '/api/uploads'
+    | '/chunks/mine'
+    | '/chunks/sources'
     | '/flashcards/study'
     | '/grammar/$unitId'
     | '/ipa/$soundId'
     | '/videos/$videoId'
+    | '/chunks/'
     | '/flashcards/'
     | '/grammar/'
     | '/ipa/'
+    | '/videos/$videoId/chunks'
     | '/videos/$videoId/dictation'
     | '/videos/$videoId/pronounce'
     | '/videos/$videoId/shadow'
@@ -326,10 +374,13 @@ export interface RootRouteChildren {
   TalkRoute: typeof TalkRoute
   ApiAnkiUploadsRoute: typeof ApiAnkiUploadsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
+  ChunksMineRoute: typeof ChunksMineRoute
+  ChunksSourcesRoute: typeof ChunksSourcesRoute
   FlashcardsStudyRoute: typeof FlashcardsStudyRoute
   GrammarUnitIdRoute: typeof GrammarUnitIdRoute
   IpaSoundIdRoute: typeof IpaSoundIdRoute
   VideosVideoIdRoute: typeof VideosVideoIdRouteWithChildren
+  ChunksIndexRoute: typeof ChunksIndexRoute
   FlashcardsIndexRoute: typeof FlashcardsIndexRoute
   GrammarIndexRoute: typeof GrammarIndexRoute
   IpaIndexRoute: typeof IpaIndexRoute
@@ -421,6 +472,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUploadsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chunks/': {
+      id: '/chunks/'
+      path: '/chunks'
+      fullPath: '/chunks/'
+      preLoaderRoute: typeof ChunksIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chunks/mine': {
+      id: '/chunks/mine'
+      path: '/chunks/mine'
+      fullPath: '/chunks/mine'
+      preLoaderRoute: typeof ChunksMineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chunks/sources': {
+      id: '/chunks/sources'
+      path: '/chunks/sources'
+      fullPath: '/chunks/sources'
+      preLoaderRoute: typeof ChunksSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/flashcards/': {
       id: '/flashcards/'
       path: '/flashcards'
@@ -477,6 +549,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VideosVideoIdIndexRouteImport
       parentRoute: typeof VideosVideoIdRoute
     }
+    '/videos/$videoId/chunks': {
+      id: '/videos/$videoId/chunks'
+      path: '/chunks'
+      fullPath: '/videos/$videoId/chunks'
+      preLoaderRoute: typeof VideosVideoIdChunksRouteImport
+      parentRoute: typeof VideosVideoIdRoute
+    }
     '/videos/$videoId/dictation': {
       id: '/videos/$videoId/dictation'
       path: '/dictation'
@@ -509,6 +588,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface VideosVideoIdRouteChildren {
+  VideosVideoIdChunksRoute: typeof VideosVideoIdChunksRoute
   VideosVideoIdDictationRoute: typeof VideosVideoIdDictationRoute
   VideosVideoIdPronounceRoute: typeof VideosVideoIdPronounceRoute
   VideosVideoIdShadowRoute: typeof VideosVideoIdShadowRoute
@@ -517,6 +597,7 @@ interface VideosVideoIdRouteChildren {
 }
 
 const VideosVideoIdRouteChildren: VideosVideoIdRouteChildren = {
+  VideosVideoIdChunksRoute: VideosVideoIdChunksRoute,
   VideosVideoIdDictationRoute: VideosVideoIdDictationRoute,
   VideosVideoIdPronounceRoute: VideosVideoIdPronounceRoute,
   VideosVideoIdShadowRoute: VideosVideoIdShadowRoute,
@@ -541,10 +622,13 @@ const rootRouteChildren: RootRouteChildren = {
   TalkRoute: TalkRoute,
   ApiAnkiUploadsRoute: ApiAnkiUploadsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
+  ChunksMineRoute: ChunksMineRoute,
+  ChunksSourcesRoute: ChunksSourcesRoute,
   FlashcardsStudyRoute: FlashcardsStudyRoute,
   GrammarUnitIdRoute: GrammarUnitIdRoute,
   IpaSoundIdRoute: IpaSoundIdRoute,
   VideosVideoIdRoute: VideosVideoIdRouteWithChildren,
+  ChunksIndexRoute: ChunksIndexRoute,
   FlashcardsIndexRoute: FlashcardsIndexRoute,
   GrammarIndexRoute: GrammarIndexRoute,
   IpaIndexRoute: IpaIndexRoute,

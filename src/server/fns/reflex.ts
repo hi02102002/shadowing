@@ -27,6 +27,7 @@ import { recordSpeechMistakes } from '../mistakes.ts'
 import {
   iteslJTopics,
   pickBank,
+  pickChunks,
   pickIteslJ,
   pickTatoeba,
 } from '../reflex/sources.ts'
@@ -135,6 +136,8 @@ export const startReflexSession = createServerFn({ method: 'POST' })
     let topicLabel: string | null = topic ?? null
     if (data.source === 'bank')
       prompts = pickBank(data.mode, data.level, data.count)
+    else if (data.source === 'chunks')
+      prompts = pickChunks(data.level, data.count)
     else if (data.source === 'tatoeba')
       prompts = await pickTatoeba(data.level, data.count)
     else if (data.source === 'iteslj') {

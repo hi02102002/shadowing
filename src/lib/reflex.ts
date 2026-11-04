@@ -28,7 +28,13 @@ export const REFLEX_MODE_INFO: Record<
 export const REFLEX_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const
 export type ReflexLevel = (typeof REFLEX_LEVELS)[number]
 
-export const REFLEX_SOURCES = ['bank', 'tatoeba', 'iteslj', 'ai'] as const
+export const REFLEX_SOURCES = [
+  'bank',
+  'chunks',
+  'tatoeba',
+  'iteslj',
+  'ai',
+] as const
 export type ReflexSource = (typeof REFLEX_SOURCES)[number]
 
 export const REFLEX_SOURCE_INFO: Record<
@@ -39,6 +45,12 @@ export const REFLEX_SOURCE_INFO: Record<
     label: 'Bộ câu có sẵn',
     detail: 'Câu soạn sẵn theo cấp độ, không cần AI để ra đề',
     modes: REFLEX_MODES,
+  },
+  chunks: {
+    label: 'Kho Chunks',
+    detail:
+      'Nói câu Việt → Anh có dùng phrasal verb, collocation, khung câu trong kho Chunks',
+    modes: ['translate'],
   },
   tatoeba: {
     label: 'Tatoeba',

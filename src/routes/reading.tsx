@@ -43,6 +43,7 @@ import type { ReadingLibraryItem } from '#/server/fns/reading'
 import type { ReadingHighlight, ReadingQuestion } from '#/db/schema'
 import { ReadingPassage } from '#/components/reading-passage'
 import { ReadingQuestions } from '#/components/reading-questions'
+import { LessonChunks } from '#/components/lesson-chunks'
 import { ReadingVocab } from '#/components/reading-vocab'
 
 const SETUP_TABS = ['library', 'ai', 'paste'] as const
@@ -478,7 +479,7 @@ function AiForm() {
   )
 }
 
-type SideTab = 'questions' | 'vocab'
+type SideTab = 'questions' | 'vocab' | 'chunks'
 
 function ReadingView({ id }: { id: number }) {
   const queryClient = useQueryClient()
@@ -652,6 +653,7 @@ function ReadingView({ id }: { id: number }) {
                 <TabsList>
                   <TabsTrigger value="questions">Câu hỏi</TabsTrigger>
                   <TabsTrigger value="vocab">Từ vựng</TabsTrigger>
+                  <TabsTrigger value="chunks">Chunks</TabsTrigger>
                 </TabsList>
               </Tabs>
               {side === 'questions' && !!total && (
@@ -710,7 +712,9 @@ function ReadingView({ id }: { id: number }) {
             )}
           </div>
 
-          {side === 'vocab' ? (
+          {side === 'chunks' ? (
+            <LessonChunks text={data.paragraphs.join('\n')} onLocate={locate} />
+          ) : side === 'vocab' ? (
             <ReadingVocab id={id} onLocate={locate} />
           ) : (
             <>

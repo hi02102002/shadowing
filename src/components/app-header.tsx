@@ -3,6 +3,7 @@ import { Link, useLocation } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   AudioLines,
+  Blocks,
   BookOpen,
   BookOpenText,
   BookX,
@@ -33,6 +34,7 @@ const NAV = [
   { to: '/reading', label: 'Đọc hiểu', icon: BookOpenText },
   { to: '/listening', label: 'Luyện nghe', icon: Headphones },
   { to: '/grammar', label: 'Ngữ pháp', icon: BookOpen },
+  { to: '/chunks', label: 'Chunks', icon: Blocks },
   { to: '/flashcards', label: 'Thẻ từ', icon: Layers },
   { to: '/review', label: 'Sổ lỗi', icon: BookX },
   { to: '/settings', label: 'Cài đặt', icon: Settings },

@@ -486,3 +486,44 @@ export interface ReflexFeedback {
   }>
   tip: string
 }
+
+/** Tài liệu chunk người dùng tự nhập (PDF / văn bản của họ): chỉ lưu trên máy, không đưa vào seed */
+export const userChunkImports = sqliteTable('user_chunk_imports', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  /** tên hiển thị, vd. "The Book of Chunks (bản của tôi)" */
+  label: text().notNull(),
+  fileName: text('file_name').notNull(),
+  /** queued | running | done | error */
+  status: text().notNull().default('queued'),
+  pages: integer().notNull().default(0),
+  donePages: integer('done_pages').notNull().default(0),
+  error: text(),
+  createdAt: createdAt(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`),
+})
+
+export const userChunks = sqliteTable(
+  'user_chunks',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    importId: integer('import_id')
+      .notNull()
+      .references(() => userChunkImports.id, { onDelete: 'cascade' }),
+    text: text().notNull(),
+    normalizedText: text('normalized_text').notNull(),
+    /** nghĩa tiếng Việt AI gợi ý (chỉ dùng cá nhân) */
+    meaningVi: text('meaning_vi'),
+    /** câu ví dụ chép nguyên văn từ tài liệu, nếu có */
+    exampleEn: text('example_en'),
+    /** formula | sentence-frame | collocation | phrasal-verb | discourse-marker */
+    kind: text().notNull(),
+    page: integer(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('user_chunks_import_text_idx').on(t.importId, t.normalizedText),
+    index('user_chunks_text_idx').on(t.normalizedText),
+  ],
+)
