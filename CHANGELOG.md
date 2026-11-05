@@ -2,6 +2,18 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.40 — 2026-11-05
+
+### Mới
+
+- **Bài học "Shadowing là gì?"** (mục Luyện IPA → nút "Shadowing là gì?"): giải thích 4 trụ cột của shadowing là âm, trọng âm, ngữ điệu và nhịp điệu bằng các ví dụ cụ thể, có nghe mẫu (thường, chậm, từng cụm) và ghi âm chấm riêng cho từng trụ cột.
+- **Luyện theo trụ cột ngay khi shadow và luyện phát âm video**: chọn "Luyện tập trung" (Sound, Stress, Intonation, Rhythm) để AI nhận xét tập trung vào phần đó. Sau khi chấm có khung tóm tắt 4 trụ cột, kèm tốc độ nói và các chỗ ngắt dài, bấm "Luyện phần này" để tập lại đúng phần đó. Trang shadow có thêm hướng dẫn "4 điều cần để ý khi shadowing".
+- Sổ lỗi có thêm hai loại lỗi mới: ngữ điệu và nhịp điệu.
+
+### Lưu ý
+
+- Trọng âm và ngữ điệu hiện là nhận xét của AI, chưa đo bằng âm học; chính xác hơn khi bật chế độ AI nghe trực tiếp bản ghi trong Cài đặt.
+
 ## 0.0.39 — 2026-11-05
 
 ### Mới
