@@ -2,6 +2,23 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.41 — 2026-11-05
+
+### Mới
+
+- **Lộ trình học cá nhân hoá** (mục "Lộ trình"): nhập mục tiêu, trình độ hiện tại → mục tiêu, thời gian và các kỹ năng muốn luyện, AI lập lộ trình theo giai đoạn → tuần → từng ngày, tự gắn video YouTube / ELLLO, bài Nghe, Đọc, Ngữ pháp, Hội thoại, Phản xạ... vào từng nhiệm vụ. Tick hoàn thành, đổi video khác, tạo lại tuần.
+- **Thẻ từ trong lộ trình theo đúng chủ đề**: bấm "Vào Thẻ từ" sẽ tạo (một lần) bộ khoảng 12 thẻ từ vựng của chủ đề nhiệm vụ rồi học đúng bộ đó, thay vì mở hàng ôn chung các từ cũ.
+- **Mức dùng AI** (trang Thống kê): số token và số lượt gọi AI hôm nay, 7 ngày, 30 ngày, biểu đồ 14 ngày và thống kê theo từng tính năng. Provider không báo số token (Ollama, một số proxy) thì ước lượng theo độ dài chữ và có ghi chú.
+
+### Cải thiện
+
+- Sinh lộ trình nhanh hơn: tạo khung lộ trình xong là vào luôn, Tuần 1 tự sinh ngay trong trang; tìm video/bài học chạy song song, có cache, ưu tiên ELLLO trước rồi mới tìm YouTube; ghi cả tuần trong một lần nên lỗi giữa chừng không để lại tuần dở dang.
+- Ngữ pháp trong lộ trình khớp hơn: danh sách Unit gửi cho AI lọc theo trình độ của tuần, giữ đúng Unit AI chọn, và khi phải đổi Unit thì tên + mô tả nhiệm vụ được viết lại cho khớp.
+
+### Sửa lỗi
+
+- Nhiệm vụ Luyện IPA trong lộ trình không còn hiện "/undefined/".
+
 ## 0.0.40 — 2026-11-05
 
 ### Mới
