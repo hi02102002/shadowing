@@ -527,3 +527,135 @@ export const userChunks = sqliteTable(
     index('user_chunks_text_idx').on(t.normalizedText),
   ],
 )
+
+export interface RoadmapPhase {
+  index: number
+  title: string
+  weeks: number
+  targetLevel: string
+  focus: string
+  milestones: string[]
+}
+
+export interface RoadmapWeekPlan {
+  week: number
+  phaseIndex: number
+  title: string
+  theme: string
+  level: string
+  focusSkills: string[]
+  searchKeywords: string[]
+}
+
+export interface RoadmapVideoMeta {
+  source: 'library' | 'elllo' | 'youtube'
+  url: string
+  youtubeId?: string
+  title: string
+  channel?: string
+  thumbnail?: string
+  durationSec?: number
+}
+
+export interface RoadmapResourceMeta {
+  kind:
+    | 'grammar'
+    | 'reading'
+    | 'listening'
+    | 'talk'
+    | 'reflex'
+    | 'speaking'
+    | 'chunks'
+    | 'ipa'
+    | 'flashcards'
+  unitId?: string
+  unitTitle?: string
+  unitGroup?: string
+  /** flashcards: bộ thẻ theo chủ đề đã tạo cho nhiệm vụ này */
+  deckId?: number
+  source?: string
+  url?: string
+  itemTitle?: string
+  scenario?: string
+  reflexMode?: string
+  soundId?: string
+}
+
+/** Lộ trình học cá nhân hoá (trang /roadmap) */
+export const roadmaps = sqliteTable('roadmaps', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  title: text().notNull(),
+  goal: text().notNull(),
+  currentLevel: text('current_level').notNull(),
+  targetLevel: text('target_level').notNull(),
+  durationMonths: integer('duration_months').notNull(),
+  totalWeeks: integer('total_weeks').notNull(),
+  dailyMinutes: integer('daily_minutes').notNull(),
+  focusSkills: text('focus_skills', { mode: 'json' })
+    .notNull()
+    .$type<string[]>(),
+  summary: text().notNull(),
+  phases: text({ mode: 'json' }).notNull().$type<RoadmapPhase[]>(),
+  weeks: text({ mode: 'json' }).notNull().$type<RoadmapWeekPlan[]>(),
+  createdAt: createdAt(),
+})
+
+/** Nhiệm vụ từng ngày trong một tuần của lộ trình */
+export const roadmapTasks = sqliteTable(
+  'roadmap_tasks',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    roadmapId: integer('roadmap_id')
+      .notNull()
+      .references(() => roadmaps.id, { onDelete: 'cascade' }),
+    weekNumber: integer('week_number').notNull(),
+    dayNumber: integer('day_number').notNull(),
+    dayTitle: text('day_title').notNull(),
+    position: integer().notNull(),
+    /** shadow | dictation | pronounce | listening | reading | grammar | talk | reflex | speaking | chunks | flashcards | ipa */
+    activityType: text('activity_type').notNull(),
+    title: text().notNull(),
+    description: text().notNull(),
+    durationMinutes: integer('duration_minutes').notNull(),
+    level: text().notNull(),
+    topic: text(),
+    searchQuery: text('search_query'),
+    preferredSource: text('preferred_source'),
+    video: text({ mode: 'json' }).$type<RoadmapVideoMeta | null>(),
+    resource: text({ mode: 'json' }).$type<RoadmapResourceMeta | null>(),
+    completedAt: integer('completed_at', { mode: 'timestamp' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('roadmap_tasks_roadmap_week_idx').on(
+      t.roadmapId,
+      t.weekNumber,
+      t.dayNumber,
+    ),
+  ],
+)
+
+export type Roadmap = typeof roadmaps.$inferSelect
+export type RoadmapTask = typeof roadmapTasks.$inferSelect
+
+
+/** Mỗi lượt gọi LLM: token dùng (do provider báo, hoặc ước lượng khi provider không trả) */
+export const aiUsage = sqliteTable(
+  'ai_usage',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    provider: text().notNull(),
+    model: text().notNull(),
+    /** tên tính năng gọi AI (roadmap, reading, …) */
+    feature: text().notNull(),
+    promptTokens: integer('prompt_tokens').notNull().default(0),
+    completionTokens: integer('completion_tokens').notNull().default(0),
+    totalTokens: integer('total_tokens').notNull().default(0),
+    /** true = provider không báo usage, số token là ước lượng theo độ dài chữ */
+    estimated: integer({ mode: 'boolean' }).notNull().default(false),
+    ok: integer({ mode: 'boolean' }).notNull().default(true),
+    durationMs: integer('duration_ms').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index('ai_usage_created_idx').on(t.createdAt)],
+)

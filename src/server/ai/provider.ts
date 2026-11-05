@@ -10,6 +10,103 @@ import type { z } from 'zod'
 import { getConfig } from '../config.ts'
 import type { AppConfig } from '../config.ts'
 
+interface UsageMeta {
+  feature?: string
+  cfg?: AppConfig
+}
+
+/** ghi một lượt gọi vào bảng ai_usage; không bao giờ làm hỏng lượt gọi AI chính */
+async function recordUsage(row: {
+  cfg: AppConfig
+  feature: string
+  prompt: number
+  completion: number
+  total: number
+  estimated: boolean
+  ok: boolean
+  durationMs: number
+}) {
+  if (process.env.VITEST) return
+  try {
+    const [{ db }, { aiUsage }] = await Promise.all([
+      import('#/db/index.ts'),
+      import('#/db/schema.ts'),
+    ])
+    db.insert(aiUsage)
+      .values({
+        provider: row.cfg.llmProvider,
+        model: row.cfg.llmModel,
+        feature: row.feature,
+        promptTokens: row.prompt,
+        completionTokens: row.completion,
+        totalTokens: row.total,
+        estimated: row.estimated,
+        ok: row.ok,
+        durationMs: row.durationMs,
+      })
+      .run()
+  } catch {
+    // tracking là phụ, bỏ qua lỗi ghi
+  }
+}
+
+/** ~4 ký tự / token: đủ để so sánh tương đối khi provider không báo usage */
+const estimateTokens = (text: string) => Math.ceil(text.length / 4)
+
+/**
+ * Chạy một lượt gọi chat, gom usage qua middleware onUsage của TanStack AI.
+ * Nếu provider không báo usage thì ước lượng từ độ dài prompt / kết quả.
+ */
+async function tracked<T>(
+  meta: UsageMeta,
+  promptText: string,
+  run: (middleware: Array<any>) => Promise<T>,
+  outputText: (result: T) => string,
+): Promise<T> {
+  const cfg = meta.cfg ?? getConfig()
+  const started = Date.now()
+  let prompt = 0
+  let completion = 0
+  let total = 0
+  let reported = false
+  const middleware = [
+    {
+      name: 'usage-tracker',
+      onUsage: (_ctx: unknown, u: any) => {
+        reported = true
+        prompt += u?.promptTokens ?? 0
+        completion += u?.completionTokens ?? 0
+        total += u?.totalTokens ?? (u?.promptTokens ?? 0) + (u?.completionTokens ?? 0)
+      },
+    },
+  ]
+  let result: T | undefined
+  let ok = true
+  try {
+    result = await run(middleware)
+    return result
+  } catch (err) {
+    ok = false
+    throw err
+  } finally {
+    if (!reported) {
+      prompt = estimateTokens(promptText)
+      completion = result === undefined ? 0 : estimateTokens(outputText(result))
+      total = prompt + completion
+    }
+    void recordUsage({
+      cfg,
+      feature: meta.feature ?? 'other',
+      prompt,
+      completion,
+      total,
+      estimated: !reported,
+      ok,
+      durationMs: Date.now() - started,
+    })
+  }
+}
+
 /**
  * Factory duy nhất tạo text adapter của TanStack AI theo cấu hình.
  * Model name là chuỗi tuỳ ý người dùng nhập nên ép kiểu `any` cho các adapter có danh sách model cố định.
@@ -83,26 +180,44 @@ export async function structured<T extends z.ZodType>(opts: {
   prompt: string
   schema: T
   cfg?: AppConfig
+  /** tên tính năng để thống kê usage */
+  feature?: string
 }): Promise<z.infer<T>> {
   const adapter = textAdapter(opts.cfg) as any
   const messages = [{ role: 'user' as const, content: opts.prompt }]
+  const meta = { feature: opts.feature, cfg: opts.cfg }
+  const promptText = `${opts.system}\n${opts.prompt}`
   try {
-    const result = await chat({
-      adapter,
-      systemPrompts: [opts.system],
-      messages,
-      outputSchema: opts.schema,
-    })
+    const result = await tracked(
+      meta,
+      promptText,
+      (middleware) =>
+        chat({
+          adapter,
+          systemPrompts: [opts.system],
+          messages,
+          outputSchema: opts.schema,
+          middleware,
+        } as any) as unknown as Promise<unknown>,
+      (r) => JSON.stringify(r),
+    )
     return opts.schema.parse(result)
   } catch (err) {
     // một số provider / proxy nhận structured output nhưng model vẫn trả markdown → dặn JSON trong prompt và hỏi lại
     if (!isOutputError(err)) throw err
-    const { text } = await chat({
-      adapter,
-      systemPrompts: [jsonInstruction(opts.system, opts.schema)],
-      messages,
-      stream: false,
-    })
+    const { text } = await tracked(
+      meta,
+      promptText,
+      (middleware) =>
+        chat({
+          adapter,
+          systemPrompts: [jsonInstruction(opts.system, opts.schema)],
+          messages,
+          stream: false,
+          middleware,
+        } as any) as unknown as Promise<{ text: string }>,
+      (r) => r.text,
+    )
     try {
       return opts.schema.parse(extractJson(text))
     } catch {
@@ -118,17 +233,61 @@ export async function* streamText(opts: {
   system: string
   prompt: string
   cfg?: AppConfig
+  feature?: string
 }) {
-  const stream = chat({
-    adapter: textAdapter(opts.cfg) as any,
-    systemPrompts: [opts.system],
-    messages: [{ role: 'user', content: opts.prompt }],
-    stream: true,
-  })
-  for await (const chunk of stream as AsyncIterable<any>) {
-    if (chunk.type === 'TEXT_MESSAGE_CONTENT' && chunk.delta)
-      yield chunk.delta as string
-    else if (chunk.type === 'content' && chunk.delta)
-      yield chunk.delta as string
+  const cfg = opts.cfg ?? getConfig()
+  const started = Date.now()
+  let prompt = 0
+  let completion = 0
+  let reported = false
+  let out = ''
+  let ok = true
+  const middleware = [
+    {
+      name: 'usage-tracker',
+      onUsage: (_ctx: unknown, u: any) => {
+        reported = true
+        prompt += u?.promptTokens ?? 0
+        completion += u?.completionTokens ?? 0
+      },
+    },
+  ]
+  try {
+    const stream = chat({
+      adapter: textAdapter(opts.cfg) as any,
+      systemPrompts: [opts.system],
+      messages: [{ role: 'user', content: opts.prompt }],
+      stream: true,
+      middleware,
+    } as any)
+    for await (const chunk of stream as AsyncIterable<any>) {
+      const delta =
+        (chunk.type === 'TEXT_MESSAGE_CONTENT' || chunk.type === 'content') &&
+        chunk.delta
+          ? (chunk.delta as string)
+          : ''
+      if (delta) {
+        out += delta
+        yield delta
+      }
+    }
+  } catch (err) {
+    ok = false
+    throw err
+  } finally {
+    if (!reported) {
+      prompt = estimateTokens(`${opts.system}\n${opts.prompt}`)
+      completion = estimateTokens(out)
+    }
+    void recordUsage({
+      cfg,
+      feature: opts.feature ?? 'other',
+      prompt,
+      completion,
+      total: prompt + completion,
+      estimated: !reported,
+      ok,
+      durationMs: Date.now() - started,
+    })
   }
 }

@@ -9,7 +9,13 @@ import { cards, decks, userChunkImports, userChunks } from '#/db/schema.ts'
 import type { CardInfo } from '#/db/schema.ts'
 import { createChunkMatcher } from '#/lib/chunk-match.ts'
 import { CHUNK_KINDS, CHUNK_LEVELS, CHUNK_TOPICS } from '#/lib/chunks.ts'
-import type { ChunkKind, ChunkSeed } from '#/lib/chunks.ts'
+import type { ChunkKind, ChunkLevel, ChunkSeed } from '#/lib/chunks.ts'
+import {
+  TOPIC_CHUNKS_SYSTEM,
+  TopicChunksSchema,
+  topicChunksPrompt,
+} from '../ai/prompts.ts'
+import { structured } from '../ai/provider.ts'
 import {
   MAX_PAGES,
   STALE_MS,
@@ -67,32 +73,148 @@ function savedTexts(texts: string[]) {
   )
 }
 
+const TOPIC_STOPWORDS = new Set([
+  'the',
+  'a',
+  'an',
+  'in',
+  'at',
+  'on',
+  'to',
+  'for',
+  'of',
+  'with',
+  'and',
+  'or',
+  'about',
+  'my',
+  'your',
+  'our',
+  'their',
+  'describing',
+  'describe',
+  'talking',
+  'talk',
+  'asking',
+  'ask',
+  'giving',
+  'give',
+  'using',
+  'use',
+  'phrases',
+  'phrase',
+  'expressions',
+  'expression',
+  'vocabulary',
+  'words',
+  'conversation',
+  'english',
+  'practice',
+])
+
+function extractQueryKeywords(q: string): string[] {
+  return q
+    .toLowerCase()
+    .split(/[\s,.;:!?()[\]"'/\\–—-]+/)
+    .filter((w) => w.length >= 3 && !TOPIC_STOPWORDS.has(w))
+}
+
+function aiTopicFileName(topic: string, level: ChunkLevel): string {
+  const clean = topic.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 120)
+  return `ai-topic:${level}:${clean}`
+}
+
+function loadCachedTopicChunks(topic: string, level: ChunkLevel) {
+  const fileName = aiTopicFileName(topic, level)
+  const imp = db
+    .select()
+    .from(userChunkImports)
+    .where(eq(userChunkImports.fileName, fileName))
+    .get()
+  if (!imp) return null
+
+  const rows = db
+    .select()
+    .from(userChunks)
+    .where(eq(userChunks.importId, imp.id))
+    .orderBy(userChunks.id)
+    .all()
+  if (!rows.length) return null
+
+  const saved = savedTexts(rows.map((r) => r.text))
+  return {
+    importId: imp.id,
+    label: imp.label,
+    level,
+    topic: topic.trim(),
+    items: rows.map((r) => ({
+      ...r,
+      label: imp.label,
+      saved: saved.has(r.text.toLowerCase()),
+    })),
+  }
+}
+
 /** Kho seed source-only offline; lọc và phân trang trên server để không gửi toàn bộ dữ liệu xuống client. */
 export const listChunks = createServerFn({ method: 'GET' })
   .validator(Filters)
   .handler(async ({ data }) => {
     const needle = data.q?.toLocaleLowerCase('en') ?? ''
-    const filtered = chunks.filter(
+    const basePool = chunks.filter(
       (chunk) =>
         (!data.level || chunk.level === data.level) &&
         (!data.topic || chunk.topic === data.topic) &&
-        (!data.kind || chunk.kind === data.kind) &&
-        (!needle ||
-          chunk.text.toLocaleLowerCase('en').includes(needle) ||
-          (chunk.meaningVi ?? chunk.exampleVi)
-            .toLocaleLowerCase('vi')
-            .includes(needle) ||
-          chunk.definitionEn?.toLocaleLowerCase('en').includes(needle)),
+        (!data.kind || chunk.kind === data.kind),
     )
+
+    let filtered = !needle
+      ? basePool
+      : basePool.filter(
+          (chunk) =>
+            chunk.text.toLocaleLowerCase('en').includes(needle) ||
+            chunk.exampleEn.toLocaleLowerCase('en').includes(needle) ||
+            (chunk.meaningVi ?? chunk.exampleVi)
+              .toLocaleLowerCase('vi')
+              .includes(needle) ||
+            chunk.definitionEn?.toLocaleLowerCase('en').includes(needle),
+        )
+
+    const exactMatchCount = filtered.length
+
+    // Nếu người học tìm theo cụm chủ đề nhiều từ (vd. "describing apartment", "talking about hometown")
+    // mà khớp chính xác nguyên cụm = 0, tự động tách từ khoá chính để gợi ý các chunk liên quan trong kho seed
+    if (needle && filtered.length === 0) {
+      const keywords = extractQueryKeywords(needle)
+      if (keywords.length > 0) {
+        const scored: Array<{ chunk: ChunkSeed; score: number }> = []
+        for (const chunk of basePool) {
+          const hay = `${chunk.text} ${chunk.exampleEn} ${chunk.meaningVi ?? ''} ${chunk.exampleVi} ${chunk.definitionEn ?? ''}`.toLowerCase()
+          let score = 0
+          for (const kw of keywords) {
+            if (hay.includes(kw)) score++
+          }
+          if (score > 0) scored.push({ chunk, score })
+        }
+        scored.sort((a, b) => b.score - a.score)
+        filtered = scored.map((s) => s.chunk)
+      }
+    }
+
     const offset = (data.page - 1) * PAGE_SIZE
     const items = filtered.slice(offset, offset + PAGE_SIZE)
     const saved = savedTexts(items.map((c) => c.text))
+    const aiTopic = data.q?.trim()
+      ? loadCachedTopicChunks(data.q.trim(), data.level ?? 'B1')
+      : null
+
     return {
       items,
       saved: items
         .filter((c) => saved.has(c.text.toLowerCase()))
         .map((c) => c.id),
       total: filtered.length,
+      exactMatchCount,
+      aiTopic,
       page: data.page,
       pageSize: PAGE_SIZE,
       pages: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
@@ -112,6 +234,106 @@ export const listChunks = createServerFn({ method: 'GET' })
   })
 
 export type ChunkListResult = Awaited<ReturnType<typeof listChunks>>
+
+/** Sinh bộ Chunks theo chủ đề và cấp độ bằng AI, lưu vào user_chunks để nghe, nói theo và lưu thẻ SRS */
+export const generateTopicChunks = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      topic: z.string().trim().min(2).max(160),
+      level: z.enum(CHUNK_LEVELS).default('B1'),
+      forceRegenerate: z.boolean().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    if (!data.forceRegenerate) {
+      const cached = loadCachedTopicChunks(data.topic, data.level)
+      if (cached) return cached
+    }
+
+    const generated = await structured({
+      feature: 'chunks',
+      system: TOPIC_CHUNKS_SYSTEM,
+      prompt: topicChunksPrompt({
+        topic: data.topic,
+        level: data.level,
+      }),
+      schema: TopicChunksSchema,
+    })
+
+    const fileName = aiTopicFileName(data.topic, data.level)
+    const label = `AI Chunks · ${data.topic} (${data.level})`
+
+    const existingImp = db
+      .select()
+      .from(userChunkImports)
+      .where(eq(userChunkImports.fileName, fileName))
+      .get()
+
+    let importId: number
+    if (existingImp) {
+      importId = existingImp.id
+      db.delete(userChunks).where(eq(userChunks.importId, importId)).run()
+      db.update(userChunkImports)
+        .set({
+          label: label.slice(0, 200),
+          status: 'done',
+          pages: 1,
+          donePages: 1,
+          error: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(userChunkImports.id, importId))
+        .run()
+    } else {
+      importId = db
+        .insert(userChunkImports)
+        .values({
+          label: label.slice(0, 200),
+          fileName: fileName.slice(0, 200),
+          status: 'done',
+          pages: 1,
+          donePages: 1,
+        })
+        .returning({ id: userChunkImports.id })
+        .get().id
+    }
+
+    const seen = new Set<string>()
+    for (const item of generated.chunks) {
+      const text = item.text.trim()
+      const normalizedText = text.toLowerCase().replace(/\s+/g, ' ')
+      if (!text || seen.has(normalizedText)) continue
+      seen.add(normalizedText)
+
+      const exEn = item.exampleEn.trim()
+      const exVi = item.exampleVi.trim()
+      const exampleCombined = exEn
+        ? exVi
+          ? `${exEn}\n${exVi}`
+          : exEn
+        : null
+
+      db.insert(userChunks)
+        .values({
+          importId,
+          text,
+          normalizedText,
+          meaningVi: item.meaningVi.trim(),
+          exampleEn: exampleCombined,
+          kind: item.kind,
+          page: null,
+        })
+        .run()
+    }
+
+    const loaded = loadCachedTopicChunks(data.topic, data.level)
+    if (!loaded) {
+      throw new Error('Không tạo được danh sách chunks từ AI, hãy thử lại.')
+    }
+    return loaded
+  })
+
+export type AiTopicChunksResult = Awaited<ReturnType<typeof generateTopicChunks>>
 
 /** Danh mục giấy phép hiển thị ở trang attribution. */
 export const listChunkSources = createServerFn({ method: 'GET' }).handler(
@@ -171,13 +393,25 @@ export const saveChunkCard = createServerFn({ method: 'POST' })
         .where(eq(userChunks.id, data.userChunkId))
         .get()
       if (!row) throw new Error('Không tìm thấy chunk')
+      const lines = row.exampleEn?.split('\n') ?? []
+      const exEn = lines[0]?.trim() ?? ''
+      const exVi = lines[1]?.trim() ?? ''
       card = {
         front: row.text,
         back: row.meaningVi ?? '',
         example: row.exampleEn,
         meaningVi: row.meaningVi,
         audioUrl: null,
-        info: null,
+        info: exEn
+          ? {
+              pos: null,
+              examples: [{ en: exEn, vi: exVi }],
+              collocations: [],
+              idioms: [],
+              family: [],
+              synonyms: [],
+            }
+          : null,
       }
     }
     const deckId = chunkDeckId(true)

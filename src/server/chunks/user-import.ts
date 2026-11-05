@@ -115,6 +115,7 @@ export async function runUserChunkImport(id: number, pages: string[]) {
     touch(id, { status: 'running', pages: pages.length, donePages: 0 })
     for (const batch of batchPages(pages)) {
       const { chunks } = await structured({
+        feature: 'user-import',
         system: USER_CHUNK_EXTRACT_SYSTEM,
         prompt: userChunkExtractPrompt(batch.text),
         schema: UserChunkExtractSchema,

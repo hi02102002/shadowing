@@ -51,6 +51,7 @@ export const analyzeDictation = createServerFn({ method: 'POST' })
 
     const tokens = JSON.parse(row.attempt.diffJson) as AlignToken[]
     const analysis = await structured({
+      feature: 'dictation',
       system: dictationSystem(getConfig().accent),
       prompt: dictationPrompt(row.seg.text, row.attempt.input, tokens, prev?.text),
       schema: DictationAnalysisSchema,

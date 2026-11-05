@@ -35,6 +35,7 @@ const turnsOf = (id: number) =>
 async function aiTurn(convo: { id: number; topic: string; level: string }) {
   const turns = turnsOf(convo.id)
   const { reply, hints } = await structured({
+    feature: 'conversation',
     system: conversationSystem(convo.topic, convo.level as TalkLevel),
     prompt: conversationPrompt(turns),
     schema: ConversationReplySchema,
@@ -140,6 +141,7 @@ export const finishConversation = createServerFn({ method: 'POST' })
     const turns = turnsOf(convo.id)
     if (!turns.some((t) => t.role === 'user')) throw new Error('Bạn chưa nói câu nào trong buổi này')
     const feedback = await structured({
+      feature: 'conversation',
       system: CONVERSATION_FEEDBACK_SYSTEM,
       prompt: conversationFeedbackPrompt({ topic: convo.topic, level: convo.level as TalkLevel, turns }),
       schema: isIeltsScenario(convo.scenario) ? IeltsConversationFeedbackSchema : ConversationFeedbackSchema,

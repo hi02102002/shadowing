@@ -11,9 +11,11 @@ import { ActivityHeatmap } from '#/components/activity-heatmap'
 import { ScoreTrendChart } from '#/components/score-trend-chart'
 import { Button } from '#/components/ui/button'
 import { Progress } from '#/components/ui/progress'
-import { activityStatsQuery, statsQuery } from '#/lib/queries'
+import { activityStatsQuery, aiUsageQuery, statsQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
 import { setDailyGoal } from '#/server/fns/stats'
+import type { AiUsageStats } from '#/server/fns/stats'
+import { useQuery } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/stats')({
   loader: ({ context }) =>
@@ -46,6 +48,107 @@ function Tile({
       </span>
       {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
     </div>
+  )
+}
+
+const nf = new Intl.NumberFormat('vi-VN')
+const compact = (n: number) =>
+  n >= 1_000_000
+    ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 10_000
+      ? `${Math.round(n / 1000)}k`
+      : nf.format(n)
+
+function AiUsageSection() {
+  const { data } = useQuery(aiUsageQuery())
+  if (!data) return null
+  return <AiUsageCard data={data} />
+}
+
+function AiUsageCard({ data }: { data: AiUsageStats }) {
+  const max = Math.max(1, ...data.byFeature.map((f) => f.totalTokens))
+  const dailyMax = Math.max(1, ...data.daily.map((d) => d.totalTokens))
+  const periods = [
+    { label: 'Hôm nay', v: data.today },
+    { label: '7 ngày', v: data.week },
+    { label: '30 ngày', v: data.month },
+  ]
+  return (
+    <section className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Mức dùng AI</h2>
+        {data.lastModel && (
+          <span className="text-xs text-muted-foreground">
+            {data.lastModel.provider} · {data.lastModel.model}
+          </span>
+        )}
+      </div>
+
+      {data.month.calls === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Chưa có lượt gọi AI nào được ghi nhận.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {periods.map(({ label, v }) => (
+              <div key={label} className="flex flex-col gap-0.5 rounded-lg border p-3">
+                <span className="text-xs text-muted-foreground">{label}</span>
+                <span className="text-xl font-semibold tabular-nums">
+                  {compact(v.totalTokens)}
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    token
+                  </span>
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {nf.format(v.calls)} lượt · vào {compact(v.promptTokens)} / ra{' '}
+                  {compact(v.completionTokens)}
+                  {v.failed > 0 && ` · ${v.failed} lỗi`}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex h-16 items-end gap-1" aria-label="Token theo ngày, 14 ngày gần nhất">
+            {data.daily.map((d) => (
+              <div
+                key={d.day}
+                title={`${d.day}: ${nf.format(d.totalTokens)} token, ${d.calls} lượt`}
+                className="min-h-0.5 flex-1 rounded-sm bg-primary/60"
+                style={{ height: `${Math.max(3, (d.totalTokens / dailyMax) * 100)}%` }}
+              />
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              Theo tính năng (30 ngày)
+            </span>
+            {data.byFeature.map((f) => (
+              <div key={f.feature} className="flex items-center gap-3 text-sm">
+                <span className="w-32 shrink-0 truncate">{f.feature}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${(f.totalTokens / max) * 100}%` }}
+                  />
+                </div>
+                <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {compact(f.totalTokens)} · {nf.format(f.calls)} lượt
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {data.estimatedCalls > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {data.estimatedCalls} lượt không được provider báo số token nên
+              được ước lượng theo độ dài chữ (~4 ký tự/token).
+            </p>
+          )}
+        </>
+      )}
+    </section>
   )
 }
 
@@ -111,6 +214,8 @@ function StatsPage() {
           </p>
         )}
       </section>
+
+      <AiUsageSection />
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Tile

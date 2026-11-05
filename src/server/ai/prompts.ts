@@ -11,6 +11,8 @@ import type { SpeakingTarget } from '#/lib/speaking-topics.ts'
 import type { Accent } from '#/lib/speech.ts'
 import type { ListeningLevel } from '#/lib/listening.ts'
 import type { ReflexLevel, ReflexMode } from '#/lib/reflex.ts'
+import { ROADMAP_ACTIVITY_TYPES } from '#/lib/roadmap.ts'
+import type { RoadmapActivityType } from '#/lib/roadmap.ts'
 
 export const MISTAKE_TYPES = [
   'weak_form', // dạng yếu: to → /tə/, and → /ən/
@@ -1007,3 +1009,290 @@ export const userChunkExtractPrompt = (text: string) => `Đoạn tài liệu:
 ${text}
 """
 Liệt kê mọi chunk trong đoạn trên.`
+
+/* ---------- Sinh bộ Chunks theo chủ đề bằng AI (/chunks & /roadmap) ---------- */
+
+export const TopicChunksSchema = z.object({
+  chunks: z
+    .array(
+      z.object({
+        text: z
+          .string()
+          .describe(
+            'cụm từ cố định, khung câu, collocation, phrasal verb hoặc từ nối tiếng Anh tự nhiên (2-7 từ)',
+          ),
+        kind: z.enum(USER_CHUNK_KINDS),
+        meaningVi: z
+          .string()
+          .describe('nghĩa tiếng Việt tự nhiên, ngắn gọn, dễ áp dụng'),
+        exampleEn: z
+          .string()
+          .describe(
+            'một câu ví dụ giao tiếp thực tế bằng tiếng Anh có dùng cụm này trong đúng tình huống chủ đề',
+          ),
+        exampleVi: z
+          .string()
+          .describe('bản dịch tiếng Việt tự nhiên của câu ví dụ trên'),
+      }),
+    )
+    .min(8)
+    .max(12),
+})
+
+export const TOPIC_CHUNKS_SYSTEM = `Bạn là giáo viên tiếng Anh chuyên dạy giao tiếp theo phương pháp Lexical Approach (học theo cụm từ / chunks) cho người Việt.
+Nhiệm vụ: Tạo danh sách 10 chunk tiếng Anh thiết thực, tự nhiên và tần suất sử dụng cao nhất xoay quanh chủ đề và cấp độ CEFR được yêu cầu.
+Quy tắc:
+- Đa dạng loại chunk (kind):
+  + formula: cụm cố định hoặc câu giao tiếp trọn vẹn hay dùng trong tình huống đó
+  + sentence-frame: khung câu mở đầu để người học ghép ý vào (vd: "I'm looking for a place that...", "The best thing about ... is ...")
+  + collocation: cụm động từ + danh từ hoặc tính từ + danh từ đi liền tự nhiên (vd: "within walking distance", "fully furnished apartment", "heavy traffic")
+  + phrasal-verb: cụm động từ thông dụng trong chủ đề (vd: "move in", "check out", "get around")
+  + discourse-marker: cụm nối tự nhiên khi nói
+- Độ khó từ vựng và câu ví dụ phải khớp đúng cấp độ CEFR yêu cầu.
+- Câu ví dụ (exampleEn) phải là câu nói tự nhiên ngoài đời thực, dễ nghe và dễ nhại lại (shadowing).`
+
+export function topicChunksPrompt(opts: { topic: string; level: string }) {
+  return `Chủ đề tình huống: "${opts.topic}"
+Cấp độ CEFR: ${opts.level}
+
+Hãy tạo 10 chunks tiếng Anh hữu ích nhất cho chủ đề "${opts.topic}" ở trình độ ${opts.level}, kèm nghĩa tiếng Việt và câu ví dụ Anh–Việt thực tế.`
+}
+
+/* ---------- Lộ trình học cá nhân hoá (/roadmap) ---------- */
+
+const ROADMAP_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const
+
+export const RoadmapOverviewSchema = z.object({
+  title: z
+    .string()
+    .describe('tên lộ trình ngắn gọn bằng tiếng Việt, vd. "Giao tiếp tự tin từ A2 lên B2 trong 6 tháng"'),
+  summary: z
+    .string()
+    .describe('chiến lược học tập tổng thể 2-3 câu bằng tiếng Việt, giải thích cách phân bổ các giai đoạn'),
+  phases: z
+    .array(
+      z.object({
+        index: z.number().int().min(1),
+        title: z.string().describe('tên giai đoạn bằng tiếng Việt'),
+        weeks: z.number().int().min(1).describe('số tuần của giai đoạn này'),
+        targetLevel: z.enum(ROADMAP_LEVELS),
+        focus: z.string().describe('mục tiêu trọng tâm của giai đoạn bằng tiếng Việt'),
+        milestones: z
+          .array(z.string())
+          .describe('2-3 cột mốc đạt được sau giai đoạn này, bằng tiếng Việt'),
+        themes: z
+          .array(
+            z.object({
+              title: z.string().describe('tiêu đề ngắn của chủ đề bằng tiếng Việt'),
+              theme: z.string().describe('chủ đề tình huống cụ thể bằng tiếng Việt'),
+              searchKeywords: z
+                .array(z.string())
+                .describe('2-3 cụm từ khoá tiếng Anh ngắn (2-4 từ) để tìm video/bài học'),
+            }),
+          )
+          .min(2)
+          .max(6)
+          .describe(
+            'các chủ đề tuần nối tiếp nhau trong giai đoạn, tiến bộ dần; hệ thống sẽ tự trải đều lên các tuần của giai đoạn',
+          ),
+      }),
+    )
+    .min(1)
+    .max(4),
+})
+export type RoadmapOverviewOutput = z.infer<typeof RoadmapOverviewSchema>
+
+export const RoadmapWeekDaysSchema = z.object({
+  days: z
+    .array(
+      z.object({
+        dayNumber: z.number().int().min(1).max(7),
+        dayTitle: z
+          .string()
+          .describe('tiêu đề học của ngày bằng tiếng Việt, vd. "Nghe & bắt nhịp hội thoại đặt món"'),
+        tasks: z
+          .array(
+            z.object({
+              activityType: z.enum(ROADMAP_ACTIVITY_TYPES),
+              title: z
+                .string()
+                .describe('tên nhiệm vụ cụ thể bằng tiếng Việt, nêu rõ nội dung'),
+              description: z
+                .string()
+                .describe('hướng dẫn cách luyện cụ thể 1-2 câu bằng tiếng Việt'),
+              durationMinutes: z.number().int().min(5).max(90),
+              level: z.enum(ROADMAP_LEVELS),
+              topic: z
+                .string()
+                .describe('chủ đề cụ thể của bài tập (bằng tiếng Anh hoặc Việt ngắn gọn)'),
+              searchQuery: z
+                .string()
+                .describe(
+                  'cụm từ khoá TIẾNG ANH ngắn gọn (2-5 từ) để tìm đúng video trên YouTube/ELLLO, tìm bài đọc/nghe, hoặc tìm chủ điểm trong sách English Grammar in Use (vd. "present perfect", "modal verbs", "ordering at a restaurant", "job interview tips")',
+                ),
+              preferredSource: z
+                .enum(['elllo', 'youtube', 'any'])
+                .describe(
+                  'với nhiệm vụ video (shadow/dictation/pronounce): chọn "elllo" nếu cần hội thoại chuẩn cấp độ A1-B2, "youtube" nếu cần tình huống thực tế/vlog/bài nói tự nhiên; các nhiệm vụ khác để "any"',
+                ),
+              existingVideoId: z
+                .string()
+                .nullable()
+                .describe(
+                  'nếu trong danh sách video có sẵn của người học có bài thật sự khớp chủ đề và cấp độ thì điền youtubeId của bài đó, không thì null',
+                ),
+              grammarUnitId: z
+                .string()
+                .nullable()
+                .describe(
+                  'với activityType="grammar": điền đúng mã số Unit (vd. "1", "2", "7", "49") từ danh sách bài English Grammar in Use được cung cấp; các activityType khác để null',
+                ),
+            }),
+          )
+          .min(1)
+          .max(5),
+      }),
+    )
+    .min(7)
+    .max(7),
+})
+export type RoadmapWeekDaysOutput = z.infer<typeof RoadmapWeekDaysSchema>
+
+export const ROADMAP_SYSTEM = `Bạn là chuyên gia thiết kế lộ trình học tiếng Anh cá nhân hoá cho người Việt trên ứng dụng Shadowing.
+Ứng dụng có đầy đủ các công cụ học tập sau (activityType):
+- shadow: Shadowing (nghe và nhại lại đồng thời theo video YouTube / ELLLO).
+- dictation: Nghe chép chính tả từng câu trong video.
+- pronounce: Ghi âm luyện phát âm từng câu trong video (chấm độ chính xác và 4 trụ cột âm, trọng âm, ngữ điệu, nhịp điệu).
+- listening: Luyện nghe hiểu có câu hỏi trắc nghiệm/điền từ (từ Tactics for Listening, ELLLO, Breaking News English, Essential English Blog, Cambridge IELTS Listening).
+- reading: Luyện đọc hiểu theo cấp độ A2-C1 (từ Reading for the Real World, Breaking News English, OneStopEnglish, Linguapress, Cambridge IELTS hoặc AI viết theo chủ đề).
+- grammar: Học lý thuyết và làm bài tập trong 145 bài sách "English Grammar in Use" (Raymond Murphy).
+- talk: Hội thoại nhập vai thực tế với AI (hoặc giám khảo IELTS Part 1/Part 3).
+- reflex: Luyện phản xạ nói nhanh có bấm giờ (dịch nói Việt -> Anh, hỏi nhanh đáp nhanh, phản xạ tình huống, mẫu câu).
+- speaking: Luyện nói độc thoại theo đề kiểu IELTS Speaking Part 2.
+- chunks: Học các cụm từ cố định, phrasal verb, collocation, khung câu giao tiếp trong kho Chunks.
+- ipa: Luyện bảng âm IPA và bài học 4 trụ cột của Shadowing.
+- flashcards: Ôn tập bộ thẻ từ vựng theo lịch lặp lại ngắt quãng FSRS.
+
+Nguyên tắc thiết kế lộ trình:
+1. CHỈ sử dụng các kỹ năng (activityType) nằm trong danh sách kỹ năng người học đã chọn.
+2. Phân bổ độ khó (CEFR level) tăng dần hợp lý từ trình độ hiện tại lên trình độ mục tiêu theo từng giai đoạn.
+3. Chủ đề học phải sát với mục tiêu thực tế của người học, không chung chung, không lặp lại nhàm chán giữa các ngày.
+4. Với searchQuery: luôn viết bằng TIẾNG ANH ngắn gọn, rõ nghĩa để máy tìm kiếm trên YouTube, ELLLO, thư viện Đọc/Nghe hoặc mục lục sách English Grammar in Use trả về kết quả chính xác nhất.`
+
+export function roadmapOverviewPrompt(opts: {
+  goal: string
+  currentLevel: string
+  targetLevel: string
+  durationMonths: number
+  totalWeeks: number
+  dailyMinutes: number
+  focusSkills: RoadmapActivityType[]
+  topMistakes: Array<{ type: string; count: number; examples: string[] }>
+}) {
+  const mistakesText = opts.topMistakes.length
+    ? `\nCác lỗi người học đang mắc nhiều nhất trong Sổ lỗi:\n${opts.topMistakes
+        .map(
+          (m) =>
+            `- ${mistakeLabel(m.type)} (${m.count} lần): ${m.examples.join(', ')}`,
+        )
+        .join('\n')}`
+    : ''
+
+  return `Thiết kế khung lộ trình học tiếng Anh:
+- Mục tiêu của người học: "${opts.goal}"
+- Trình độ hiện tại: ${opts.currentLevel} -> Trình độ mục tiêu: ${opts.targetLevel}
+- Thời gian: ${opts.durationMonths} tháng (${opts.totalWeeks} tuần), mỗi ngày học khoảng ${opts.dailyMinutes} phút
+- Các kỹ năng người học muốn có trong lộ trình: ${opts.focusSkills.join(', ')}${mistakesText}
+
+Yêu cầu:
+- Chia ${opts.totalWeeks} tuần thành 2–4 giai đoạn (phases) rõ ràng; tổng số tuần của các phase phải bằng đúng ${opts.totalWeeks}.
+- Với mỗi giai đoạn, đưa ra 2–6 chủ đề (themes) giao tiếp / học thuật cụ thể, thiết thực, nối tiếp và tiến bộ dần từ ${opts.currentLevel} lên ${opts.targetLevel}. Số chủ đề nên xấp xỉ số tuần của giai đoạn (tối đa 6); nếu giai đoạn dài hơn thì mỗi chủ đề sẽ được kéo dài thành nhiều tuần.
+- KHÔNG liệt kê từng tuần; hệ thống sẽ tự trải các chủ đề lên các tuần.`
+}
+
+export function roadmapWeekDaysPrompt(opts: {
+  goal: string
+  dailyMinutes: number
+  focusSkills: RoadmapActivityType[]
+  weekPlan: {
+    week: number
+    totalWeeks: number
+    title: string
+    theme: string
+    level: string
+    focusSkills: string[]
+    searchKeywords: string[]
+  }
+  existingVideos: Array<{ youtubeId: string; title: string; durationSec: number | null }>
+  topMistakes: Array<{ type: string; count: number; examples: string[] }>
+  availableGrammarUnits?: Array<{ id: string; title: string; group: string }>
+}) {
+  const videosText = opts.existingVideos.length
+    ? `\nVideo hiện có trong thư viện của người học (chỉ chọn existingVideoId nếu thật sự hợp chủ đề):\n${opts.existingVideos
+        .slice(0, 20)
+        .map((v) => `- id="${v.youtubeId}": ${v.title}`)
+        .join('\n')}`
+    : '\nThư viện video của người học hiện chưa có bài nào (để existingVideoId = null).'
+
+  const mistakesText = opts.topMistakes.length
+    ? `\nLỗi người học hay gặp cần lưu ý sửa: ${opts.topMistakes
+        .map((m) => `${mistakeLabel(m.type)} (${m.examples.slice(0, 3).join(', ')})`)
+        .join('; ')}.`
+    : ''
+
+  const grammarText =
+    opts.focusSkills.includes('grammar') && opts.availableGrammarUnits?.length
+      ? `\nDanh sách các bài ngữ pháp phù hợp trình độ tuần này trong sách English Grammar in Use (khi tạo nhiệm vụ activityType="grammar", BẮT BUỘC chọn một bài trong danh sách này, điền mã số vào grammarUnitId, đặt title + description khớp đúng nội dung bài đó; mỗi Unit chỉ dùng một lần trong tuần và chọn bài gần chủ đề tuần nhất):\n${opts.availableGrammarUnits
+          .map((u) => `- Unit ${u.id}: ${u.title} (${u.group})`)
+          .join('\n')}`
+      : ''
+
+  return `Lập kế hoạch học chi tiết từng ngày (7 ngày: dayNumber từ 1 đến 7) cho Tuần ${opts.weekPlan.week}/${opts.weekPlan.totalWeeks}:
+- Mục tiêu chung: "${opts.goal}"
+- Chủ đề tuần ${opts.weekPlan.week}: "${opts.weekPlan.title}" — ${opts.weekPlan.theme}
+- Cấp độ tuần này: ${opts.weekPlan.level}
+- Thời lượng học mỗi ngày: khoảng ${opts.dailyMinutes} phút (chia thành 2–4 nhiệm vụ/ngày sao cho tổng durationMinutes mỗi ngày xấp xỉ ${opts.dailyMinutes} phút)
+- Các kỹ năng được phép dùng (CHỈ chọn activityType trong danh sách này): ${opts.focusSkills.join(', ')}
+- Từ khoá gợi ý của tuần: ${opts.weekPlan.searchKeywords.join(', ')}${mistakesText}${videosText}${grammarText}
+
+Lưu ý quan trọng:
+- Mỗi ngày (dayNumber 1..7) phải có nội dung cụ thể, nối tiếp nhau trong tuần (ví dụ: đầu tuần nạp từ/ngữ pháp/nghe/chép chính tả, giữa tuần shadowing/đọc hiểu/phản xạ, cuối tuần hội thoại AI/tổng hợp).
+- Với nhiệm vụ video (shadow, dictation, pronounce): đặt searchQuery bằng tiếng Anh cụ thể về tình huống/chủ đề (vd: "hotel check in conversation", "talking about hobbies", "daily standup meeting") để tìm trên ELLLO hoặc YouTube. Không đặt các câu quá dài hay ký tự đặc biệt.
+- Với nhiệm vụ grammar: BẮT BUỘC chọn đúng mã số Unit từ danh sách English Grammar in Use ở trên điền vào grammarUnitId, đồng thời viết title và description đúng theo chủ điểm của Unit đó; searchQuery cũng ghi đúng tên chủ điểm tiếng Anh của Unit đó.
+- Với nhiệm vụ reading hoặc listening: đặt searchQuery là chủ đề tiếng Anh ngắn gọn (1-3 từ, vd: "technology", "travel", "health", "environment", "work", "education", "food") để khớp với bài đọc/bài nghe trong thư viện.`
+}
+
+
+/* ---------- Bộ thẻ từ vựng theo chủ đề của nhiệm vụ lộ trình ---------- */
+
+export const TopicVocabSchema = z.object({
+  words: z
+    .array(
+      z.object({
+        word: z
+          .string()
+          .describe('từ hoặc cụm từ tiếng Anh (1-3 từ), đúng chủ đề, dạng nguyên mẫu'),
+        ipa: z.string().describe('phiên âm IPA, không kèm dấu gạch chéo'),
+        meaningVi: z
+          .string()
+          .describe('nghĩa tiếng Việt ngắn gọn, kèm từ loại trong ngoặc, vd. "(n) hộ chiếu"'),
+        exampleEn: z.string().describe('câu ví dụ tự nhiên, đúng chủ đề và cấp độ'),
+        exampleVi: z.string().describe('bản dịch tiếng Việt của câu ví dụ'),
+      }),
+    )
+    .min(8)
+    .max(14),
+})
+
+export const TOPIC_VOCAB_SYSTEM = `Bạn là giáo viên tiếng Anh tạo bộ thẻ từ vựng (flashcard) cho người Việt.
+Quy tắc:
+- Chỉ chọn từ/cụm từ THỰC SỰ thuộc chủ đề được yêu cầu, hữu ích khi giao tiếp ngoài đời.
+- Độ khó khớp đúng cấp độ CEFR; ưu tiên từ có tần suất dùng cao, không trùng lặp, không chọn từ quá cơ bản so với cấp độ.
+- Ví dụ là câu nói tự nhiên, ngắn, dễ đọc theo (shadowing).`
+
+export function topicVocabPrompt(opts: { topic: string; level: string; goal?: string }) {
+  return `Chủ đề: "${opts.topic}"
+Cấp độ CEFR: ${opts.level}${opts.goal ? `\nMục tiêu học của người học: "${opts.goal}"` : ''}
+
+Tạo 12 thẻ từ vựng quan trọng nhất của chủ đề này.`
+}

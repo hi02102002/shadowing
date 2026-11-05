@@ -52,6 +52,7 @@ export async function contextLookup(
   if (opts.cachedOnly || !hasLlm(getConfig())) return null
 
   const result = await structured({
+    feature: 'lookup',
     system: LOOKUP_SYSTEM,
     prompt: lookupPrompt(text, sentence),
     schema: LookupSchema,

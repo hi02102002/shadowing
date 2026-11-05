@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import {
   Blocks,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   FileUp,
+  Loader2,
   Mic,
+  RotateCcw,
   Search,
+  Sparkles,
 } from 'lucide-react'
 import { z } from 'zod'
 
@@ -27,9 +30,10 @@ import {
   CHUNK_TOPIC_LABELS,
   CHUNK_TOPICS,
 } from '#/lib/chunks'
+import type { ChunkLevel, ChunkSeed } from '#/lib/chunks'
 import { chunksQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
-import type { ChunkSeed } from '#/lib/chunks'
+import { generateTopicChunks } from '#/server/fns/chunks'
 
 const searchSchema = z.object({
   level: z.enum(CHUNK_LEVELS).optional().catch(undefined),
@@ -37,6 +41,7 @@ const searchSchema = z.object({
   kind: z.enum(CHUNK_KINDS).optional().catch(undefined),
   q: z.string().max(100).optional().catch(undefined),
   page: z.coerce.number().int().min(1).default(1).catch(1),
+  autoGen: z.enum(['1', '0']).optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/chunks/')({
@@ -51,12 +56,54 @@ export const Route = createFileRoute('/chunks/')({
 function ChunksPage() {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: '/chunks/' })
+  const queryClient = useQueryClient()
   const { data } = useSuspenseQuery(chunksQuery(search))
 
   const patchSearch = (patch: Partial<typeof search>) =>
     void navigate({
       search: (previous) => ({ ...previous, ...patch, page: 1 }),
     })
+
+  const generateMutation = useMutation({
+    mutationFn: (variables: {
+      topic: string
+      level: ChunkLevel
+      forceRegenerate?: boolean
+    }) => generateTopicChunks({ data: variables }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['chunks'] })
+      void queryClient.invalidateQueries({ queryKey: ['user-chunks'] })
+      void queryClient.invalidateQueries({ queryKey: ['user-chunk-imports'] })
+    },
+  })
+
+  useEffect(() => {
+    if (
+      search.autoGen === '1' &&
+      search.q &&
+      !data.aiTopic &&
+      !generateMutation.isPending
+    ) {
+      generateMutation.mutate(
+        { topic: search.q, level: search.level ?? 'B1' },
+        {
+          onSettled: () => {
+            void navigate({
+              search: (prev) => ({ ...prev, autoGen: undefined }),
+              replace: true,
+            })
+          },
+        },
+      )
+    }
+  }, [
+    search.autoGen,
+    search.q,
+    search.level,
+    data.aiTopic,
+    generateMutation,
+    navigate,
+  ])
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
@@ -71,8 +118,9 @@ function ChunksPage() {
               0,
             )}{' '}
             câu và cụm A1–C1 có nguồn Anh–Việt, đóng cùng ứng dụng để học
-            offline. Kho không đặt giới hạn số lượng và không dùng câu tự biên
-            soạn. Bấm loa để nghe, micro để nói theo và chấm phát âm.
+            offline. Kho không đặt giới hạn số lượng và có thể dùng AI biên soạn
+            chunks theo mọi chủ đề. Bấm loa để nghe, micro để nói theo và chấm
+            phát âm.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -97,7 +145,7 @@ function ChunksPage() {
             onChange={(event) =>
               patchSearch({ q: event.target.value || undefined })
             }
-            placeholder="Tìm cụm tiếng Anh hoặc nghĩa tiếng Việt…"
+            placeholder="Tìm cụm tiếng Anh, chủ đề hoặc nghĩa tiếng Việt…"
             className="pl-8"
           />
         </div>
@@ -129,9 +177,93 @@ function ChunksPage() {
         />
       </section>
 
+      {/* Trạng thái đang tạo chunks bằng AI */}
+      {generateMutation.isPending && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm text-primary">
+          <Loader2 className="size-5 shrink-0 animate-spin" />
+          <div className="flex flex-col gap-0.5">
+            <span className="font-semibold">
+              Đang dùng AI tạo 10 chunks giao tiếp thực tế…
+            </span>
+            <span className="text-xs opacity-90">
+              Chủ đề: &ldquo;{search.q}&rdquo; ({search.level ?? 'B1'})
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Bảng chunks do AI biên soạn theo chủ đề */}
+      {data.aiTopic && (
+        <section className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-5 text-primary" />
+              <h2 className="text-base font-semibold">
+                10 Chunks AI biên soạn cho chủ đề &ldquo;{data.aiTopic.topic}&rdquo; (
+                {data.aiTopic.level})
+              </h2>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={generateMutation.isPending}
+              onClick={() =>
+                generateMutation.mutate({
+                  topic: data.aiTopic!.topic,
+                  level: data.aiTopic!.level,
+                  forceRegenerate: true,
+                })
+              }
+            >
+              {generateMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RotateCcw className="size-3.5" />
+              )}
+              Tạo lại bằng AI
+            </Button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {data.aiTopic.items.map((row) => (
+              <AiChunkCard
+                key={row.id}
+                row={row}
+                onRefresh={() => {
+                  void queryClient.invalidateQueries({
+                    queryKey: ['chunks'],
+                  })
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Nếu đang tìm kiếm một chủ đề nhưng chưa có AI chunks, cho phép tạo bằng AI */}
+      {!data.aiTopic && search.q && !generateMutation.isPending && data.items.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-primary/40 bg-card p-3 text-sm">
+          <span className="text-muted-foreground">
+            Bạn cần cụm từ giao tiếp sát thực tế cho chủ đề &ldquo;
+            <b>{search.q}</b>&rdquo;?
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              generateMutation.mutate({
+                topic: search.q!,
+                level: search.level ?? 'B1',
+              })
+            }
+          >
+            <Sparkles className="size-3.5 text-primary" /> Tạo 10 chunks bằng AI
+          </Button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="text-muted-foreground">
-          {data.total} chunk phù hợp
+          {data.total} chunk trong kho có sẵn
         </span>
         <span className="tabular-nums text-muted-foreground">
           Trang {data.page}/{data.pages}
@@ -148,11 +280,36 @@ function ChunksPage() {
             />
           ))}
         </div>
-      ) : (
-        <p className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
-          Không có chunk nào khớp bộ lọc.
-        </p>
-      )}
+      ) : !data.aiTopic && !generateMutation.isPending ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-primary/40 bg-card p-10 text-center">
+          <div className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+            <Sparkles className="size-6" />
+          </div>
+          <h3 className="text-lg font-semibold">
+            {search.q
+              ? `Chưa có chunk trong kho có sẵn khớp "${search.q}"`
+              : 'Không có chunk nào khớp bộ lọc'}
+          </h3>
+          <p className="max-w-md text-sm text-muted-foreground">
+            {search.q
+              ? `Kho offline chưa có cụm từ chính xác này. Bạn có thể để AI tạo ngay 10 cụm từ, khung câu và collocation cho chủ đề "${search.q}" ở cấp độ ${search.level ?? 'B1'}.`
+              : 'Hãy thử đổi từ khoá hoặc điều chỉnh cấp độ / chủ đề.'}
+          </p>
+          {search.q && (
+            <Button
+              onClick={() =>
+                generateMutation.mutate({
+                  topic: search.q!,
+                  level: search.level ?? 'B1',
+                })
+              }
+            >
+              <Sparkles className="size-4" />
+              Tạo 10 chunks theo chủ đề này bằng AI
+            </Button>
+          )}
+        </div>
+      ) : null}
 
       <div className="flex justify-center gap-2">
         <Button
@@ -349,6 +506,83 @@ function ChunkCard({ chunk, saved }: { chunk: ChunkSeed; saved: boolean }) {
             <ExternalLink className="size-3" />
           </a>
         )}
+      </div>
+    </article>
+  )
+}
+
+function AiChunkCard({
+  row,
+  onRefresh: _onRefresh,
+}: {
+  row: {
+    id: number
+    text: string
+    meaningVi: string | null
+    exampleEn: string | null
+    kind: string
+    saved: boolean
+  }
+  onRefresh: () => void
+}) {
+  const [shadow, setShadow] = useState<string | null>(null)
+  const lines = row.exampleEn?.split('\n') ?? []
+  const exEn = lines[0]?.trim() || null
+  const exVi = lines[1]?.trim() || null
+
+  return (
+    <article className="flex min-w-0 flex-col gap-3 rounded-xl border border-primary/25 bg-card p-4 shadow-xs">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="outline" className="border-primary/40 text-primary">
+          {(CHUNK_KIND_LABELS as Partial<Record<string, string>>)[row.kind] ??
+            row.kind}
+        </Badge>
+        <Badge variant="secondary" className="text-[10px]">
+          AI biên soạn
+        </Badge>
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-start gap-1">
+          <h2 className="flex-1 text-lg font-semibold leading-snug">
+            {row.text}
+          </h2>
+          <ListenButton text={row.text} />
+        </div>
+        {row.meaningVi && (
+          <p className="mt-1 text-sm text-muted-foreground">{row.meaningVi}</p>
+        )}
+      </div>
+
+      {exEn && (
+        <div className="flex items-start gap-1 border-t pt-2.5 text-sm">
+          <div className="min-w-0 flex-1">
+            <p>{exEn}</p>
+            {exVi && (
+              <p className="mt-0.5 text-xs text-muted-foreground">{exVi}</p>
+            )}
+          </div>
+          <ListenButton text={exEn} />
+          <button
+            type="button"
+            title="Nói theo câu này"
+            aria-label={`Nói theo: ${exEn}`}
+            onClick={() => setShadow(exEn)}
+            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Mic className="size-4" />
+          </button>
+        </div>
+      )}
+
+      {shadow && (
+        <ChunkShadow text={shadow} onClose={() => setShadow(null)} />
+      )}
+
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+        <SaveChunkButton target={{ userChunkId: row.id }} saved={row.saved} />
+        <Button size="sm" variant="outline" onClick={() => setShadow(row.text)}>
+          <Mic /> Nói theo
+        </Button>
       </div>
     </article>
   )

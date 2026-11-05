@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
@@ -9,6 +9,7 @@ import { videosQuery } from '#/lib/queries'
 import { discardUpload, importLocal, importVideo } from '#/server/fns/videos'
 import type { ImportResult } from '#/server/fns/videos'
 
+export type VideoSubRoute = 'shadow' | 'dictation' | 'pronounce'
 type PendingImport = { kind: 'url'; url: string } | LocalImportPending
 
 /**
@@ -20,15 +21,27 @@ export function useVideoImport() {
   const queryClient = useQueryClient()
   const [dialog, setDialog] = useState<CaptionDialogState | null>(null)
   const [pending, setPending] = useState<PendingImport | null>(null)
+  const subRouteRef = useRef<VideoSubRoute | undefined>(undefined)
 
   const openVideo = useCallback(
     async (youtubeId: string) => {
+      const sub = subRouteRef.current
+      subRouteRef.current = undefined
       setDialog(null)
       setPending(null)
       await queryClient.invalidateQueries({ queryKey: videosQuery().queryKey })
-      // danh sách Khám phá đánh dấu bài "Đã có"
+      // danh sách Khám phá & Lộ trình đánh dấu bài "Đã có"
       void queryClient.invalidateQueries({ queryKey: ['catalog'] })
-      await navigate({ to: '/videos/$videoId', params: { videoId: youtubeId } })
+      void queryClient.invalidateQueries({ queryKey: ['roadmap'] })
+      if (sub === 'shadow') {
+        await navigate({ to: '/videos/$videoId/shadow', params: { videoId: youtubeId } })
+      } else if (sub === 'dictation') {
+        await navigate({ to: '/videos/$videoId/dictation', params: { videoId: youtubeId } })
+      } else if (sub === 'pronounce') {
+        await navigate({ to: '/videos/$videoId/pronounce', params: { videoId: youtubeId } })
+      } else {
+        await navigate({ to: '/videos/$videoId', params: { videoId: youtubeId } })
+      }
     },
     [navigate, queryClient],
   )
@@ -85,13 +98,17 @@ export function useVideoImport() {
     if (dialog?.step === 'confirm' && pending?.kind === 'local') {
       void discardUpload({ data: { uploadId: pending.uploadId } })
     }
+    subRouteRef.current = undefined
     confirm.reset()
     setDialog(null)
     setPending(null)
   }
 
   return {
-    importUrl: mutation.mutate,
+    importUrl: (url: string, subRoute?: VideoSubRoute) => {
+      subRouteRef.current = subRoute
+      mutation.mutate(url)
+    },
     /** link đang import (chờ server trả kết quả) */
     importing: mutation.isPending ? mutation.variables : null,
     error: mutation.error,

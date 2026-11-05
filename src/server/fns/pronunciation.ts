@@ -318,6 +318,7 @@ export const assessDrill = createServerFn({ method: 'POST' })
     let feedback = heard.feedback
     if (!feedback && data.focus && hasLlm(cfg)) {
       feedback = await structured({
+        feature: 'pronunciation',
         system: pronunciationSystem(cfg.accent),
         prompt: pronunciationPrompt({
           reference: data.text,
@@ -364,6 +365,7 @@ export const pronunciationFeedback = createServerFn({ method: 'POST' })
 
     const stored = JSON.parse(row.attempt.wordsJson) as StoredWords
     const feedback = await structured({
+      feature: 'pronunciation',
       system: pronunciationSystem(getConfig().accent),
       prompt: pronunciationPrompt({
         reference: row.seg.text,

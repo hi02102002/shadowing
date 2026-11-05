@@ -165,6 +165,7 @@ export const generateListeningQuestions = createServerFn({ method: 'POST' })
         line.replace(/\[\[|]]/g, ''),
       )
       const output = await structured({
+        feature: 'listening',
         system: LISTENING_SYSTEM,
         prompt: listeningQuestionsPrompt({
           title: `${row.title} · ${section.title}`,

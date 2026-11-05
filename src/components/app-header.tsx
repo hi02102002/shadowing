@@ -12,6 +12,7 @@ import {
   Headphones,
   Layers,
   Library,
+  Map,
   Menu,
   MessagesSquare,
   Moon,
@@ -28,6 +29,7 @@ import { cn } from '#/lib/utils'
 
 const NAV = [
   { to: '/', label: 'Thư viện', icon: Library },
+  { to: '/roadmap', label: 'Lộ trình', icon: Map },
   { to: '/explore', label: 'Khám phá', icon: Compass },
   { to: '/talk', label: 'Nói với AI', icon: MessagesSquare },
   { to: '/reflex', label: 'Phản xạ', icon: Zap },

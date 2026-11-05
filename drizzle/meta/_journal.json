@@ -148,6 +148,20 @@
       "when": 1793798805124,
       "tag": "0020_user_chunks",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1793889453476,
+      "tag": "0021_roadmaps",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1793894303323,
+      "tag": "0022_ai_usage",
+      "breakpoints": true
     }
   ]
 }

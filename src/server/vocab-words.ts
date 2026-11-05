@@ -92,6 +92,7 @@ function askChunk(chunk: Array<{ idx: number; text: string }>, seen: Set<string>
     })
     .join('\n')
   return structured({
+    feature: 'vocab-words',
     system: VIDEO_PHRASES_SYSTEM,
     prompt: videoPhrasesPrompt(lines, words),
     schema: VideoPhrasesSchema,

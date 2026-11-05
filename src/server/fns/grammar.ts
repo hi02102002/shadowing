@@ -160,6 +160,7 @@ export const explainGrammarSection = createServerFn({ method: 'POST' })
     if (!section) throw new Error('Không tìm thấy mục này')
     return cachedAi(`grammar:sec:${unit.id}:${data.section}`, () =>
       structured({
+        feature: 'grammar',
         system: GRAMMAR_SYSTEM,
         prompt: grammarSectionPrompt(unit.title, section.label, plainText(section.body).slice(0, 6000)),
         schema: GrammarExplainSchema,
@@ -180,6 +181,7 @@ export const explainGrammarAnswer = createServerFn({ method: 'POST' })
     const answer = readableAnswer(item, data.answer)
     const result = await cachedAi(`grammar:ans:${unit.id}:${key}:${normalizeAnswer(answer)}`, () =>
       structured({
+        feature: 'grammar',
         system: GRAMMAR_SYSTEM,
         prompt: grammarAnswerPrompt({
           unitTitle: unit.title,
@@ -302,6 +304,7 @@ export const grammarDrill = createServerFn({ method: 'POST' })
     const parts = await Promise.all(
       Array.from({ length: batches }, (_, b) =>
         structured({
+          feature: 'grammar',
           system: GRAMMAR_SYSTEM,
           prompt: grammarDrillPrompt({
             unitTitle: unit.title,

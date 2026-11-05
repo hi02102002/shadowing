@@ -22,6 +22,7 @@ export const testLlm = createServerFn({ method: 'POST' }).handler(async () => {
   const started = Date.now()
   try {
     const res = await structured({
+      feature: 'settings',
       system: 'You are a connection test. Reply with JSON only.',
       prompt: 'Return ok=true and the IPA of the word "water".',
       schema: z.object({ ok: z.boolean(), ipa: z.string() }),

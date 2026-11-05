@@ -99,6 +99,7 @@ export const assessSpeaking = createServerFn({ method: 'POST' })
             cfg,
           })
         : await structured({
+            feature: 'speaking',
             system: speakingFeedbackSystem(cfg.accent, false),
             prompt: speakingFeedbackPrompt(row),
             schema: SpeakingFeedbackSchema,

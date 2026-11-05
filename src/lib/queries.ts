@@ -10,7 +10,7 @@ import {
 import { getEssentialBook, listEssentialBooks } from '#/server/fns/essential.ts'
 import { listCards, listDecks, studyQueue } from '#/server/fns/flashcards.ts'
 import { listMistakes, practiceStats } from '#/server/fns/review.ts'
-import { activityStats } from '#/server/fns/stats.ts'
+import { activityStats, aiUsageStats } from '#/server/fns/stats.ts'
 import {
   getConversation,
   listConversations,
@@ -50,6 +50,7 @@ import {
   listUserChunkImports,
   listUserChunks,
 } from '#/server/fns/chunks.ts'
+import { getRoadmap, listRoadmaps } from '#/server/fns/roadmap.ts'
 import type { ChunkKind, ChunkLevel, ChunkTopic } from './chunks.ts'
 import type { Level } from './levels.ts'
 
@@ -237,6 +238,13 @@ export const activityStatsQuery = () =>
     queryFn: () => activityStats(),
   })
 
+/** trang Thống kê: lượng token AI đã dùng */
+export const aiUsageQuery = () =>
+  queryOptions({
+    queryKey: ['ai-usage'],
+    queryFn: () => aiUsageStats(),
+  })
+
 export const conversationsQuery = () =>
   queryOptions({
     queryKey: ['conversations'],
@@ -361,3 +369,16 @@ export const reflexTopicsQuery = () =>
     queryFn: () => listReflexTopics(),
     staleTime: 6 * 60 * 60 * 1000,
   })
+
+export const roadmapsQuery = () =>
+  queryOptions({
+    queryKey: ['roadmaps'],
+    queryFn: () => listRoadmaps(),
+  })
+
+export const roadmapQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['roadmap', id],
+    queryFn: () => getRoadmap({ data: { id } }),
+  })
+

@@ -196,7 +196,7 @@ Items to process:
 ${words.map((w, i) => `${i + 1}. ${w}`).join('\n')}`
 
   const out = await withRetry(() =>
-    structured({ system: VOCAB_SYSTEM, prompt, schema: FlashcardsSchema }),
+    structured({ feature: 'anki-builder-ai', system: VOCAB_SYSTEM, prompt, schema: FlashcardsSchema }),
   )
   const cards = out.cards.map((item, i) => ({
     // AI giữ đúng thứ tự → dùng từ gốc đã chọn, để cụm từ gộp theo từ không bị lệch khi AI đổi dạng (smile → to smile)
@@ -243,7 +243,7 @@ export async function enrichNotes(
     )
     .join('\n\n')}`
   const out = await withRetry(() =>
-    structured({ system: NOTES_SYSTEM, prompt, schema: NotesSchema }),
+    structured({ feature: 'anki-builder-ai', system: NOTES_SYSTEM, prompt, schema: NotesSchema }),
   )
   return raw.map((orig, i) => {
     const g = out.notes.at(i)
@@ -272,6 +272,7 @@ ${words.slice(0, 40).join(', ')}
 ${storyText ? `Context / Reading text from lesson:\n${storyText.slice(0, 1500)}` : ''}`
   const out = await withRetry(() =>
     structured({
+      feature: 'anki-builder-ai',
       system: CHUNKS_SYSTEM,
       prompt,
       schema: StandaloneChunksSchema,

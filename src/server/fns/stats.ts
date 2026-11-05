@@ -126,3 +126,78 @@ export const setDailyGoal = createServerFn({ method: 'POST' })
     saveConfig({ dailyGoal: data.goal })
     return { goal: data.goal }
   })
+
+export interface AiUsageTotals {
+  calls: number
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  failed: number
+}
+
+const ZERO: AiUsageTotals = {
+  calls: 0,
+  promptTokens: 0,
+  completionTokens: 0,
+  totalTokens: 0,
+  failed: 0,
+}
+
+/** Thống kê dùng AI: tổng theo hôm nay / 7 ngày / 30 ngày, theo tính năng và theo ngày (14 ngày) */
+export const aiUsageStats = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const now = Math.floor(Date.now() / 1000)
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const today = Math.floor(startOfToday.getTime() / 1000)
+    const since = (days: number) => today - (days - 1) * 86400
+
+    const totals = (from: number) =>
+      db.get<AiUsageTotals>(sql`
+        select count(*) as calls,
+          coalesce(sum(prompt_tokens), 0) as promptTokens,
+          coalesce(sum(completion_tokens), 0) as completionTokens,
+          coalesce(sum(total_tokens), 0) as totalTokens,
+          coalesce(sum(case when ok then 0 else 1 end), 0) as failed
+        from ai_usage where created_at >= ${from} and created_at <= ${now}`) ??
+      ZERO
+
+    const byFeature = db.all<
+      AiUsageTotals & { feature: string; estimated: number }
+    >(sql`
+      select feature, count(*) as calls,
+        coalesce(sum(prompt_tokens), 0) as promptTokens,
+        coalesce(sum(completion_tokens), 0) as completionTokens,
+        coalesce(sum(total_tokens), 0) as totalTokens,
+        coalesce(sum(case when ok then 0 else 1 end), 0) as failed,
+        coalesce(sum(estimated), 0) as estimated
+      from ai_usage where created_at >= ${since(30)}
+      group by feature order by totalTokens desc`)
+
+    const daily = db.all<{ day: string; totalTokens: number; calls: number }>(sql`
+      select strftime('%Y-%m-%d', created_at, 'unixepoch', 'localtime') as day,
+        coalesce(sum(total_tokens), 0) as totalTokens, count(*) as calls
+      from ai_usage where created_at >= ${since(14)}
+      group by day order by day`)
+
+    const model = db.get<{ provider: string; model: string }>(
+      sql`select provider, model from ai_usage order by id desc limit 1`,
+    )
+    const estimatedCalls =
+      db.get<{ n: number }>(
+        sql`select count(*) as n from ai_usage where estimated and created_at >= ${since(30)}`,
+      )?.n ?? 0
+
+    return {
+      today: totals(today),
+      week: totals(since(7)),
+      month: totals(since(30)),
+      byFeature,
+      daily,
+      lastModel: model ?? null,
+      estimatedCalls,
+    }
+  },
+)
+
+export type AiUsageStats = Awaited<ReturnType<typeof aiUsageStats>>

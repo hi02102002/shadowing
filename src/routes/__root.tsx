@@ -4,6 +4,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import { FormDevtoolsPanel } from '@tanstack/react-form-devtools'
 
 import { AppHeader, THEME_SCRIPT } from '#/components/app-header'
+import { FloatingBackButton } from '#/components/floating-back-button'
 import { QuickLookup } from '#/components/quick-lookup'
 import { UpdateDialog } from '#/components/update-dialog'
 import { TooltipProvider } from '#/components/ui/tooltip'
@@ -51,6 +52,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <main>{children}</main>
           <QuickLookup />
           <UpdateDialog />
+          <FloatingBackButton />
         </TooltipProvider>
         <TanStackDevtools
           config={{ position: 'bottom-left' }}

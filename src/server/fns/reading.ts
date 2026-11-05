@@ -95,6 +95,7 @@ export const generateReading = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const types = formatTypes(data.format, data.types)
     const passage = await structured({
+      feature: 'reading',
       system: READING_SYSTEM,
       prompt: readingPrompt({ ...data, types }),
       schema: ReadingPassageSchema,
@@ -316,6 +317,7 @@ export const generateReadingQuestions = createServerFn({ method: 'POST' })
     const row = requirePassage(data.id)
     const format = data.format ?? (row.format as ReadingFormat)
     const out = await structured({
+      feature: 'reading',
       system: READING_SYSTEM,
       prompt: readingQuestionsPrompt({
         title: row.title,

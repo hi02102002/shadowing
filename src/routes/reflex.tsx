@@ -56,6 +56,9 @@ import type { ReflexItemRow, ReflexSessionDetail } from '#/server/fns/reflex'
 
 const searchSchema = z.object({
   id: z.number().int().optional().catch(undefined),
+  mode: z.enum(REFLEX_MODES).optional().catch(undefined),
+  level: z.enum(REFLEX_LEVELS).optional().catch(undefined),
+  topic: z.string().optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/reflex')({
@@ -105,14 +108,17 @@ function Chip({
 }
 
 function Setup() {
+  const search = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [mode, setMode] = useState<ReflexMode>('translate')
-  const [source, setSource] = useState<ReflexSource>('bank')
-  const [level, setLevel] = useState<ReflexLevel>('A2')
+  const [mode, setMode] = useState<ReflexMode>(search.mode ?? 'translate')
+  const [source, setSource] = useState<ReflexSource>(
+    search.topic ? 'ai' : 'bank',
+  )
+  const [level, setLevel] = useState<ReflexLevel>(search.level ?? 'A2')
   const [count, setCount] = useState<number>(10)
   const [seconds, setSeconds] = useState<number | null>(null)
-  const [topic, setTopic] = useState('')
+  const [topic, setTopic] = useState(search.topic ?? '')
   const { data: history = [] } = useQuery(reflexSessionsQuery())
   const topics = useQuery({
     ...reflexTopicsQuery(),

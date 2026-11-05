@@ -97,6 +97,7 @@ async function aiPrompts(
   topic?: string,
 ) {
   const { items } = await structured({
+    feature: 'reflex',
     system: reflexSetSystem(mode),
     prompt: reflexSetPrompt({ count, level, topic }),
     schema: ReflexSetSchema,
@@ -203,6 +204,7 @@ export const submitReflexAnswer = createServerFn({ method: 'POST' })
     const said = await hearSpeech(data.audio)
     if (!said.trim()) throw new Error('Không nghe rõ, hãy nói lại')
     const feedback = await structured({
+      feature: 'reflex',
       system: reflexGradeSystem(session.mode as ReflexMode),
       prompt: reflexGradePrompt({
         level: session.level,

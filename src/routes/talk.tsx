@@ -27,6 +27,9 @@ import type { ConversationDetail } from '#/server/fns/conversation'
 
 const searchSchema = z.object({
   id: z.number().int().optional().catch(undefined),
+  scenario: z.string().optional().catch(undefined),
+  topic: z.string().optional().catch(undefined),
+  level: z.enum(TALK_LEVELS).optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/talk')({
@@ -46,11 +49,20 @@ function TalkPage() {
 }
 
 function Setup() {
+  const search = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [scenario, setScenario] = useState(SCENARIOS[0].id)
-  const [custom, setCustom] = useState('')
-  const [level, setLevel] = useState<TalkLevel>('B1')
+  const initialScenario =
+    search.scenario &&
+    (search.scenario === CUSTOM_SCENARIO ||
+      SCENARIOS.some((s) => s.id === search.scenario))
+      ? search.scenario
+      : search.topic
+        ? CUSTOM_SCENARIO
+        : SCENARIOS[0].id
+  const [scenario, setScenario] = useState(initialScenario)
+  const [custom, setCustom] = useState(search.topic ?? '')
+  const [level, setLevel] = useState<TalkLevel>(search.level ?? 'B1')
   const { data: history = [] } = useQuery(conversationsQuery())
 
   const start = useMutation({

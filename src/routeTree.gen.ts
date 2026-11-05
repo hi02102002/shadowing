@@ -16,6 +16,7 @@ import { Route as ListeningRouteImport } from './routes/listening'
 import { Route as ReadingRouteImport } from './routes/reading'
 import { Route as ReflexRouteImport } from './routes/reflex'
 import { Route as ReviewRouteImport } from './routes/review'
+import { Route as RoadmapRouteImport } from './routes/roadmap'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SpeakingRouteImport } from './routes/speaking'
 import { Route as StatsRouteImport } from './routes/stats'
@@ -74,6 +75,11 @@ const ReflexRoute = ReflexRouteImport.update({
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RoadmapRoute = RoadmapRouteImport.update({
+  id: '/roadmap',
+  path: '/roadmap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/reading': typeof ReadingRoute
   '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
+  '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/reading': typeof ReadingRoute
   '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
+  '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
@@ -271,6 +279,7 @@ export interface FileRoutesById {
   '/reading': typeof ReadingRoute
   '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
+  '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
@@ -306,6 +315,7 @@ export interface FileRouteTypes {
     | '/reading'
     | '/reflex'
     | '/review'
+    | '/roadmap'
     | '/settings'
     | '/speaking'
     | '/stats'
@@ -339,6 +349,7 @@ export interface FileRouteTypes {
     | '/reading'
     | '/reflex'
     | '/review'
+    | '/roadmap'
     | '/settings'
     | '/speaking'
     | '/stats'
@@ -371,6 +382,7 @@ export interface FileRouteTypes {
     | '/reading'
     | '/reflex'
     | '/review'
+    | '/roadmap'
     | '/settings'
     | '/speaking'
     | '/stats'
@@ -405,6 +417,7 @@ export interface RootRouteChildren {
   ReadingRoute: typeof ReadingRoute
   ReflexRoute: typeof ReflexRoute
   ReviewRoute: typeof ReviewRoute
+  RoadmapRoute: typeof RoadmapRoute
   SettingsRoute: typeof SettingsRoute
   SpeakingRoute: typeof SpeakingRoute
   StatsRoute: typeof StatsRoute
@@ -474,6 +487,13 @@ declare module '@tanstack/react-router' {
       path: '/review'
       fullPath: '/review'
       preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/roadmap': {
+      id: '/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof RoadmapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -677,6 +697,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReadingRoute: ReadingRoute,
   ReflexRoute: ReflexRoute,
   ReviewRoute: ReviewRoute,
+  RoadmapRoute: RoadmapRoute,
   SettingsRoute: SettingsRoute,
   SpeakingRoute: SpeakingRoute,
   StatsRoute: StatsRoute,
