@@ -22,6 +22,8 @@ export const MISTAKE_TYPES = [
   'vowel', // nguyên âm
   'consonant', // phụ âm (th, v/w, r/l…)
   'stress', // trọng âm
+  'intonation', // ngữ điệu: giọng lên xuống
+  'rhythm', // nhịp điệu: chia cụm, ngắt nghỉ, đều nhịp
   'vocabulary', // từ chưa biết
   'spelling', // nghe đúng nhưng viết sai chính tả
   'grammar', // nghe sai do suy đoán ngữ pháp
@@ -41,6 +43,8 @@ export const MISTAKE_TYPE_LABELS: Record<
   vowel: 'Nguyên âm',
   consonant: 'Phụ âm',
   stress: 'Trọng âm',
+  intonation: 'Ngữ điệu',
+  rhythm: 'Nhịp điệu',
   vocabulary: 'Từ vựng',
   spelling: 'Chính tả',
   grammar: 'Ngữ pháp',
@@ -108,6 +112,7 @@ const BASE_SYSTEM = `Bạn là giáo viên phát âm và nghe tiếng Anh giàu 
 - Luôn trả lời bằng tiếng Việt, ngắn gọn, cụ thể, dễ hiểu.
 - Hiểu rõ các lỗi đặc trưng của người Việt: bỏ âm cuối (-s, -ed, -t, -k), nhầm /θ/ /ð/ với /t/ /d/ /z/, /v/ vs /w/, /ʃ/ vs /s/, /l/ vs /n/ cuối, không bật hơi, không có trọng âm, đọc từng từ rời rạc.
 - Hiểu connected speech: weak forms, linking, elision, assimilation, flap T.
+- Phân loại lỗi theo 4 trụ cột của shadowing: âm (vowel, consonant, ending_sound, weak_form), trọng âm (stress), ngữ điệu (intonation), nhịp điệu (rhythm, linking, elision). Chỉ dùng intonation / rhythm khi có bằng chứng: bạn nghe trực tiếp bản ghi, hoặc tốc độ và chỗ ngắt dài cho thấy; nếu chỉ có chữ thì đừng đoán ngữ điệu.
 - Chỉ liệt kê lỗi thực sự có trong dữ liệu, không bịa thêm.`
 
 const ACCENT_NAME: Record<Accent, string> = {
@@ -158,6 +163,25 @@ ${tokensForPrompt(tokens) || '(không có — người học viết đúng hoàn
 Hãy phân tích lỗi và chỉ ra các hiện tượng connected speech trong câu gốc giúp người học nghe tốt hơn.`
 }
 
+/** trụ cột đang luyện ở trang "Shadowing là gì?" → nhận xét tập trung vào đó */
+export const DRILL_FOCUS = ['sound', 'stress', 'intonation', 'rhythm'] as const
+export type DrillFocus = (typeof DRILL_FOCUS)[number]
+
+const FOCUS_HINT: Record<DrillFocus, string> = {
+  sound: 'âm: nguyên âm, phụ âm và âm cuối của từng từ',
+  stress:
+    'trọng âm: từ nhiều âm tiết nhấn đúng âm tiết nào, và từ nào được nhấn trong câu',
+  intonation: 'ngữ điệu: giọng lên hay xuống ở cuối câu và ở từ quan trọng',
+  rhythm:
+    'nhịp điệu: chia cụm, chỗ ngắt, đọc đều hay vấp, từ chức năng đọc nhẹ và nhanh',
+}
+
+/** dòng dặn thêm cho model khi người học đang luyện một trụ cột cụ thể; rỗng nếu không có */
+export function focusInstruction(focus?: DrillFocus, note?: string) {
+  if (!focus) return ''
+  return `\nNgười học đang luyện riêng phần ${FOCUS_HINT[focus]}. Hãy nhận xét tập trung vào phần này, tối đa 3 lỗi quan trọng nhất.${note ? ` Lưu ý của bài: ${note}` : ''}`
+}
+
 export function pronunciationPrompt(opts: {
   reference: string
   transcript: string
@@ -165,6 +189,8 @@ export function pronunciationPrompt(opts: {
   wpm: number | null
   refWpm: number | null
   pauses: Array<{ after: string; ms: number }>
+  focus?: DrillFocus
+  note?: string
 }) {
   return `Câu gốc: "${opts.reference}"
 STT nhận dạng người học nói: "${opts.transcript}"
@@ -174,7 +200,7 @@ Các khoảng ngắt dài (>400ms): ${opts.pauses.map((p) => `sau "${p.after}" $
 Các chỗ khác biệt:
 ${tokensForPrompt(opts.tokens) || '(STT nhận dạng đúng toàn bộ)'}
 
-Hãy nhận xét phát âm, chỉ ra lỗi và đưa bài tập luyện lại.`
+Hãy nhận xét phát âm, chỉ ra lỗi và đưa bài tập luyện lại.${focusInstruction(opts.focus, opts.note)}`
 }
 
 /** Kết quả khi model LLM nghe trực tiếp bản ghi âm: chữ nghe được + nhận xét trong một lần gọi */
@@ -195,9 +221,13 @@ Nhiệm vụ: bạn được nghe trực tiếp bản ghi âm người học đ�
 3. "fluency": độ trôi chảy 0-100 dựa trên nhịp, ngắt nghỉ và ngữ điệu so với người bản xứ.
 Nếu bản ghi im lặng hoặc không nghe rõ, để transcript rỗng và nói rõ trong summary.`
 
-export function audioPronunciationPrompt(reference: string) {
+export function audioPronunciationPrompt(
+  reference: string,
+  focus?: DrillFocus,
+  note?: string,
+) {
   return `Câu gốc người học cần đọc: "${reference}"
-Hãy nghe bản ghi âm đính kèm và đánh giá phát âm.`
+Hãy nghe bản ghi âm đính kèm và đánh giá phát âm.${focusInstruction(focus, note)}`
 }
 
 export const LookupSchema = z.object({

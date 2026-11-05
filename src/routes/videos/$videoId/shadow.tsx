@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { EyeOff } from 'lucide-react'
 
 import { KaraokeText, OptionToggle } from '#/components/karaoke-text'
+import { ShadowingGuide } from '#/components/pillar-summary'
 import { PronunciationPanel } from '#/components/pronunciation-panel'
 import { SegmentControls } from '#/components/segment-controls'
 import { Label } from '#/components/ui/label'
@@ -22,6 +23,8 @@ function ShadowMode() {
 
   return (
     <div className="flex flex-col gap-4">
+      <ShadowingGuide />
+
       <SegmentControls
         index={idx}
         total={total}

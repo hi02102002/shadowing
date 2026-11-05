@@ -32,6 +32,7 @@ import { Route as GrammarIndexRouteImport } from './routes/grammar/index'
 import { Route as GrammarUnitIdRouteImport } from './routes/grammar/$unitId'
 import { Route as IpaIndexRouteImport } from './routes/ipa/index'
 import { Route as IpaSoundIdRouteImport } from './routes/ipa/$soundId'
+import { Route as IpaShadowingRouteImport } from './routes/ipa/shadowing'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
 import { Route as VideosVideoIdIndexRouteImport } from './routes/videos/$videoId/index'
 import { Route as VideosVideoIdChunksRouteImport } from './routes/videos/$videoId/chunks'
@@ -155,6 +156,11 @@ const IpaSoundIdRoute = IpaSoundIdRouteImport.update({
   path: '/ipa/$soundId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IpaShadowingRoute = IpaShadowingRouteImport.update({
+  id: '/ipa/shadowing',
+  path: '/ipa/shadowing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VideosVideoIdRoute = VideosVideoIdRouteImport.update({
   id: '/videos/$videoId',
   path: '/videos/$videoId',
@@ -211,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/flashcards/study': typeof FlashcardsStudyRoute
   '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
+  '/ipa/shadowing': typeof IpaShadowingRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
   '/chunks/': typeof ChunksIndexRoute
   '/flashcards/': typeof FlashcardsIndexRoute
@@ -243,6 +250,7 @@ export interface FileRoutesByTo {
   '/flashcards/study': typeof FlashcardsStudyRoute
   '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
+  '/ipa/shadowing': typeof IpaShadowingRoute
   '/chunks': typeof ChunksIndexRoute
   '/flashcards': typeof FlashcardsIndexRoute
   '/grammar': typeof GrammarIndexRoute
@@ -275,6 +283,7 @@ export interface FileRoutesById {
   '/flashcards/study': typeof FlashcardsStudyRoute
   '/grammar/$unitId': typeof GrammarUnitIdRoute
   '/ipa/$soundId': typeof IpaSoundIdRoute
+  '/ipa/shadowing': typeof IpaShadowingRoute
   '/videos/$videoId': typeof VideosVideoIdRouteWithChildren
   '/chunks/': typeof ChunksIndexRoute
   '/flashcards/': typeof FlashcardsIndexRoute
@@ -309,6 +318,7 @@ export interface FileRouteTypes {
     | '/flashcards/study'
     | '/grammar/$unitId'
     | '/ipa/$soundId'
+    | '/ipa/shadowing'
     | '/videos/$videoId'
     | '/chunks/'
     | '/flashcards/'
@@ -341,6 +351,7 @@ export interface FileRouteTypes {
     | '/flashcards/study'
     | '/grammar/$unitId'
     | '/ipa/$soundId'
+    | '/ipa/shadowing'
     | '/chunks'
     | '/flashcards'
     | '/grammar'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/flashcards/study'
     | '/grammar/$unitId'
     | '/ipa/$soundId'
+    | '/ipa/shadowing'
     | '/videos/$videoId'
     | '/chunks/'
     | '/flashcards/'
@@ -405,6 +417,7 @@ export interface RootRouteChildren {
   FlashcardsStudyRoute: typeof FlashcardsStudyRoute
   GrammarUnitIdRoute: typeof GrammarUnitIdRoute
   IpaSoundIdRoute: typeof IpaSoundIdRoute
+  IpaShadowingRoute: typeof IpaShadowingRoute
   VideosVideoIdRoute: typeof VideosVideoIdRouteWithChildren
   ChunksIndexRoute: typeof ChunksIndexRoute
   FlashcardsIndexRoute: typeof FlashcardsIndexRoute
@@ -575,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IpaSoundIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ipa/shadowing': {
+      id: '/ipa/shadowing'
+      path: '/ipa/shadowing'
+      fullPath: '/ipa/shadowing'
+      preLoaderRoute: typeof IpaShadowingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/videos/$videoId': {
       id: '/videos/$videoId'
       path: '/videos/$videoId'
@@ -669,6 +689,7 @@ const rootRouteChildren: RootRouteChildren = {
   FlashcardsStudyRoute: FlashcardsStudyRoute,
   GrammarUnitIdRoute: GrammarUnitIdRoute,
   IpaSoundIdRoute: IpaSoundIdRoute,
+  IpaShadowingRoute: IpaShadowingRoute,
   VideosVideoIdRoute: VideosVideoIdRouteWithChildren,
   ChunksIndexRoute: ChunksIndexRoute,
   FlashcardsIndexRoute: FlashcardsIndexRoute,

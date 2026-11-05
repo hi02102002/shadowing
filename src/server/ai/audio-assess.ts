@@ -8,7 +8,7 @@ import {
   audioPronunciationPrompt,
   audioPronunciationSystem,
 } from './prompts.ts'
-import type { AudioAssessment } from './prompts.ts'
+import type { AudioAssessment, DrillFocus } from './prompts.ts'
 
 const GEMINI_OPENAI_BASE =
   'https://generativelanguage.googleapis.com/v1beta/openai'
@@ -63,11 +63,12 @@ export function assessWithAudioLlm(
   wav: Buffer,
   reference: string,
   cfg: AppConfig = getConfig(),
+  drill?: { focus?: DrillFocus; note?: string },
 ): Promise<AudioAssessment> {
   return audioStructured({
     wav,
     system: audioPronunciationSystem(cfg.accent),
-    prompt: audioPronunciationPrompt(reference),
+    prompt: audioPronunciationPrompt(reference, drill?.focus, drill?.note),
     schema: AudioAssessmentSchema,
     name: 'pronunciation_assessment',
     cfg,
@@ -218,9 +219,16 @@ export async function transcribeWithAudioLlm(
     ],
   })
   const content = replyContent(res, cfg)
-  if (/not supported|unsupported|could not be processed|cannot (process|hear)/i.test(content))
+  if (
+    /not supported|unsupported|could not be processed|cannot (process|hear)/i.test(
+      content,
+    )
+  )
     throw new Error(
       `Model "${cfg.llmModel}" không nhận audio qua endpoint này. Dùng model/provider nghe được audio, hoặc nhập STT trong Cài đặt.`,
     )
-  return content.trim().replace(/^["“]|["”]$/g, '').trim()
+  return content
+    .trim()
+    .replace(/^["“]|["”]$/g, '')
+    .trim()
 }

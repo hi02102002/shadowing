@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   CheckCircle2,
   ChevronRight,
+  Ear,
   Snail,
   Speech,
   Volume2,
@@ -54,7 +55,14 @@ function IpaPage() {
             và tự ghi âm. Sang tab Luyện nghe để kiểm tra tai mình.
           </p>
         </div>
-        <AccentSwitch />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link to="/ipa/shadowing">
+              <Ear /> Shadowing là gì?
+            </Link>
+          </Button>
+          <AccentSwitch />
+        </div>
       </header>
 
       <Tabs defaultValue="chart">

@@ -8,6 +8,7 @@ import { Cpu, Headphones, Play, Sparkles, Volume2 } from 'lucide-react'
 import { AiAnalysisToggle, AiFeedback } from '#/components/ai-feedback'
 import { DiffLegend, DiffView } from '#/components/diff-view'
 import { RecordButton } from '#/components/record-button'
+import { PillarSummary } from '#/components/pillar-summary'
 import { ScoreRing } from '#/components/score-ring'
 import { Button } from '#/components/ui/button'
 import { useAiAnalysis } from '#/hooks/use-app-settings'
@@ -18,6 +19,8 @@ import { relativeTime, scoreTone } from '#/lib/format'
 import { cn } from '#/lib/utils'
 import type { AlignToken } from '#/lib/align'
 import { mistakeLabel } from '#/server/ai/prompts'
+import { PILLARS } from '#/lib/shadowing-basics'
+import type { PillarId } from '#/lib/shadowing-basics'
 import { assessPronunciation, pronunciationFeedback } from '#/server/fns/pronunciation'
 import type {
   PronunciationEngine,
@@ -78,6 +81,9 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
   const [result, setResult] = useState<PronunciationResult | null>(null)
   const shadowingRef = useRef(false)
   const [engine, setEngine] = useEngineChoice()
+  // trụ cột đang luyện (undefined = nhận xét chung); gửi kèm khi chấm và khi xin nhận xét AI
+  const [focus, setFocus] = useState<PillarId | undefined>()
+  const [resultFocus, setResultFocus] = useState<PillarId | undefined>()
   const engines = useQuery(pronunciationEnginesQuery())
 
   const assess = useMutation({
@@ -86,11 +92,13 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
       form.set('segmentId', String(segment.id))
       form.set('mode', mode)
       form.set('engine', engine)
+      if (focus) form.set('focus', focus)
       form.set('audio', new File([blob], `rec.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`, { type: blob.type }))
       return assessPronunciation({ data: form })
     },
     onSuccess: (r) => {
       setResult(r)
+      setResultFocus(focus)
       setAskedAi(false)
       void queryClient.invalidateQueries({ queryKey: videoQuery(youtubeId).queryKey })
       void queryClient.invalidateQueries({ queryKey: pronunciationHistoryQuery(segment.id).queryKey })
@@ -111,8 +119,8 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
   const [autoAi] = useAiAnalysis()
   const wantAi = !!result?.aiFeedback && (autoAi || askedAi)
   const feedback = useQuery({
-    queryKey: ['pronunciation-feedback', result?.attemptId],
-    queryFn: () => pronunciationFeedback({ data: { attemptId: result!.attemptId } }),
+    queryKey: ['pronunciation-feedback', result?.attemptId, resultFocus],
+    queryFn: () => pronunciationFeedback({ data: { attemptId: result!.attemptId, focus: resultFocus } }),
     // chưa cấu hình LLM → chỉ có điểm chấm trên máy, không gọi AI nhận xét
     enabled: wantAi,
     staleTime: Infinity,
@@ -164,6 +172,7 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
             Nghe câu gốc (có thể lặp và giảm tốc độ), sau đó bấm ghi âm và <b>nhắc lại</b>.
           </p>
         )}
+        <FocusPicker value={focus} onChange={setFocus} />
         <EnginePicker value={engine} onChange={setEngine} info={engines.data} />
         <AiAnalysisToggle />
         <RecordButton
@@ -193,6 +202,15 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
 
           <DiffView tokens={result.tokens} />
           <DiffLegend />
+
+          <PillarSummary
+            mistakes={feedback.data?.mistakes}
+            wpm={result.wpm}
+            refWpm={result.refWpm}
+            pauses={result.pauses}
+            focus={focus}
+            onFocus={setFocus}
+          />
 
           <div className="rounded-lg bg-muted/60 p-3 text-sm">
             <span className="text-muted-foreground">Máy nghe được: </span>
@@ -351,4 +369,39 @@ function ErrorChip({ token: t }: { token: AlignToken }) {
   if (t.op === 'missing')
     return <span className="rounded border border-dashed border-miss/60 bg-miss-soft px-1.5 py-0.5 text-miss">thiếu: {t.ref}</span>
   return <span className="rounded bg-extra-soft px-1.5 py-0.5 text-extra">thừa: {t.hyp}</span>
+}
+
+/** chọn trụ cột muốn luyện: nhận xét AI sẽ tập trung vào phần đó */
+function FocusPicker({
+  value,
+  onChange,
+}: {
+  value: PillarId | undefined
+  onChange: (v: PillarId | undefined) => void
+}) {
+  const pillar = PILLARS.find((p) => p.id === value)
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-wrap items-center justify-center gap-1 text-xs" role="group" aria-label="Luyện tập trung">
+        <span className="mr-1 text-muted-foreground">Luyện tập trung</span>
+        {[{ id: undefined, label: 'Tất cả' }, ...PILLARS].map((o) => (
+          <button
+            key={o.id ?? 'all'}
+            type="button"
+            aria-pressed={o.id === value}
+            onClick={() => onChange(o.id)}
+            className={cn(
+              'rounded-md border px-2 py-1 transition-colors',
+              o.id === value ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted',
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="max-w-xl text-center text-xs text-muted-foreground">
+        {pillar ? `${pillar.vi}: ${pillar.tips[0]}` : 'Chọn một trụ cột để AI nhận xét tập trung vào phần đó.'}
+      </p>
+    </div>
+  )
 }

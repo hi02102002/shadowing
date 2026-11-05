@@ -10,11 +10,12 @@ import { alignWords, displayWords } from '#/lib/align.ts'
 import type { AlignToken } from '#/lib/align.ts'
 import { assessWithAudioLlm } from '../ai/audio-assess.ts'
 import {
+  DRILL_FOCUS,
   PronunciationFeedbackSchema,
   pronunciationPrompt,
   pronunciationSystem,
 } from '../ai/prompts.ts'
-import type { PronunciationFeedback } from '../ai/prompts.ts'
+import type { DrillFocus, PronunciationFeedback } from '../ai/prompts.ts'
 import { structured } from '../ai/provider.ts'
 import { toWav16k } from '../audio.ts'
 import { getConfig, hasAudioLlm, hasLlm, hasStt } from '../config.ts'
@@ -80,7 +81,8 @@ export const pronunciationEngines = createServerFn({ method: 'GET' }).handler(
         unavailable: engineUnavailable(id, cfg),
       })),
       /** chấm trên máy lần đầu phải tải model */
-      localModelReady: whisperLocalStatus(PRONUNCIATION_MODEL).model === 'ready',
+      localModelReady:
+        whisperLocalStatus(PRONUNCIATION_MODEL).model === 'ready',
     }
   },
 )
@@ -92,6 +94,7 @@ async function hearRecording(
   reference: string,
   choice: PronunciationEngine | 'auto',
   cfg: AppConfig,
+  drill?: { focus?: DrillFocus; note?: string },
 ) {
   let transcript: string
   let words: SttWord[] = []
@@ -110,6 +113,7 @@ async function hearRecording(
       wav,
       reference,
       cfg,
+      drill,
     )
     transcript = text.trim()
     feedback = rest
@@ -151,6 +155,12 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
         .enum(['auto', ...ENGINES])
         .catch('auto')
         .parse(form.get('engine')),
+      // trụ cột đang luyện: nhận xét AI bám vào đó
+      focus: z
+        .enum(DRILL_FOCUS)
+        .optional()
+        .catch(undefined)
+        .parse(form.get('focus') ?? undefined),
     }
   })
   .handler(async ({ data }) => {
@@ -170,6 +180,7 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
       seg.text,
       data.engine,
       cfg,
+      { focus: data.focus },
     )
     const { engine, transcript, words, spokenSec } = heard
     // tắt tự phân tích: chỉ lấy chữ nghe được; bấm "Nhờ AI phân tích" sẽ phân tích lại và ghi Sổ lỗi
@@ -250,7 +261,7 @@ export type PronunciationResult = Awaited<
   ReturnType<typeof assessPronunciation>
 >
 
-/** Chấm từ / câu luyện âm ở trang IPA: không gắn với video nên không lưu lại */
+/** Chấm từ / câu luyện ở trang IPA và "Shadowing là gì?": không gắn với video nên không lưu lại */
 export const assessDrill = createServerFn({ method: 'POST' })
   .validator((form: FormData) => {
     if (!(form instanceof FormData)) throw new Error('Dữ liệu không hợp lệ')
@@ -262,25 +273,84 @@ export const assessDrill = createServerFn({ method: 'POST' })
     return {
       audio,
       text: z.string().trim().min(1).max(200).parse(form.get('text')),
+      // trụ cột đang luyện (sound/stress/intonation/rhythm) và lưu ý của bài, để nhận xét bám đúng phần đó
+      focus: z
+        .enum(DRILL_FOCUS)
+        .optional()
+        .parse(form.get('focus') ?? undefined),
+      note: z
+        .string()
+        .trim()
+        .max(200)
+        .optional()
+        .parse(form.get('note') ?? undefined),
     }
   })
   .handler(async ({ data }) => {
     const cfg = getConfig()
     const raw = Buffer.from(await data.audio.arrayBuffer())
-    const heard = await hearRecording(data.audio, raw, data.text, 'auto', cfg)
+    const drill = { focus: data.focus, note: data.note }
+    const heard = await hearRecording(
+      data.audio,
+      raw,
+      data.text,
+      'auto',
+      cfg,
+      drill,
+    )
     const result = alignWords(data.text, heard.transcript)
+
+    const pauses: StoredWords['pauses'] = []
+    for (let i = 0; i < heard.words.length - 1; i++) {
+      const gap = Math.round(
+        (heard.words[i + 1].start - heard.words[i].end) * 1000,
+      )
+      if (gap > 400) pauses.push({ after: heard.words[i].word.trim(), ms: gap })
+    }
+    const spokenCount =
+      heard.words.length || displayWords(heard.transcript).length
+    const wpm =
+      spokenCount >= 2 && heard.spokenSec > 0
+        ? Math.round((spokenCount / heard.spokenSec) * 60)
+        : null
+
+    // engine không nghe audio (STT / máy) chưa có nhận xét: nhờ LLM đọc chữ + chỗ khác biệt để nhận xét theo trụ cột
+    let feedback = heard.feedback
+    if (!feedback && data.focus && hasLlm(cfg)) {
+      feedback = await structured({
+        system: pronunciationSystem(cfg.accent),
+        prompt: pronunciationPrompt({
+          reference: data.text,
+          transcript: heard.transcript,
+          tokens: result.tokens,
+          wpm,
+          refWpm: null,
+          pauses,
+          focus: data.focus,
+          note: data.note,
+        }),
+        schema: PronunciationFeedbackSchema,
+      }).catch(() => null)
+    }
     return {
       transcript: heard.transcript,
       accuracy: result.score,
       tokens: result.tokens,
-      feedback: heard.feedback,
+      feedback,
+      wpm,
+      pauses,
     }
   })
 
 export type DrillResult = Awaited<ReturnType<typeof assessDrill>>
 
 export const pronunciationFeedback = createServerFn({ method: 'POST' })
-  .validator(z.object({ attemptId: z.number().int() }))
+  .validator(
+    z.object({
+      attemptId: z.number().int(),
+      focus: z.enum(DRILL_FOCUS).optional(),
+    }),
+  )
   .handler(async ({ data }): Promise<PronunciationFeedback> => {
     const row = db
       .select({ attempt: pronunciationAttempts, seg: segments })
@@ -302,6 +372,7 @@ export const pronunciationFeedback = createServerFn({ method: 'POST' })
         wpm: row.attempt.wpm,
         refWpm: row.attempt.refWpm,
         pauses: stored.pauses,
+        focus: data.focus,
       }),
       schema: PronunciationFeedbackSchema,
     })
@@ -337,7 +408,10 @@ export const pronunciationHistory = createServerFn({ method: 'GET' })
     // chỉ gửi các từ sai/thiếu/thừa và lỗi AI đã nhận xét, để xem lại sai ở đâu
     return rows.map(({ wordsJson, aiJson, ...a }) => ({
       ...a,
-      errors: parseJson<StoredWords>(wordsJson)?.tokens.filter((t) => t.op !== 'correct') ?? [],
+      errors:
+        parseJson<StoredWords>(wordsJson)?.tokens.filter(
+          (t) => t.op !== 'correct',
+        ) ?? [],
       mistakes:
         parseJson<PronunciationFeedback>(aiJson)?.mistakes.map((m) => ({
           word: m.word,

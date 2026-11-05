@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createFileRoute, Link, notFound } from '@tanstack/react-router'
-import { useMutation } from '@tanstack/react-query'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -16,7 +15,6 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { DiffLegend, DiffView } from '#/components/diff-view'
 import {
   AccentSwitch,
   MarkedWord,
@@ -24,12 +22,10 @@ import {
   useWordsIpa,
 } from '#/components/ipa-shared'
 import type { IpaMap } from '#/components/ipa-shared'
-import { RecordButton } from '#/components/record-button'
-import { ScoreRing } from '#/components/score-ring'
+import { RecordDrill } from '#/components/record-drill'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { useAccent } from '#/hooks/use-app-settings'
-import { useRecorder } from '#/hooks/use-recorder'
 import { IPA_DETAILS } from '#/lib/ipa-details'
 import type { SoundDetail } from '#/lib/ipa-details'
 import { exampleWord, GROUP_LABEL, IPA_SOUNDS } from '#/lib/ipa-sounds'
@@ -38,8 +34,6 @@ import type { Accent } from '#/lib/speech'
 import { speak } from '#/lib/speech'
 import { cn } from '#/lib/utils'
 import { youtubeThumbnail } from '#/lib/youtube-id'
-import { assessDrill } from '#/server/fns/pronunciation'
-import type { DrillResult } from '#/server/fns/pronunciation'
 
 export const Route = createFileRoute('/ipa/$soundId')({
   loader: ({ params }) => {
@@ -225,7 +219,7 @@ function SoundPage() {
         <div className="flex min-w-0 flex-col gap-6">
           <VideoCard id={detail.video} />
           <Section icon={Mic} title="Ghi âm và chấm">
-            <RecordDrill key={sound.id} detail={detail} accent={accent} />
+            <RecordDrill key={sound.id} targets={drillTargets(detail)} accent={accent} />
           </Section>
         </div>
       </div>
@@ -524,175 +518,13 @@ function VideoCard({ id }: { id: string }) {
   )
 }
 
-/** bỏ dấu câu và chữ hoa để "Peas." khớp "peas" */
-const normalizeWord = (w: string) => w.toLowerCase().replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, '')
-
-function RecordDrill({
-  detail,
-  accent,
-}: {
-  detail: SoundDetail
-  accent: Accent
-}) {
-  // câu luyện + từng nhóm từ đọc liền nhau (máy nhận dạng từ đơn lẻ kém chính xác)
-  const targets = useMemo(
-    () => [
-      ...detail.phrases,
-      ...detail.words.map((g) => g.items.map(exampleWord).join(', ')),
-    ],
-    [detail],
-  )
-  const [text, setText] = useState(targets[0])
-  const [result, setResult] = useState<DrillResult | null>(null)
-
-  // phiên âm từng từ của câu đang luyện, hiện dưới kết quả chấm
-  const words = useMemo(() => text.split(/\s+/).filter(Boolean), [text])
-  const ipa = useWordsIpa(`drill:${text}`, words)
-  const ipaOf = useMemo(() => {
-    const byWord = new Map<string, string | null>()
-    ipa?.forEach((v, w) => byWord.set(normalizeWord(w), v))
-    return (w: string) => byWord.get(normalizeWord(w))
-  }, [ipa])
-
-  const assess = useMutation({
-    mutationFn: (blob: Blob) => {
-      const form = new FormData()
-      form.set('text', text)
-      form.set(
-        'audio',
-        new File([blob], `rec.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`, {
-          type: blob.type,
-        }),
-      )
-      return assessDrill({ data: form })
-    },
-    onSuccess: setResult,
-  })
-
-  // bản ghi gần nhất để nghe lại giọng mình, so với giọng mẫu
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
-  useEffect(
-    () => () => {
-      if (recordingUrl) URL.revokeObjectURL(recordingUrl)
-    },
-    [recordingUrl],
-  )
-  const playRecording = () => {
-    if (recordingUrl) void new Audio(recordingUrl).play()
-  }
-
-  const recorder = useRecorder({
-    maxMs: 20_000,
-    onStop: (blob) => {
-      // bản ghi quá ngắn thường là bấm nhầm
-      if (blob.size <= 2_000) return
-      setRecordingUrl(URL.createObjectURL(blob))
-      assess.mutate(blob)
-    },
-  })
-
-  const pick = (t: string) => {
-    setText(t)
-    setResult(null)
-    setRecordingUrl(null)
-    assess.reset()
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-1.5">
-        {targets.map((t, i) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => pick(t)}
-            className={cn(
-              'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
-              t === text
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted',
-            )}
-          >
-            {i < detail.phrases.length
-              ? `Câu ${i + 1}`
-              : detail.words[i - detail.phrases.length].label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-start gap-2 rounded-lg bg-muted/60 p-3">
-        <p className="flex-1 text-lg font-medium">{text}</p>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => speak(text, { accent })}
-          aria-label="Nghe mẫu"
-        >
-          <Volume2 />
-        </Button>
-      </div>
-
-      <div className="flex flex-col items-center gap-2">
-        <RecordButton
-          recording={recorder.recording}
-          busy={assess.isPending}
-          level={recorder.level}
-          elapsedMs={recorder.elapsedMs}
-          onStart={() => {
-            setResult(null)
-            void recorder.start()
-          }}
-          onStop={recorder.stop}
-        />
-        {recorder.error && (
-          <p className="text-sm text-destructive">{recorder.error}</p>
-        )}
-        {assess.error && (
-          <p className="text-center text-sm text-destructive">
-            {assess.error.message}
-          </p>
-        )}
-      </div>
-
-      {result && (
-        <div className="flex flex-col gap-3 border-t pt-4">
-          <div className="flex items-center gap-4">
-            <ScoreRing value={result.accuracy} label="Chính xác" />
-            <div className="min-w-0 flex-1">
-              <DiffView tokens={result.tokens} ipa={ipaOf} className="text-base" />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={playRecording} disabled={!recordingUrl}>
-              <Mic /> Nghe lại giọng bạn
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => speak(text, { accent })}>
-              <Volume2 /> Nghe mẫu
-            </Button>
-          </div>
-          <DiffLegend />
-          <p className="text-sm">
-            <span className="text-muted-foreground">Máy nghe được: </span>
-            <span className="italic">
-              “{result.transcript || '(không nhận dạng được)'}”
-            </span>
-          </p>
-          {result.feedback && (
-            <div className="flex flex-col gap-2 rounded-lg bg-muted/60 p-3 text-sm">
-              <p>{result.feedback.summary}</p>
-              {result.feedback.mistakes.map((m) => (
-                <div key={m.word + m.heard}>
-                  <span className="font-medium">{m.word}</span>{' '}
-                  <span className="ipa text-muted-foreground">{m.ipa}</span>
-                  <p className="text-muted-foreground">
-                    {m.explanation} {m.tip}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
+/** câu luyện + từng nhóm từ đọc liền nhau (máy nhận dạng từ đơn lẻ kém chính xác) */
+function drillTargets(detail: SoundDetail) {
+  return [
+    ...detail.phrases.map((text, i) => ({ label: `Câu ${i + 1}`, text })),
+    ...detail.words.map((g) => ({
+      label: g.label,
+      text: g.items.map(exampleWord).join(', '),
+    })),
+  ]
 }
