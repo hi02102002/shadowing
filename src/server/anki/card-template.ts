@@ -605,8 +605,13 @@ export function renderCard(c: CardParts, media: Media) {
     ...(c.info?.idioms ?? []).map((i, n) =>
       chunkLine(i.en, i.vi, undefined, media.chunkSounds?.[n]),
     ),
-    ...(c.info?.collocations ?? []).map((k) =>
-      chunkLine(k.words, k.type, k.example),
+    ...(c.info?.collocations ?? []).map((k, n) =>
+      chunkLine(
+        k.words,
+        k.type,
+        k.example,
+        media.chunkSounds?.[(c.info?.idioms.length ?? 0) + n],
+      ),
     ),
   ].slice(0, 5)
   const chunksHtml = chunks.length

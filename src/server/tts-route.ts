@@ -121,31 +121,36 @@ function get(url: string, referer?: string): Promise<Buffer> {
   })
 }
 
-export default defineHandler(async (event) => {
-  const params = new URL(event.req.url).searchParams
-  const text = (params.get('text') ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_CHARS)
-  const accent = params.get('accent') === 'uk' ? 'uk' : 'us'
-  if (!text) return new Response('Thiếu text', { status: 400 })
-
-  const lang = LANG[accent]
+/** mp3 giọng đọc của text (đọc cache, chưa có thì tải: Youdao có ký → Youdao thường → Google); ném lỗi nếu mọi nguồn đều hỏng */
+export async function speechMp3(
+  raw: string,
+  accent: Accent = 'uk',
+): Promise<Buffer> {
+  const text = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_CHARS)
+  if (!text) throw new Error('Thiếu text')
   const file = path.join(
     cacheDir(),
-    `${createHash('sha1').update(`${lang}|${text.toLowerCase()}`).digest('hex')}.mp3`,
+    `${createHash('sha1').update(`${LANG[accent]}|${text.toLowerCase()}`).digest('hex')}.mp3`,
   )
-  let audio: Buffer | null = await fs.readFile(file).catch(() => null)
-  if (!audio) {
-    try {
-      audio = await download(text, accent)
-    } catch (err) {
-      return new Response(err instanceof Error ? err.message : String(err), {
-        status: 502,
-      })
-    }
-    await fs.mkdir(cacheDir(), { recursive: true })
-    await fs.writeFile(file, audio).catch(() => {})
+  const cached = await fs.readFile(file).catch(() => null)
+  if (cached) return cached
+  const audio = await download(text, accent)
+  await fs.mkdir(cacheDir(), { recursive: true })
+  await fs.writeFile(file, audio).catch(() => {})
+  return audio
+}
+
+export default defineHandler(async (event) => {
+  const params = new URL(event.req.url).searchParams
+  const accent = params.get('accent') === 'uk' ? 'uk' : 'us'
+  let audio: Buffer
+  try {
+    audio = await speechMp3(params.get('text') ?? '', accent)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return new Response(message, {
+      status: message === 'Thiếu text' ? 400 : 502,
+    })
   }
   return new Response(new Uint8Array(audio), {
     headers: {

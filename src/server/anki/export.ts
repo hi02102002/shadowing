@@ -11,14 +11,14 @@ import { zipSync } from 'fflate'
 
 import { cardMediaDir } from '../media-store.ts'
 import { getEssentialMedia } from '../essential-media-route.ts'
-import { bingImageUrl, youdaoVoiceUrl } from '#/lib/anki-builder.ts'
+import { bingImageUrl } from '#/lib/anki-builder.ts'
 import {
   CARD_CSS,
   audioButton,
   escapeHtml,
   renderCard,
 } from './card-template.ts'
-import { mediaDownloader } from './media.ts'
+import { mediaDownloader, speech } from './media.ts'
 import type { CardInfo } from '#/db/schema.ts'
 
 export interface ExportCard {
@@ -111,6 +111,13 @@ export async function buildApkg(
       ? addFile(`gen-${hash32(url).toString(16)}.${d.ext}`, d.data)
       : null
   }
+  /** audio giọng đọc của text, dùng chung file nếu cùng nội dung */
+  const tts = async (text: string) => {
+    const d = await speech(text)
+    return d
+      ? addFile(`tts-${hash32(text.toLowerCase()).toString(16)}.mp3`, d.data)
+      : null
+  }
   const sound = (name: string | null) => (name ? `[sound:${name}]` : '')
 
   const jobs = exportDecks.flatMap((d) =>
@@ -131,7 +138,13 @@ export async function buildApkg(
       if (!isNote) {
         const word = c.front.trim()
         const exampleText = first(c.example) || c.info?.examples[0]?.en || ''
-        const idioms = (c.info?.idioms ?? []).slice(0, 5)
+        // thứ tự giống khung chunks của thẻ (thành ngữ rồi collocation, tối đa 5 dòng); collocation là danh sách từ → đọc câu ví dụ của nó
+        const chunkTexts = [
+          ...(c.info?.idioms ?? []).map((x) => x.en),
+          ...(c.info?.collocations ?? []).map(
+            (k) => k.example || k.words.split(/[,|]/)[0].trim(),
+          ),
+        ].slice(0, 5)
         const [image, audio, example, chunks] = await Promise.all([
           (async () =>
             (await fetchMedia(c.imageUrl, 'jpg')) ??
@@ -144,11 +157,9 @@ export async function buildApkg(
                   ? `/api/card-media/${encodeURIComponent(c.audioFile)}`
                   : null),
               'mp3',
-            )) ?? (await fetchMedia(youdaoVoiceUrl(word), 'mp3')))(),
-          exampleText ? fetchMedia(youdaoVoiceUrl(exampleText), 'mp3') : null,
-          Promise.all(
-            idioms.map((x) => fetchMedia(youdaoVoiceUrl(x.en), 'mp3')),
-          ),
+            )) ?? (await tts(word)))(),
+          exampleText ? tts(exampleText) : null,
+          Promise.all(chunkTexts.map((t) => (t ? tts(t) : null))),
         ])
         if (image)
           imageTag = `<img src="${escapeHtml(image)}" alt="${escapeHtml(word)}" style="max-height:220px;max-width:100%;object-fit:cover;border-radius:8px">`

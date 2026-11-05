@@ -4,6 +4,11 @@ import { buildApkg } from './export.ts'
 import { readApkg } from './apkg.ts'
 import type { ExportCard } from './export.ts'
 
+// không gọi mạng thật (cả giọng đọc dùng node:https)
+vi.mock('../tts-route.ts', () => ({
+  speechMp3: () => Promise.reject(new Error('offline')),
+}))
+
 // không gọi mạng thật: ảnh/audio tự tạo (Bing, Youdao) thất bại → thẻ vẫn xuất, thiếu media
 beforeEach(() =>
   vi.stubGlobal('fetch', () => Promise.reject(new Error('offline'))),

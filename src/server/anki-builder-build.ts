@@ -2,14 +2,14 @@
  * Dựng gói .apkg từ thẻ do trình tạo Anki sinh ra: tải ảnh (Bing) và audio (Youdao, giọng Anh) về nhúng offline.
  * Bố cục thẻ lấy từ repo essentialenglish2ank (CSS dùng chung với card-template.ts).
  */
-import { bingImageUrl, youdaoVoiceUrl } from '#/lib/anki-builder.ts'
+import { bingImageUrl } from '#/lib/anki-builder.ts'
 import type {
   AnyAnkiCard,
   NoteCard,
   VocabularyCard,
 } from '#/lib/anki-builder.ts'
 import { audioButton, escapeHtml, posInfo } from './anki/card-template.ts'
-import { mediaDownloader } from './anki/media.ts'
+import { mediaDownloader, speech } from './anki/media.ts'
 import type { Download, Downloaded } from './anki/media.ts'
 import { writeApkg } from './anki/export.ts'
 import type { ApkgRow } from './anki/export.ts'
@@ -32,20 +32,12 @@ interface Prepared {
   media: Array<{ name: string; data: Uint8Array }>
 }
 
-/** tải audio của text theo URL đã có, lỗi thì thử lại bằng URL Youdao chuẩn */
-async function audioFor(
-  download: Download,
-  url: string | undefined,
+/** audio giọng đọc UK của text (chuỗi nguồn có dự phòng của app) */
+const audioFor = (
+  _download: Download,
+  _url: string | undefined,
   text: string,
-) {
-  const fallback = youdaoVoiceUrl(text)
-  const wanted = (url ?? '').replace(/([?&]type=)2\b/, '$11') || fallback
-  if (!wanted) return null
-  return (
-    (await download(wanted, 'mp3')) ??
-    (fallback && fallback !== wanted ? await download(fallback, 'mp3') : null)
-  )
-}
+) => speech(text.trim())
 
 async function prepareVocabulary(
   card: VocabularyCard,
