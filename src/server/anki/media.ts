@@ -33,13 +33,15 @@ function limiter(host: string) {
   let active = 0
   const queue: Array<() => void> = []
   return async <T>(task: () => Promise<T>): Promise<T> => {
+    // hết chỗ thì chờ; người trước xong sẽ chuyển thẳng slot cho mình (không giảm rồi tăng lại → không vượt max)
     if (active >= max) await new Promise<void>((resolve) => queue.push(resolve))
-    active++
+    else active++
     try {
       return await task()
     } finally {
-      active--
-      queue.shift()?.()
+      const waiter = queue.shift()
+      if (waiter) waiter()
+      else active--
     }
   }
 }

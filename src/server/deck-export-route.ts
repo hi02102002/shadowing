@@ -67,7 +67,7 @@ export default defineHandler(async (event) => {
     if (query.download === '1') {
       if (job.status !== 'completed' || !job.data)
         return Response.json({ error: 'File chưa sẵn sàng' }, { status: 400 })
-      const filename = `${job.title.replace(/[^\w\s.-]/g, '').trim() || 'deck'}.apkg`
+      const filename = `${job.title.replace(/[^\p{L}\p{N}\s.-]/gu, '').trim() || 'deck'}.apkg`
       return new Response(job.data as BodyInit, {
         headers: {
           'content-type': 'application/octet-stream',
@@ -84,6 +84,9 @@ export default defineHandler(async (event) => {
     })
   }
 
+  // việc nặng (AI, tải media) chỉ bắt đầu khi client chủ động yêu cầu, tránh prefetch / tải lại trang kích hoạt
+  if (query.start !== '1')
+    return Response.json({ error: 'Thiếu start=1' }, { status: 400 })
   const param = event.context.params?.id ?? ''
   let list: Array<typeof decks.$inferSelect>
   let title: string

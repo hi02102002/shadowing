@@ -13,6 +13,7 @@ import { TimeChoice, formatSeconds } from '#/components/time-choice'
 import { useRecorder } from '#/hooks/use-recorder'
 import { IELTS_PART1, IELTS_PART3 } from '#/lib/conversation'
 import type { TalkLevel } from '#/lib/conversation'
+import { useStopSpeechOnLeave } from '#/hooks/use-stop-speech'
 import { speak, speakLong } from '#/lib/speech'
 import { CUSTOM_TOPIC, PREP_CHOICES, PREP_LIMIT, SPEAK_CHOICES, SPEAK_SECONDS_LIMIT, SPEAKING_TARGETS, SPEAKING_TARGET_LABEL, SPEAKING_TOPICS, parseCueCard } from '#/lib/speaking-topics'
 import type { SpeakingTarget } from '#/lib/speaking-topics'
@@ -84,6 +85,7 @@ function useExam() {
 const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
 
 function SpeakingPage() {
+  useStopSpeechOnLeave()
   const { id } = Route.useSearch()
   const [topic, setTopic] = useState<(Topic & { target: SpeakingTarget }) | null>(null)
   return (

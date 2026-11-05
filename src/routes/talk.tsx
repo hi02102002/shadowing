@@ -17,6 +17,7 @@ import { useStoredToggle } from '#/hooks/use-stored-toggle'
 import { CUSTOM_SCENARIO, MAX_USER_TURNS, SCENARIOS, TALK_LEVELS, TALK_LEVEL_LABEL, scenarioLabel } from '#/lib/conversation'
 import type { TalkLevel } from '#/lib/conversation'
 import { conversationQuery, conversationsQuery, statsQuery } from '#/lib/queries'
+import { useStopSpeechOnLeave } from '#/hooks/use-stop-speech'
 import { speak, speakLong } from '#/lib/speech'
 import { cn } from '#/lib/utils'
 import { mistakeLabel } from '#/server/ai/prompts'
@@ -35,6 +36,7 @@ export const Route = createFileRoute('/talk')({
 })
 
 function TalkPage() {
+  useStopSpeechOnLeave()
   const { id } = Route.useSearch()
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">

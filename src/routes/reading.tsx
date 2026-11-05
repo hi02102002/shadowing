@@ -27,6 +27,7 @@ import {
   splitPastedText,
 } from '#/lib/reading-topics'
 import type { AiQuestionType, LibrarySource, ReadingFormat, ReadingLevel, ReadingSource } from '#/lib/reading-topics'
+import { useStopSpeechOnLeave } from '#/hooks/use-stop-speech'
 import { speakLong } from '#/lib/speech'
 import { cn } from '#/lib/utils'
 import {
@@ -64,6 +65,7 @@ export const Route = createFileRoute('/reading')({
 })
 
 function ReadingPage() {
+  useStopSpeechOnLeave()
   const { id } = Route.useSearch()
   return id ? <ReadingView key={id} id={id} /> : <Setup />
 }

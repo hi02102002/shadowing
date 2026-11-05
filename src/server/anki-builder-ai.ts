@@ -199,7 +199,11 @@ ${words.map((w, i) => `${i + 1}. ${w}`).join('\n')}`
     structured({ system: VOCAB_SYSTEM, prompt, schema: FlashcardsSchema }),
   )
   const cards = out.cards.map((item, i) => ({
-    word: item.word.trim() || words[i] || '',
+    // AI giữ đúng thứ tự → dùng từ gốc đã chọn, để cụm từ gộp theo từ không bị lệch khi AI đổi dạng (smile → to smile)
+    word:
+      (out.cards.length === words.length
+        ? words[i]
+        : item.word.trim() || words[i]) || '',
     ipa: item.ipa.trim(),
     vietnamese: item.vietnamese.trim(),
     englishDefinition: item.englishDefinition.trim(),

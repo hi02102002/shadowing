@@ -25,6 +25,23 @@ export function speak(
   return true
 }
 
+/**
+ * Dừng hẳn giọng đang đọc (mp3 và giọng trình duyệt). Bỏ luôn nguồn của thẻ audio để trình duyệt không còn
+ * hiện điều khiển media (nút pause) và đoạn đang nối dở trong speakLong không đọc tiếp.
+ */
+export function stopSpeech() {
+  if (typeof window === 'undefined') return
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  const current = player
+  player = null
+  if (current) {
+    current.onended = null
+    current.pause()
+    current.removeAttribute('src')
+    current.load()
+  }
+}
+
 function speakWithBrowser(
   text: string,
   opts: { accent: Accent; rate?: number; onEnd?: () => void },

@@ -173,7 +173,7 @@ export async function buildApkg(
       )
       rows[i] = {
         deck,
-        guid: c.guid ?? `shadowing:${c.front}`,
+        guid: c.guid ?? `shadowing:${deck}:${i}:${c.front}`,
         fields: [html.front, html.back],
         sort: c.front,
         tags: html.tags,
@@ -202,8 +202,9 @@ export function writeApkg(
   media: Map<string, Uint8Array>,
 ): Uint8Array {
   const now = Math.floor(Date.now() / 1000)
-  const deckId = now * 1000
-  const modelId = deckId + 1
+  // id cố định theo tên: xuất lại / xuất deck khác không tạo thêm note type trùng trong Anki
+  const modelId = 1_700_000_000_001
+  const deckBase = 1_700_000_100_000
 
   // deck cha (phần trước "::") cũng phải có trong collection để Anki hiện đúng cây
   const deckIds = new Map<string, number>()
@@ -211,10 +212,10 @@ export function writeApkg(
     const parts = r.deck.split('::')
     for (let i = 1; i <= parts.length; i++) {
       const name = parts.slice(0, i).join('::')
-      if (!deckIds.has(name)) deckIds.set(name, deckId + 1000 + deckIds.size)
+      if (!deckIds.has(name)) deckIds.set(name, deckBase + hash32(name))
     }
   }
-  if (!deckIds.size) deckIds.set('Deck', deckId + 1000)
+  if (!deckIds.size) deckIds.set('Deck', deckBase + hash32('Deck'))
 
   const db = new Database(':memory:')
   try {
@@ -361,7 +362,7 @@ export function writeApkg(
     )
     db.transaction(() => {
       rows.forEach((r, i) => {
-        const id = deckId + i + 10
+        const id = now * 1000 + i + 10
         const sortField = r.sort
         insertNote.run(
           id,
