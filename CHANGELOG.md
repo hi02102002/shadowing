@@ -2,6 +2,15 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.38 — 2026-11-05
+
+### Sửa lỗi
+
+- **Xuất Anki: mọi chunk và câu ví dụ đều có nút nghe.** Trước đây nhiều thành ngữ không có giọng vì Youdao thiếu audio; giờ giọng đọc đi qua chuỗi dự phòng của app (Youdao → Google) và tải có giới hạn luồng, tự thử lại khi lỗi.
+- **Đọc hiểu / Nói với AI / Luyện nói:** thoát trang là giọng đọc mẫu dừng hẳn, không còn chạy tiếp kèm nút pause của trình duyệt.
+- Xuất lại bộ thẻ vào Anki không tạo thêm kiểu thẻ (note type) trùng; tên file tải về giữ nguyên chữ tiếng Việt; thẻ tự thêm trùng mặt trước không còn đè lên nhau.
+- Trang "Tạo Anki": cụm từ được gộp đúng vào thẻ của từ đã chọn dù AI đổi dạng từ.
+
 ## 0.0.37 — 2026-11-05
 
 ### Mới
