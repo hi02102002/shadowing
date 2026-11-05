@@ -2,6 +2,12 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.39 — 2026-11-05
+
+### Mới
+
+- **Báo khi có bản cập nhật mới** (app desktop): hiện hộp thoại cho biết có bản mới, bạn chọn "Cập nhật" hoặc "Để sau". Không ép: chỉ tải và cài khi bạn bấm, "Để sau" thì không hỏi lại cho đến khi có bản mới hơn. Vẫn cập nhật được trong Cài đặt như trước.
+
 ## 0.0.38 — 2026-11-05
 
 ### Sửa lỗi
