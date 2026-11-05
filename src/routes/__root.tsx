@@ -5,6 +5,7 @@ import { FormDevtoolsPanel } from '@tanstack/react-form-devtools'
 
 import { AppHeader, THEME_SCRIPT } from '#/components/app-header'
 import { QuickLookup } from '#/components/quick-lookup'
+import { UpdateDialog } from '#/components/update-dialog'
 import { TooltipProvider } from '#/components/ui/tooltip'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
@@ -49,6 +50,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <AppHeader />
           <main>{children}</main>
           <QuickLookup />
+          <UpdateDialog />
         </TooltipProvider>
         <TanStackDevtools
           config={{ position: 'bottom-left' }}
