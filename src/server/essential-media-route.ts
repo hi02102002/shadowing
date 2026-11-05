@@ -29,19 +29,23 @@ async function fetchMedia(url: URL, file: string) {
   return data
 }
 
-export default defineHandler(async (event) => {
-  const params = event.context.params ?? {}
-  // pattern route bắt buộc đủ 3 tham số
-  const { slug, dir } = params
-  const name = path.basename(decodeURIComponent(params.file))
-  if (!findBook(slug) || !/^[\w-]+$/.test(dir) || !/^[\w.-]+\.(jpe?g|png|gif|webp|mp3)$/i.test(name)) {
-    return new Response('Not found', { status: 404 })
-  }
+/** nội dung ảnh/audio của sách (đọc cache, chưa có thì tải từ site), null nếu tham số sai hoặc không tải được */
+export async function getEssentialMedia(slug: string, dir: string, rawName: string) {
+  const name = path.basename(rawName)
+  if (!findBook(slug) || !/^[\w-]+$/.test(dir) || !/^[\w.-]+\.(jpe?g|png|gif|webp|mp3)$/i.test(name)) return null
   const file = path.join(essentialDir(), slug, dir, name)
   const sub = dir === '__' ? '' : dir === '_' ? 'wordlist/' : `${dir}/wordlist/`
   const url = new URL(`${slug}/data/${sub}${name}`, EE_BASE)
   const data = (await fs.readFile(file).catch(() => null)) ?? (await fetchMedia(url, file).catch(() => null))
-  if (!data) return new Response('Not found', { status: 404 })
+  return data ? { data, name } : null
+}
+
+export default defineHandler(async (event) => {
+  const params = event.context.params ?? {}
+  // pattern route bắt buộc đủ 3 tham số
+  const media = await getEssentialMedia(params.slug, params.dir, decodeURIComponent(params.file))
+  if (!media) return new Response('Not found', { status: 404 })
+  const { data, name } = media
   return new Response(data, {
     headers: {
       'content-type': MIME[path.extname(name).toLowerCase()] ?? 'application/octet-stream',

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnkiBuilderRouteImport } from './routes/anki-builder'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as ListeningRouteImport } from './routes/listening'
 import { Route as ReadingRouteImport } from './routes/reading'
@@ -19,6 +20,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SpeakingRouteImport } from './routes/speaking'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as TalkRouteImport } from './routes/talk'
+import { Route as ApiAnkiBuildRouteImport } from './routes/api/anki-build'
 import { Route as ApiAnkiUploadsRouteImport } from './routes/api/anki-uploads'
 import { Route as ApiUploadsRouteImport } from './routes/api/uploads'
 import { Route as ChunksIndexRouteImport } from './routes/chunks/index'
@@ -41,6 +43,11 @@ import { Route as VideosVideoIdVocabRouteImport } from './routes/videos/$videoId
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnkiBuilderRoute = AnkiBuilderRouteImport.update({
+  id: '/anki-builder',
+  path: '/anki-builder',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExploreRoute = ExploreRouteImport.update({
@@ -86,6 +93,11 @@ const StatsRoute = StatsRouteImport.update({
 const TalkRoute = TalkRouteImport.update({
   id: '/talk',
   path: '/talk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnkiBuildRoute = ApiAnkiBuildRouteImport.update({
+  id: '/api/anki-build',
+  path: '/api/anki-build',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAnkiUploadsRoute = ApiAnkiUploadsRouteImport.update({
@@ -181,6 +193,7 @@ const VideosVideoIdVocabRoute = VideosVideoIdVocabRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/anki-builder': typeof AnkiBuilderRoute
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
@@ -190,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
   '/talk': typeof TalkRoute
+  '/api/anki-build': typeof ApiAnkiBuildRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/chunks/mine': typeof ChunksMineRoute
@@ -211,6 +225,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/anki-builder': typeof AnkiBuilderRoute
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
@@ -220,6 +235,7 @@ export interface FileRoutesByTo {
   '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
   '/talk': typeof TalkRoute
+  '/api/anki-build': typeof ApiAnkiBuildRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/chunks/mine': typeof ChunksMineRoute
@@ -241,6 +257,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/anki-builder': typeof AnkiBuilderRoute
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
   '/reading': typeof ReadingRoute
@@ -250,6 +267,7 @@ export interface FileRoutesById {
   '/speaking': typeof SpeakingRoute
   '/stats': typeof StatsRoute
   '/talk': typeof TalkRoute
+  '/api/anki-build': typeof ApiAnkiBuildRoute
   '/api/anki-uploads': typeof ApiAnkiUploadsRoute
   '/api/uploads': typeof ApiUploadsRoute
   '/chunks/mine': typeof ChunksMineRoute
@@ -273,6 +291,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/anki-builder'
     | '/explore'
     | '/listening'
     | '/reading'
@@ -282,6 +301,7 @@ export interface FileRouteTypes {
     | '/speaking'
     | '/stats'
     | '/talk'
+    | '/api/anki-build'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/chunks/mine'
@@ -303,6 +323,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/anki-builder'
     | '/explore'
     | '/listening'
     | '/reading'
@@ -312,6 +333,7 @@ export interface FileRouteTypes {
     | '/speaking'
     | '/stats'
     | '/talk'
+    | '/api/anki-build'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/chunks/mine'
@@ -332,6 +354,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/anki-builder'
     | '/explore'
     | '/listening'
     | '/reading'
@@ -341,6 +364,7 @@ export interface FileRouteTypes {
     | '/speaking'
     | '/stats'
     | '/talk'
+    | '/api/anki-build'
     | '/api/anki-uploads'
     | '/api/uploads'
     | '/chunks/mine'
@@ -363,6 +387,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnkiBuilderRoute: typeof AnkiBuilderRoute
   ExploreRoute: typeof ExploreRoute
   ListeningRoute: typeof ListeningRoute
   ReadingRoute: typeof ReadingRoute
@@ -372,6 +397,7 @@ export interface RootRouteChildren {
   SpeakingRoute: typeof SpeakingRoute
   StatsRoute: typeof StatsRoute
   TalkRoute: typeof TalkRoute
+  ApiAnkiBuildRoute: typeof ApiAnkiBuildRoute
   ApiAnkiUploadsRoute: typeof ApiAnkiUploadsRoute
   ApiUploadsRoute: typeof ApiUploadsRoute
   ChunksMineRoute: typeof ChunksMineRoute
@@ -393,6 +419,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/anki-builder': {
+      id: '/anki-builder'
+      path: '/anki-builder'
+      fullPath: '/anki-builder'
+      preLoaderRoute: typeof AnkiBuilderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/explore': {
@@ -456,6 +489,13 @@ declare module '@tanstack/react-router' {
       path: '/talk'
       fullPath: '/talk'
       preLoaderRoute: typeof TalkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/anki-build': {
+      id: '/api/anki-build'
+      path: '/api/anki-build'
+      fullPath: '/api/anki-build'
+      preLoaderRoute: typeof ApiAnkiBuildRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/anki-uploads': {
@@ -611,6 +651,7 @@ const VideosVideoIdRouteWithChildren = VideosVideoIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnkiBuilderRoute: AnkiBuilderRoute,
   ExploreRoute: ExploreRoute,
   ListeningRoute: ListeningRoute,
   ReadingRoute: ReadingRoute,
@@ -620,6 +661,7 @@ const rootRouteChildren: RootRouteChildren = {
   SpeakingRoute: SpeakingRoute,
   StatsRoute: StatsRoute,
   TalkRoute: TalkRoute,
+  ApiAnkiBuildRoute: ApiAnkiBuildRoute,
   ApiAnkiUploadsRoute: ApiAnkiUploadsRoute,
   ApiUploadsRoute: ApiUploadsRoute,
   ChunksMineRoute: ChunksMineRoute,

@@ -45,11 +45,21 @@ export interface VocabWord {
   guid: string
 }
 
+/** khung "Common mistakes" / "Language help" trong bài đọc của unit → thẻ ghi chú (Language Notes) */
+export interface VocabNote {
+  /** tiêu đề thẻ, vd. "Common mistakes · A ‣ Head and face" */
+  title: string
+  lines: string[]
+  /** id ổn định để import lại không bị trùng thẻ */
+  guid: string
+}
+
 export interface VocabUnit {
   /** vị trí unit trong data.json */
   index: number
   title: string
   words: VocabWord[]
+  notes: VocabNote[]
 }
 
 /** chuyển chuỗi thành đoạn URL giống hàm urlFriendlyFull của site (tên thư mục ảnh/audio) */
@@ -133,6 +143,35 @@ function readingExamples(reading: RawUnit['reading']) {
   }
 }
 
+/** các khung ghi chú trong bài đọc, kèm tên mục (A ‣ …) chứa khung đó */
+export function readingNotes(book: VocabBook, index: number, reading: RawUnit['reading']): VocabNote[] {
+  if (!Array.isArray(reading)) return []
+  const notes: VocabNote[] = []
+  for (const r of reading) {
+    let section = ''
+    for (const el of parse(r.story ?? '').querySelectorAll('div.section-rotate, div.common-mistakes-cover')) {
+      if (el.classList.contains('section-rotate')) {
+        section = text(el.querySelector('span')?.innerHTML)
+        continue
+      }
+      const label = text(el.querySelector('h3')?.innerHTML) || 'Note'
+      const body = el.querySelector('div')?.innerHTML ?? ''
+      const lines = body
+        .replace(/<br\s*\/?>|<\/p>|<\/li>/gi, '\n')
+        .split('\n')
+        .map((l) => text(l))
+        .filter(Boolean)
+      if (!lines.length) continue
+      notes.push({
+        title: section ? `${label} · ${section}` : label,
+        lines,
+        guid: `eenote:${book.slug}:${index}:${notes.length}`,
+      })
+    }
+  }
+  return notes
+}
+
 function parseWordlistUnit(book: VocabBook, u: RawUnit, index: number): VocabUnit {
   const dir = urlFriendlyFull(u.en)
   let fromReading: ((word: string) => ReadingHit | null) | undefined
@@ -165,7 +204,7 @@ function parseWordlistUnit(book: VocabBook, u: RawUnit, index: number): VocabUni
       },
     ]
   })
-  return { index, title: u.en.trim(), words: dropSharedImages(words) }
+  return { index, title: u.en.trim(), words: dropSharedImages(words), notes: readingNotes(book, index, u.reading) }
 }
 
 /** ảnh bài đọc dùng cho nhiều từ (vd. cây gia phả cho cả mục "Family words") không giúp phân biệt từ → bỏ */
@@ -198,7 +237,7 @@ function parseHtmlUnit(book: VocabBook, u: RawUnit, index: number): VocabUnit {
       },
     ]
   })
-  return { index, title: u.en.trim(), words }
+  return { index, title: u.en.trim(), words, notes: [] }
 }
 
 export interface UnitGroup {

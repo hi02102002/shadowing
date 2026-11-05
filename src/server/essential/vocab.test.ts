@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { VocabBook } from './books.ts'
 import { VOCAB_BOOKS, findBook } from './books.ts'
-import { parseBook, unitGroups, urlFriendlyFull } from './vocab.ts'
+import { parseBook, readingNotes, unitGroups, urlFriendlyFull } from './vocab.ts'
 import type { VocabUnit, VocabWord } from './vocab.ts'
 
 // fixture tự viết, mô phỏng cấu trúc data.json của từng dạng sách (không chép nội dung sách)
@@ -161,6 +161,7 @@ describe('unitGroups', () => {
     index: 0,
     title: 'Unit 1',
     words: Array.from({ length: n }, (_, i) => ({ word: `w${i}` }) as VocabWord),
+    notes: [],
   })
   const sizes = (n: number, max: number) => unitGroups(unit(n), max).map((g) => g.words.length)
 
@@ -171,5 +172,29 @@ describe('unitGroups', () => {
     const groups = unitGroups(unit(7), 3)
     expect(groups.map((g) => [g.part, g.parts])).toEqual([[0, 3], [1, 3], [2, 3]])
     expect(groups.flatMap((g) => g.words.map((w) => w.word))).toEqual(unit(7).words.map((w) => w.word))
+  })
+})
+
+describe('readingNotes', () => {
+  // fixture tự viết theo cấu trúc HTML của bài đọc
+  const reading = [
+    {
+      story:
+        '<div class="section-rotate"><span>A ‣ Head</span></div><p>x</p>' +
+        '<div class="common-mistakes-cover"><h3>Common <span>mistakes</span></h3><div><p>A: What&rsquo;s he like?<br />B: He&rsquo;s nice.</p></div></div>' +
+        '<div class="common-mistakes-cover language-help-cover"><h3>Language <span>help</span></h3><div><strong>Cover</strong> means over.</div></div>',
+    },
+  ]
+
+  it('lấy các khung ghi chú kèm tên mục, mỗi dòng một phần tử', () => {
+    const notes = readingNotes(WORDLIST_BOOK, 3, reading)
+    expect(notes.map((n) => n.title)).toEqual(['Common mistakes · A ‣ Head', 'Language help · A ‣ Head'])
+    expect(notes[0].lines).toEqual(['A: What’s he like?', 'B: He’s nice.'])
+    expect(notes[1].guid).toBe('eenote:sample-wordlist:3:1')
+  })
+
+  it('không có bài đọc dạng mảng thì không có ghi chú', () => {
+    expect(readingNotes(WORDLIST_BOOK, 0, null)).toEqual([])
+    expect(readingNotes(WORDLIST_BOOK, 0, '<ul></ul>')).toEqual([])
   })
 })

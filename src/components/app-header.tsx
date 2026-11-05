@@ -16,6 +16,7 @@ import {
   MessagesSquare,
   Moon,
   Settings,
+  Sparkles,
   Speech,
   Sun,
   Zap,
@@ -36,6 +37,7 @@ const NAV = [
   { to: '/grammar', label: 'Ngữ pháp', icon: BookOpen },
   { to: '/chunks', label: 'Chunks', icon: Blocks },
   { to: '/flashcards', label: 'Thẻ từ', icon: Layers },
+  { to: '/anki-builder', label: 'Tạo Anki', icon: Sparkles },
   { to: '/review', label: 'Sổ lỗi', icon: BookX },
   { to: '/settings', label: 'Cài đặt', icon: Settings },
 ] as const
@@ -50,7 +52,7 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-screen-2xl items-center gap-2 px-3 sm:gap-4 sm:px-4">
+      <div className="mx-auto flex h-14 max-w-screen-3xl items-center gap-2 px-3 sm:gap-4 sm:px-4">
         <Link
           to="/"
           className="flex shrink-0 items-center gap-2 font-semibold text-foreground no-underline"
@@ -70,13 +72,13 @@ export function AppHeader() {
           <Menu className="size-4 shrink-0" />
           <span className="truncate">{current.label}</span>
         </button>
-        <nav className="hidden min-w-0 flex-1 items-center gap-1 2xl:flex">
+        <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-hidden 2xl:flex">
           {NAV.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
               activeOptions={{ exact: to === '/' }}
-              className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground no-underline transition-colors hover:bg-muted hover:text-foreground"
+              className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground no-underline transition-colors hover:bg-muted hover:text-foreground"
               activeProps={{ className: cn('bg-muted text-foreground') }}
             >
               <Icon className="size-4" />

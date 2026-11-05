@@ -20,6 +20,7 @@ const config = defineConfig({
         '/api/grammar-media/:file': './src/server/grammar-media-route.ts',
         '/api/essential-media/:slug/:dir/:file':
           './src/server/essential-media-route.ts',
+        '/api/deck-export/:id': './src/server/deck-export-route.ts',
         '/api/bing-image/:q': './src/server/bing-image-route.ts',
         '/api/tts': './src/server/tts-route.ts',
         '/api/speaking-audio/:id': './src/server/speaking-audio-route.ts',

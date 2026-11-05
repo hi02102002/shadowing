@@ -71,6 +71,7 @@ export function EssentialImportDialog({ open, onOpenChange, onImported }: Props)
         {submit.data ? (
           <div className="flex flex-col gap-2 text-sm">
             <p className="text-base font-medium">Đã thêm {submit.data.added} thẻ.</p>
+            {submit.data.notes > 0 && <p className="text-muted-foreground">Kèm {submit.data.notes} thẻ ghi chú (Common mistakes / Language help).</p>}
             {submit.data.skipped > 0 && (
               <p className="text-muted-foreground">Bỏ qua {submit.data.skipped} từ đã có trong bộ thẻ.</p>
             )}

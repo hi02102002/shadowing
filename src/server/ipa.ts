@@ -251,3 +251,17 @@ export async function wordsToIpa(
     return null
   })
 }
+
+/**
+ * IPA của một từ/cụm từ không cần AI: tra từng từ trong từ điển CMU, đặt trong dấu gạch chéo như từ điển khác.
+ * null nếu có từ nào không có trong từ điển (số, tên riêng lạ…) → nơi gọi dùng nguồn khác.
+ */
+export async function phraseToIpa(
+  text: string,
+  accent: Accent = 'us',
+): Promise<string | null> {
+  const words = text.split(/\s+/).filter(Boolean)
+  if (!words.length || words.length > 8) return null
+  const ipa = await wordsToIpa(words, accent)
+  return ipa.every((i) => i) ? `/${ipa.join(' ')}/` : null
+}

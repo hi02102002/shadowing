@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, ChevronDown, FileUp, FolderPlus, GraduationCap, Layers, Loader2, Pencil, Plus, Search, Settings2, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronDown, FileUp, FolderPlus, Download, GraduationCap, Layers, Loader2, Pencil, Plus, Search, Settings2, Trash2 } from 'lucide-react'
 
 import { AnkiImportDialog } from '#/components/anki-import-dialog'
 import { EssentialImportDialog } from '#/components/essential-import-dialog'
@@ -9,6 +9,7 @@ import { StudySettingsDialog } from '#/components/study-settings-dialog'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { downloadApkg } from '#/lib/anki-export-client'
 import { dueLabel } from '#/lib/format'
 import { cardsQuery, decksQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
@@ -227,6 +228,7 @@ function BookGroup({
           <span className="text-ok">{dueCount} đến hạn</span>
           <span className="text-muted-foreground">{sum('total')} thẻ</span>
         </span>
+        <ExportButton target={`book?name=${encodeURIComponent(book)}`} title="Xuất cả sách (.apkg)" />
         <Button size="sm" asChild disabled={!newCount && !dueCount}>
           <Link to="/flashcards/study" search={{ book }}>
             <GraduationCap />
@@ -310,10 +312,13 @@ function DeckCard({
             Học
           </Link>
         </Button>
+        <span className="ml-auto">
+          <ExportButton target={String(deck.id)} title="Xuất .apkg (Anki)" disabled={!deck.total} />
+        </span>
         <Button
           size="icon"
           variant="ghost"
-          className="ml-auto size-8"
+          className="size-8"
           title="Đổi tên"
           onClick={() => setRenaming((v) => !v)}
         >
@@ -499,5 +504,33 @@ function AddCardForm({ deckId, onAdded }: { deckId: number; onAdded: () => void 
       </div>
       {add.error && <p className="text-sm text-destructive">{add.error.message}</p>}
     </form>
+  )
+}
+
+/** nút tải .apkg: server tự tạo ảnh/audio nên mất một lúc, hiện tiến độ ngay trên nút */
+function ExportButton({ target, title, disabled }: { target: string; title: string; disabled?: boolean }) {
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const busy = progress != null
+  return (
+    <Button
+      size={busy ? 'sm' : 'icon'}
+      variant="ghost"
+      className={busy ? 'text-muted-foreground' : 'size-8'}
+      title={busy ? 'Đang tạo ảnh/audio và đóng gói…' : title}
+      disabled={disabled || busy}
+      onClick={() => {
+        setProgress({ done: 0, total: 0 })
+        downloadApkg(target, (done, total) => setProgress({ done, total }))
+          .catch((err: unknown) => window.alert(err instanceof Error ? err.message : 'Xuất file thất bại'))
+          .finally(() => setProgress(null))
+      }}
+    >
+      {busy ? <Loader2 className="animate-spin" /> : <Download />}
+      {busy && progress.total > 0 && (
+        <span className="tabular-nums">
+          {progress.done}/{progress.total}
+        </span>
+      )}
+    </Button>
   )
 }
