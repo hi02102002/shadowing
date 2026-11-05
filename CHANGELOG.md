@@ -2,6 +2,21 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.37 — 2026-11-05
+
+### Mới
+
+- **Xuất bộ thẻ ra Anki (.apkg)**: nút tải xuống trên từng bộ thẻ và trên cả nhóm sách trong mục "Thẻ từ".
+  - Bộ thuộc sách xuất thành deck lồng nhau "Tên sách::Unit", xuất cả sách thì deck cha chứa các unit.
+  - Ảnh (Bing) và giọng đọc Anh (Youdao) được tạo sẵn và nhúng vào file để học offline; thẻ sách chưa học được bổ sung nghĩa Việt, ví dụ, chunks trước khi xuất.
+  - Thẻ có badge loại từ, IPA, hộp nghĩa Việt / định nghĩa tiếng Anh, khung Lexical Chunks và câu ví dụ, có chế độ tối của Anki. Nút nghe ở ví dụ và chunk không tự phát.
+- **Tạo thẻ Anki bằng AI** (mục "Tạo Anki" trên thanh điều hướng): chọn sách và unit, dán link bài học hoặc dán danh sách từ, chọn từ vựng / cụm từ / ghi chú, AI sinh thẻ, xem trước, sửa rồi tải file .apkg.
+- **Thẻ ghi chú (Language Notes)**: khi thêm unit của English Vocabulary in Use, các khung "Common mistakes" và "Language help" thành thẻ ghi chú riêng trong bộ thẻ của unit.
+
+### Thay đổi
+
+- Phiên âm IPA lấy từ từ điển trước (từ điển Anh–Việt, bộ CMU có sẵn), AI chỉ dùng khi không có nguồn nào khác.
+
 ## 0.0.36 — 2026-11-04
 
 ### Thay đổi
