@@ -2,6 +2,12 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.43 — 2026-11-07
+
+### Cải thiện
+
+- **Bài tập luyện lại** trong phần AI phân tích lỗi: các từ/cụm tiếng Anh cần luyện (vd 'fresh fish', 'plenty of') giờ là nút 🔊 bấm vào để nghe phát âm mẫu theo giọng UK/US trong Cài đặt. Áp dụng cả cho các phân tích đã lưu trước đây.
+
 ## 0.0.42 — 2026-11-07
 
 ### Cải thiện
