@@ -106,7 +106,7 @@ export const PronunciationFeedbackSchema = z.object({
   mistakes: z.array(MistakeSchema),
   drills: z
     .array(z.string())
-    .describe('2-3 bài tập ngắn để luyện lại, bằng tiếng Việt'),
+    .describe("2-3 bài tập ngắn để luyện lại, bằng tiếng Việt; từ/cụm/câu tiếng Anh cần đọc đặt trong nháy đơn, vd 'fresh fish', để app phát âm mẫu"),
 })
 export type PronunciationFeedback = z.infer<typeof PronunciationFeedbackSchema>
 

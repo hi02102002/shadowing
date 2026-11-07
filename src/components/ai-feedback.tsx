@@ -1,4 +1,4 @@
-import { AlertCircle, Lightbulb, Loader2, Sparkles } from 'lucide-react'
+import { AlertCircle, Lightbulb, Loader2, Sparkles, Volume2 } from 'lucide-react'
 import { useId } from 'react'
 import { Link } from '@tanstack/react-router'
 
@@ -6,7 +6,9 @@ import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Label } from '#/components/ui/label'
 import { Switch } from '#/components/ui/switch'
-import { useAiAnalysis } from '#/hooks/use-app-settings'
+import { useAccent, useAiAnalysis } from '#/hooks/use-app-settings'
+import { splitDrill } from '#/lib/drill-phrases'
+import { speak } from '#/lib/speech'
 import { cn } from '#/lib/utils'
 import { mistakeLabel } from '#/server/ai/prompts'
 import type { DictationAnalysis, PronunciationFeedback } from '#/server/ai/prompts'
@@ -118,12 +120,35 @@ export function AiFeedback({ status, error, summary, mistakes, connectedSpeech, 
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bài tập luyện lại</h4>
           <ol className="list-decimal space-y-1 pl-5 text-sm">
             {drills.map((d, i) => (
-              <li key={i}>{d}</li>
+              <li key={i} className="leading-relaxed">
+                <DrillText text={d} />
+              </li>
             ))}
           </ol>
         </div>
       )}
     </section>
+  )
+}
+
+/** Bài tập luyện lại: cụm tiếng Anh trong nháy ('fresh fish') thành nút bấm nghe phát âm mẫu */
+function DrillText({ text }: { text: string }) {
+  const [accent] = useAccent()
+  return splitDrill(text).map((p, i) =>
+    p.speak ? (
+      <button
+        key={i}
+        type="button"
+        onClick={() => speak(p.speak!, { accent })}
+        title={`Nghe mẫu: ${p.speak}`}
+        className="mx-0.5 inline-flex items-baseline gap-1 rounded bg-primary/10 px-1.5 font-medium text-primary hover:bg-primary/20 focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        <Volume2 className="size-3.5 self-center" />
+        {p.speak}
+      </button>
+    ) : (
+      <span key={i}>{p.text}</span>
+    ),
   )
 }
 
