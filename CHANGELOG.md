@@ -2,6 +2,12 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.42 — 2026-11-07
+
+### Cải thiện
+
+- **Ngữ pháp → "Giải thích tiếng Việt"** có thêm khối **Các dạng câu**: khẳng định, phủ định (kèm dạng rút gọn), nghi vấn Yes/No kèm câu trả lời ngắn và câu hỏi Wh-, mỗi dạng có công thức và ví dụ nghe được. Các mục đã giải thích trước đây sẽ được AI tạo lại theo dạng mới.
+
 ## 0.0.41 — 2026-11-05
 
 ### Mới
