@@ -237,6 +237,39 @@ function ExplainPanel({ data }: { data: GrammarExplain }) {
           </li>
         ))}
       </ol>
+      {!!data.forms?.length && (
+        <div className="flex flex-col gap-2 border-t pt-3">
+          <span className="font-medium">Các dạng câu</span>
+          <ul className="flex flex-col gap-2">
+            {data.forms.map((f, i) => (
+              <li key={i} className="rounded-md border bg-background p-2.5">
+                <p className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-medium text-primary">{f.name}</span>
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{f.formula}</code>
+                </p>
+                <ul className="mt-1 flex flex-col gap-1">
+                  {f.examples.map((e, j) => (
+                    <li key={j} className="flex items-start gap-1.5">
+                      <button
+                        type="button"
+                        className="mt-0.5 text-muted-foreground hover:text-primary"
+                        onClick={() => speak(e.en, { accent })}
+                        aria-label="Nghe câu ví dụ"
+                      >
+                        <Volume2 className="size-3.5" />
+                      </button>
+                      <span>
+                        <span className="font-medium">{e.en}</span>{' '}
+                        <span className="text-muted-foreground">({e.vi})</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {!!data.pitfalls.length && (
         <div className="flex flex-col gap-1 border-t pt-3">
           <span className="flex items-center gap-1.5 font-medium">

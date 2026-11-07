@@ -291,6 +291,25 @@ export const GrammarExplainSchema = z.object({
       }),
     )
     .describe('2-5 điểm chính'),
+  forms: z
+    .array(
+      z.object({
+        name: z
+          .string()
+          .describe(
+            'tên dạng câu bằng tiếng Việt, vd. "Khẳng định", "Phủ định", "Nghi vấn (Yes/No)", "Câu hỏi Wh-", "Phủ định rút gọn", "Câu trả lời ngắn"',
+          ),
+        formula: z
+          .string()
+          .describe('công thức ngắn gọn của dạng này, vd. "S + have/has + V3"'),
+        examples: z
+          .array(z.object({ en: z.string(), vi: z.string() }))
+          .describe('1-2 câu ví dụ tiếng Anh tự đặt, kèm bản dịch'),
+      }),
+    )
+    .describe(
+      'các dạng câu của cấu trúc: khẳng định, phủ định, nghi vấn (Yes/No và Wh- nếu có), câu trả lời ngắn / dạng rút gọn nếu hữu ích. Chỉ rỗng nếu mục này không phải cấu trúc có chia dạng (vd. chỉ là tình huống minh hoạ)',
+    ),
   pitfalls: z
     .array(z.string())
     .describe(
@@ -324,7 +343,8 @@ Mục ${label} trong sách (tiếng Anh):
 """
 ${text}
 """
-Hãy giảng lại mục này bằng tiếng Việt cho người học trình độ trung cấp.`
+Hãy giảng lại mục này bằng tiếng Việt cho người học trình độ trung cấp.
+Nếu mục có cấu trúc/thì/động từ, BẮT BUỘC liệt kê đủ các dạng câu trong "forms": khẳng định, phủ định (kèm dạng rút gọn như haven't/hasn't), nghi vấn Yes/No (kèm câu trả lời ngắn), và câu hỏi Wh- nếu phù hợp — mỗi dạng có công thức và ví dụ.`
 }
 
 export function grammarAnswerPrompt(opts: {

@@ -158,7 +158,7 @@ export const explainGrammarSection = createServerFn({ method: 'POST' })
     const unit = await requireUnit(data.unitId)
     const section = unit.sections.at(data.section)
     if (!section) throw new Error('Không tìm thấy mục này')
-    return cachedAi(`grammar:sec:${unit.id}:${data.section}`, () =>
+    return cachedAi(`grammar:sec2:${unit.id}:${data.section}`, () =>
       structured({
         feature: 'grammar',
         system: GRAMMAR_SYSTEM,
