@@ -2,6 +2,14 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.44 — 2026-11-07
+
+### Mới
+
+- **Nghe từ trong video** (mục "Nghe từ"): gõ một từ hoặc cụm từ, app phát đúng đoạn người thật nói từ đó trong video YouTube, kèm câu có tô đậm từ cần nghe. Bấm ← → để nghe thêm giọng khác, R để nghe lại, chỉnh tốc độ 0.75×. Tìm trong các video của thư viện trước, rồi tìm thêm trên YouTube (lần đầu mất khoảng 10-25 giây, sau đó lưu lại nên mở lại tức thì).
+- Mở nhanh từ bất cứ đâu: nút **"Video khác"** trong khung tra từ (nhấp đúp vào một từ), và biểu tượng 🎬 cạnh từ sai / cụm cần luyện trong phần AI phân tích lỗi.
+- **Shadowing là gì? → Câu luyện theo chủ đề**: nhờ AI soạn câu ví dụ cho cả 4 phần (âm, trọng âm, ngữ điệu, nhịp điệu) theo chủ đề và cấp độ. Mở từ Lộ trình thì chủ đề và cấp độ của nhiệm vụ được điền sẵn.
+
 ## 0.0.43 — 2026-11-07
 
 ### Cải thiện
