@@ -1316,3 +1316,68 @@ Cấp độ CEFR: ${opts.level}${opts.goal ? `\nMục tiêu học của người
 
 Tạo 12 thẻ từ vựng quan trọng nhất của chủ đề này.`
 }
+
+export const ShadowingSetSchema = z.object({
+  sound: z
+    .array(
+      z.object({
+        text: z.string().describe('câu ngắn 4-8 từ'),
+        focus: z
+          .string()
+          .describe('tiếng Việt: âm cần để ý, ghi IPA trong /.../ và từ chứa âm đó'),
+      }),
+    )
+    .describe('3 câu'),
+  stressWords: z
+    .array(z.string())
+    .describe('3 từ 2-4 âm tiết thuộc chủ đề, chỉ một từ đơn, không có dấu'),
+  stressBase: z
+    .string()
+    .describe('một câu 5-6 từ mà nhấn các từ khác nhau sẽ đổi nghĩa'),
+  stressSentences: z
+    .array(
+      z.object({
+        stressed: z
+          .number()
+          .int()
+          .describe('chỉ số từ được nhấn trong stressBase, đếm từ 0 theo dấu cách'),
+        meaning: z.string().describe('tiếng Việt: ý nghĩa khi nhấn từ đó'),
+      }),
+    )
+    .describe('3-4 cách nhấn khác nhau'),
+  intonation: z
+    .array(
+      z.object({
+        text: z.string(),
+        direction: z
+          .enum(['rise', 'fall', 'rise-tag'])
+          .describe('rise: câu hỏi Yes/No; fall: khẳng định, Wh-, cảm thán; rise-tag: câu hỏi đuôi xin xác nhận'),
+        stressed: z
+          .number()
+          .int()
+          .nullable()
+          .describe('chỉ số từ mang nhấn chính, đếm từ 0 theo dấu cách'),
+        note: z.string().describe('tiếng Việt: lên hay xuống giọng ở đâu, nhấn từ nào'),
+      }),
+    )
+    .describe('3 câu: một rise, một fall, một rise-tag'),
+  rhythm: z
+    .array(
+      z.object({
+        chunks: z
+          .array(z.string())
+          .describe('các cụm đọc liền theo thứ tự; nối bằng dấu cách ra cả câu'),
+      }),
+    )
+    .describe('2 câu 6-9 từ'),
+})
+
+export const shadowingSetSystem = `Bạn là giáo viên phát âm tiếng Anh soạn bài shadowing cho người Việt theo 4 trụ cột: âm (sound), trọng âm (stress), ngữ điệu (intonation), nhịp điệu (rhythm).
+- Mọi câu tiếng Anh tự nhiên, sát đời sống, đúng chủ đề và vừa cấp độ CEFR.
+- Phần âm chọn câu có lỗi người Việt hay mắc: âm cuối (-s, -t, -d, -k, -ed), /θ/ /ð/, /ʃ/ vs /s/, cụm phụ âm, nguyên âm dài/ngắn.
+- Phần nhịp điệu chia cụm theo nghĩa, từ chức năng đi kèm từ mang nghĩa.
+- Ghi chú bằng tiếng Việt, ngắn gọn.`
+
+export const shadowingSetPrompt = (opts: { topic: string; level: string }) =>
+  `Soạn bộ câu luyện shadowing, cấp độ ${opts.level}, chủ đề: ${opts.topic}.`
+

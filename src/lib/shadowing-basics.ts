@@ -97,6 +97,28 @@ export const RHYTHM_EXAMPLES: RhythmExample[] = [
   },
 ]
 
+/** bộ câu ví dụ cho cả 4 trụ cột: mặc định là bộ soạn sẵn ở trên, hoặc AI soạn theo chủ đề lộ trình */
+export interface ShadowingSet {
+  sound: Array<PillarExample & { focus: string }>
+  stressWords: string[]
+  stressBase: string
+  stressSentences: StressSentence[]
+  intonation: IntonationExample[]
+  rhythm: RhythmExample[]
+}
+
+export const DEFAULT_SHADOWING_SET: ShadowingSet = {
+  sound: SOUND_EXAMPLES,
+  stressWords: [...STRESS_WORDS],
+  stressBase: STRESS_BASE,
+  stressSentences: STRESS_SENTENCES,
+  intonation: INTONATION_EXAMPLES,
+  rhythm: RHYTHM_EXAMPLES,
+}
+
+export const SHADOWING_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const
+export type ShadowingLevel = (typeof SHADOWING_LEVELS)[number]
+
 export interface Pillar {
   id: PillarId
   /** nhãn tiếng Anh như trong slide */
@@ -183,3 +205,63 @@ const PILLAR_OF_MISTAKE: Record<string, PillarId> = {
 /** loại lỗi AI trả về → trụ cột của shadowing; null với lỗi không thuộc trụ cột nào (từ vựng, ngữ pháp…) */
 export const pillarOfMistake = (type: string): PillarId | null =>
   PILLAR_OF_MISTAKE[type] ?? null
+
+/** đầu ra thô của AI (xem ShadowingSetSchema) */
+export interface RawShadowingSet {
+  sound: Array<{ text: string; focus: string }>
+  stressWords: string[]
+  stressBase: string
+  stressSentences: Array<{ stressed: number; meaning: string }>
+  intonation: Array<{
+    text: string
+    direction: IntonationDirection
+    stressed: number | null
+    note: string
+  }>
+  rhythm: Array<{ chunks: string[] }>
+}
+
+const words = (s: string) => s.trim().split(/\s+/).filter(Boolean)
+const inRange = (i: number | null | undefined, text: string) =>
+  i != null && Number.isInteger(i) && i >= 0 && i < words(text).length
+
+/**
+ * Làm sạch bộ câu AI soạn: bỏ câu rỗng, chỉ số nhấn lệch câu, cụm rỗng; câu nhịp điệu dựng lại từ các cụm
+ * để luôn khớp. Phần nào AI trả thiếu thì dùng lại phần mặc định.
+ */
+export function normalizeShadowingSet(raw: RawShadowingSet): ShadowingSet {
+  const d = DEFAULT_SHADOWING_SET
+  const sound = raw.sound
+    .map((x) => ({ text: x.text.trim(), focus: x.focus.trim() }))
+    .filter((x) => x.text)
+  const stressWords = raw.stressWords
+    .map((w) => w.trim().replace(/[^A-Za-z'-]/g, ''))
+    .filter(Boolean)
+  const stressBase = raw.stressBase.trim()
+  const stressSentences = raw.stressSentences.filter(
+    (s, i, all) =>
+      inRange(s.stressed, stressBase) &&
+      all.findIndex((o) => o.stressed === s.stressed) === i,
+  )
+  const intonation = raw.intonation
+    .map((x) => ({
+      text: x.text.trim(),
+      direction: x.direction,
+      stressed: inRange(x.stressed, x.text) ? (x.stressed ?? undefined) : undefined,
+      note: x.note.trim(),
+    }))
+    .filter((x) => x.text)
+  const rhythm = raw.rhythm
+    .map((x) => x.chunks.map((c) => c.trim()).filter(Boolean))
+    .filter((chunks) => chunks.length > 1)
+    .map((chunks) => ({ text: chunks.join(' '), chunks }))
+  const useStress = stressBase && stressSentences.length >= 2
+  return {
+    sound: sound.length ? sound : d.sound,
+    stressWords: stressWords.length ? stressWords : d.stressWords,
+    stressBase: useStress ? stressBase : d.stressBase,
+    stressSentences: useStress ? stressSentences : d.stressSentences,
+    intonation: intonation.length ? intonation : d.intonation,
+    rhythm: rhythm.length ? rhythm : d.rhythm,
+  }
+}

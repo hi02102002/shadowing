@@ -65,6 +65,8 @@ import {
 import type { LibrarySource, ReadingLevel } from '#/lib/reading-topics'
 import { REFLEX_LEVELS, REFLEX_MODES } from '#/lib/reflex'
 import type { ReflexLevel, ReflexMode } from '#/lib/reflex'
+import { SHADOWING_LEVELS } from '#/lib/shadowing-basics'
+import type { ShadowingLevel } from '#/lib/shadowing-basics'
 import {
   ROADMAP_ACTIVITY_INFO,
   ROADMAP_GOAL_PRESETS,
@@ -1194,7 +1196,15 @@ function RoadmapTaskItem({
       }
       case 'ipa':
         if (res?.soundId === 'shadowing') {
-          void navigate({ to: '/ipa/shadowing' })
+          void navigate({
+            to: '/ipa/shadowing',
+            search: {
+              topic: task.topic || task.title,
+              level: SHADOWING_LEVELS.includes(task.level as ShadowingLevel)
+                ? (task.level as ShadowingLevel)
+                : undefined,
+            },
+          })
         } else if (res?.soundId) {
           void navigate({
             to: '/ipa/$soundId',
