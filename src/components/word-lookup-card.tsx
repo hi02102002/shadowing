@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   AudioLines,
+  Clapperboard,
   ExternalLink,
   Lightbulb,
   Loader2,
@@ -161,6 +162,12 @@ export function WordLookupCard({
             Nghe trong video
           </Button>
         )}
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/pronounce" search={{ q: headword }} onClick={onClose}>
+            <Clapperboard />
+            Video khác
+          </Link>
+        </Button>
         <SaveToDeck
           text={target.text}
           sentence={target.sentence}

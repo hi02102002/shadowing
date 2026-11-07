@@ -1,4 +1,4 @@
-import { AlertCircle, Lightbulb, Loader2, Sparkles, Volume2 } from 'lucide-react'
+import { AlertCircle, Clapperboard, Lightbulb, Loader2, Sparkles, Volume2 } from 'lucide-react'
 import { useId } from 'react'
 import { Link } from '@tanstack/react-router'
 
@@ -75,6 +75,7 @@ export function AiFeedback({ status, error, summary, mistakes, connectedSpeech, 
             <li key={i} className="rounded-lg bg-muted/60 p-3">
               <div className="mb-1.5 flex flex-wrap items-baseline gap-2">
                 <span className="font-semibold">{m.word}</span>
+                <VideoLink phrase={m.word} />
                 {m.ipa && <span className="ipa text-sm text-muted-foreground">{m.ipa}</span>}
                 {m.heard && (
                   <span className="text-sm text-bad">
@@ -136,8 +137,8 @@ function DrillText({ text }: { text: string }) {
   const [accent] = useAccent()
   return splitDrill(text).map((p, i) =>
     p.speak ? (
+      <span key={i} className="inline-flex items-baseline">
       <button
-        key={i}
         type="button"
         onClick={() => speak(p.speak!, { accent })}
         title={`Nghe mẫu: ${p.speak}`}
@@ -146,9 +147,26 @@ function DrillText({ text }: { text: string }) {
         <Volume2 className="size-3.5 self-center" />
         {p.speak}
       </button>
+      <VideoLink phrase={p.speak} />
+      </span>
     ) : (
       <span key={i}>{p.text}</span>
     ),
+  )
+}
+
+/** mở trang "Nghe từ trong video" để nghe người thật nói từ / cụm này */
+function VideoLink({ phrase }: { phrase: string }) {
+  return (
+    <Link
+      to="/pronounce"
+      search={{ q: phrase }}
+      title={`Nghe "${phrase}" trong video`}
+      aria-label={`Nghe "${phrase}" trong video`}
+      className="inline-flex self-center rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-primary"
+    >
+      <Clapperboard className="size-3.5" />
+    </Link>
   )
 }
 

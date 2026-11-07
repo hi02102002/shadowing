@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnkiBuilderRouteImport } from './routes/anki-builder'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as ListeningRouteImport } from './routes/listening'
+import { Route as PronounceRouteImport } from './routes/pronounce'
 import { Route as ReadingRouteImport } from './routes/reading'
 import { Route as ReflexRouteImport } from './routes/reflex'
 import { Route as ReviewRouteImport } from './routes/review'
@@ -60,6 +61,11 @@ const ExploreRoute = ExploreRouteImport.update({
 const ListeningRoute = ListeningRouteImport.update({
   id: '/listening',
   path: '/listening',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PronounceRoute = PronounceRouteImport.update({
+  id: '/pronounce',
+  path: '/pronounce',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReadingRoute = ReadingRouteImport.update({
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/anki-builder': typeof AnkiBuilderRoute
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
+  '/pronounce': typeof PronounceRoute
   '/reading': typeof ReadingRoute
   '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByTo {
   '/anki-builder': typeof AnkiBuilderRoute
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
+  '/pronounce': typeof PronounceRoute
   '/reading': typeof ReadingRoute
   '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
@@ -276,6 +284,7 @@ export interface FileRoutesById {
   '/anki-builder': typeof AnkiBuilderRoute
   '/explore': typeof ExploreRoute
   '/listening': typeof ListeningRoute
+  '/pronounce': typeof PronounceRoute
   '/reading': typeof ReadingRoute
   '/reflex': typeof ReflexRoute
   '/review': typeof ReviewRoute
@@ -312,6 +321,7 @@ export interface FileRouteTypes {
     | '/anki-builder'
     | '/explore'
     | '/listening'
+    | '/pronounce'
     | '/reading'
     | '/reflex'
     | '/review'
@@ -346,6 +356,7 @@ export interface FileRouteTypes {
     | '/anki-builder'
     | '/explore'
     | '/listening'
+    | '/pronounce'
     | '/reading'
     | '/reflex'
     | '/review'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/anki-builder'
     | '/explore'
     | '/listening'
+    | '/pronounce'
     | '/reading'
     | '/reflex'
     | '/review'
@@ -414,6 +426,7 @@ export interface RootRouteChildren {
   AnkiBuilderRoute: typeof AnkiBuilderRoute
   ExploreRoute: typeof ExploreRoute
   ListeningRoute: typeof ListeningRoute
+  PronounceRoute: typeof PronounceRoute
   ReadingRoute: typeof ReadingRoute
   ReflexRoute: typeof ReflexRoute
   ReviewRoute: typeof ReviewRoute
@@ -466,6 +479,13 @@ declare module '@tanstack/react-router' {
       path: '/listening'
       fullPath: '/listening'
       preLoaderRoute: typeof ListeningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pronounce': {
+      id: '/pronounce'
+      path: '/pronounce'
+      fullPath: '/pronounce'
+      preLoaderRoute: typeof PronounceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reading': {
@@ -694,6 +714,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnkiBuilderRoute: AnkiBuilderRoute,
   ExploreRoute: ExploreRoute,
   ListeningRoute: ListeningRoute,
+  PronounceRoute: PronounceRoute,
   ReadingRoute: ReadingRoute,
   ReflexRoute: ReflexRoute,
   ReviewRoute: ReviewRoute,
