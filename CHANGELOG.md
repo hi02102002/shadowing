@@ -2,7 +2,7 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
-## 0.0.50 — 2026-11-09
+## 0.0.51 — 2026-11-10
 
 ### Mới
 
@@ -11,8 +11,17 @@ Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát h
   - **Khung Camera khẩu hình nổi (Webcam Bubble)**: hỗ trợ bật/tắt camera riêng biệt, kéo thả tự do mọi vị trí trên màn hình, đổi hình dạng (hình tròn / hình chữ nhật bo góc), đổi kích cỡ (S/M/L) và có nút **"Dừng quay"** ngay dưới khung camera.
   - **Bộ chọn dải câu nộp bài trực quan**: cho phép chọn nhanh câu hiện tại, từ câu hiện tại đến hết bài, toàn bài hoặc tuỳ chọn dải câu kèm dropdown hiển thị rõ nội dung và thời gian của từng câu. Có card xem trước phụ đề tiếng Anh và danh sách tất cả các câu trong bài.
   - **Trộn âm thanh tự động**: kết hợp âm thanh micro của học sinh và âm thanh bài học từ trình duyệt để cô giáo nghe rõ cả khẩu hình và ngữ điệu bài học.
-  - **Hỗ trợ đầy đủ trên Desktop App (Electron)**: tự động nhận diện môi trường Desktop, cấp quyền camera, microphone và display-capture để quay cửa sổ app Shadowing mượt mà kèm âm thanh loopback mà không cần chọn tab thủ công.
+  - **Hỗ trợ trọn vẹn trên Desktop App (Electron)**: tự động nhận diện môi trường Desktop, cấp quyền camera, micro và display-capture để quay cửa sổ app Shadowing mượt mà.
+  - **Thu âm thanh máy tính trên Desktop Linux**: tự động phát hiện và kết nối kênh System Audio Monitor (PipeWire / PulseAudio) để thu toàn bộ âm thanh bài học phát ra tai nghe/loa máy tính và trộn với micro người học.
   - Sau khi quay xong, học sinh có thể xem lại video trực tiếp và tải file về máy (`.webm`) để nộp bài.
+
+### Sửa lỗi
+
+- **Lỗi crash `MediaRecorder's state is 'recording'`**: tách hoàn toàn logic đếm ngược và khởi động MediaRecorder ra khỏi React state updater để ngăn chặn hiện tượng double-invocation và xung đột render chu kỳ.
+- **Lỗi `unsub is not a function`**: gọi đúng method `.unsubscribe()` của TanStack Store subscription khi cleanup.
+- **Lỗi video không có âm thanh**: thu trực tiếp micro khi người dùng chọn Entire Screen hoặc không có tab audio, đồng thời kích hoạt `audioCtx.resume()` để tránh AudioContext bị suspended.
+- Không tự động ngắt quãng playback video khi chuyển câu trong quá trình quay Shadowing.
+- Vượt qua 100% kiểm tra TypeScript type-check và ESLint.
 
 ### Sửa lỗi
 
