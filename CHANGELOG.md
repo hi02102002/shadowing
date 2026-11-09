@@ -2,6 +2,12 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.47 — 2026-11-09
+
+### Sửa lỗi
+
+- **Mở video bị lỗi "i is not a function"**: tách logic database của tính năng chỉnh sửa phân đoạn (split/merge segments) ra khỏi endpoint server function để tránh Vite bundle mã server và thư viện `better-sqlite3` vào client bundle của trang chi tiết video.
+
 ## 0.0.46 — 2026-11-09
 
 ### Mới
