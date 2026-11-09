@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Camera,
   CameraOff,
-  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -102,8 +101,7 @@ export function VideoSubmissionBar({
   const startSegment = segments[actualFrom]
   const endSegment = segments[actualTo]
   const selectedCount = actualTo - actualFrom + 1
-  const estimatedDurationMs =
-    startSegment && endSegment ? Math.max(0, endSegment.endMs - startSegment.startMs) : 0
+  const estimatedDurationMs = Math.max(0, endSegment.endMs - startSegment.startMs)
 
   // Bắt đầu quay khi bấm xác nhận
   const handleConfirmStart = () => {
@@ -165,11 +163,7 @@ export function VideoSubmissionBar({
     })
 
     return () => {
-      if (typeof sub === 'function') {
-        ;(sub as () => void)()
-      } else if (sub && typeof (sub as { unsubscribe?: () => void }).unsubscribe === 'function') {
-        ;(sub as { unsubscribe: () => void }).unsubscribe()
-      }
+      sub.unsubscribe()
     }
   }, [recorder, segments])
 
@@ -479,11 +473,11 @@ export function VideoSubmissionBar({
                         Câu #{actualFrom + 1} (Bắt đầu)
                       </span>
                       <span className="font-mono">
-                        {startSegment ? formatTime(startSegment.startMs) : ''}
+                        {formatTime(startSegment.startMs)}
                       </span>
                     </div>
                     <p className="font-medium text-foreground italic">
-                      "{startSegment?.text}"
+                      "{startSegment.text}"
                     </p>
                   </div>
 
@@ -495,11 +489,11 @@ export function VideoSubmissionBar({
                           Câu #{actualTo + 1} (Kết thúc)
                         </span>
                         <span className="font-mono">
-                          {endSegment ? formatTime(endSegment.endMs) : ''}
+                          {formatTime(endSegment.endMs)}
                         </span>
                       </div>
                       <p className="font-medium text-foreground italic">
-                        "{endSegment?.text}"
+                        "{endSegment.text}"
                       </p>
                     </div>
                   )}

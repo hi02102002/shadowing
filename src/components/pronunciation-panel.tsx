@@ -25,7 +25,6 @@ import { pronunciationEnginesQuery, pronunciationHistoryQuery, videoQuery } from
 import { relativeTime, scoreTone } from '#/lib/format'
 import { cn } from '#/lib/utils'
 import type { AlignToken } from '#/lib/align'
-import { mistakeLabel } from '#/server/ai/prompts'
 import { PILLARS } from '#/lib/shadowing-basics'
 import type { PillarId } from '#/lib/shadowing-basics'
 import { assessPronunciation, pronunciationFeedback } from '#/server/fns/pronunciation'

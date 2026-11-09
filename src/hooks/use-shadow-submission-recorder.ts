@@ -133,34 +133,43 @@ export function useShadowSubmissionRecorder(
           if (!micStream) return false
         }
 
-        // Yêu cầu chọn Tab Chrome để quay (gợi ý Chrome Tab và bật audio)
+        // Yêu cầu chọn Tab Chrome hoặc Cửa sổ app để quay
         let screenStream: MediaStream
         try {
-          const displayMediaOptions = {
-            video: {
-              displaySurface: 'browser',
-            },
-            audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
-            },
-            // Gợi ý trình duyệt ưu tiên mở Chrome Tab thay vì Entire Screen
-            preferCurrentTab: true,
-            selfBrowserSurface: 'include',
-            systemAudio: 'include',
-            surfaceSwitching: 'include',
-          }
+          const isElectron =
+            typeof window !== 'undefined' &&
+            (/electron/i.test(navigator.userAgent) ||
+              Boolean((window as unknown as { shadowingDesktop?: unknown }).shadowingDesktop))
 
-          // @ts-expect-error - Các tham số preferCurrentTab của Chromium
+          const displayMediaOptions: DisplayMediaStreamOptions = isElectron
+            ? {
+                video: true,
+                audio: true,
+              }
+            : {
+                video: {
+                  displaySurface: 'browser',
+                },
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false,
+                },
+                // @ts-expect-error - Chromium hints
+                preferCurrentTab: true,
+                selfBrowserSurface: 'include',
+                systemAudio: 'include',
+                surfaceSwitching: 'include',
+              }
+
           screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions)
         } catch {
-          setError('Bạn đã huỷ chọn màn hình/tab để quay.')
+          setError('Bạn đã huỷ chọn màn hình/cửa sổ để quay.')
           return false
         }
         screenStreamRef.current = screenStream
 
-        const micTracks = micStream ? micStream.getAudioTracks() : []
+        const micTracks = micStream.getAudioTracks()
         const screenAudioTracks = screenStream.getAudioTracks()
         const hasTabSound = screenAudioTracks.length > 0
         setHasTabAudio(hasTabSound)
@@ -169,10 +178,7 @@ export function useShadowSubmissionRecorder(
 
         if (hasTabSound && micTracks.length > 0) {
           // Có CẢ tiếng bài học từ tab VÀ tiếng micro của bạn -> Mix bằng Web Audio API
-          const AudioContextClass =
-            window.AudioContext ||
-            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-          const audioCtx = new AudioContextClass()
+          const audioCtx = new AudioContext()
           audioContextRef.current = audioCtx
 
           // QUAN TRỌNG: Chrome tự động suspend AudioContext nếu không được resume chủ động

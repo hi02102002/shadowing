@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
+import { app, BrowserWindow, desktopCapturer, dialog, Menu, session, shell } from 'electron'
 import ffmpegStatic from 'ffmpeg-static'
 
 import { checkForUpdates, initUpdater } from './updater.js'
@@ -70,6 +70,34 @@ app.on('before-quit', (event) => {
 
 async function start() {
   Menu.setApplicationMenu(buildMenu())
+
+  // Cấp quyền tự động cho media, camera, micro, quay màn hình
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['media', 'camera', 'microphone', 'display-capture', 'screen-wake-lock']
+    callback(allowed.includes(permission))
+  })
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+    const allowed = ['media', 'camera', 'microphone', 'display-capture', 'screen-wake-lock']
+    return allowed.includes(permission)
+  })
+
+  // Xử lý quay màn hình / cửa sổ trên Desktop app
+  if (session.defaultSession.setDisplayMediaRequestHandler) {
+    session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+      try {
+        const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] })
+        const shadowWin = sources.find((s) => s.name.includes('Shadowing')) || sources[0]
+        if (shadowWin) {
+          callback({ video: shadowWin, audio: 'loopback' })
+        } else {
+          callback({})
+        }
+      } catch (err) {
+        callback({})
+      }
+    })
+  }
+
   win = new BrowserWindow({
     width: 1280,
     height: 860,
