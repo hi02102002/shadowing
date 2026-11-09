@@ -30,8 +30,9 @@ async function captureSystemAudioFallback(): Promise<MediaStream | null> {
     const devices = await navigator.mediaDevices.enumerateDevices()
     const audioInputs = devices.filter((d) => d.kind === 'audioinput')
 
-    // Tìm thiết bị Monitor (âm thanh phát ra từ máy tính / tai nghe / loa)
+    // Tìm thiết bị Monitor / DesktopAudio (âm thanh phát ra từ máy tính / tai nghe / loa)
     const monitorDevice =
+      audioInputs.find((d) => d.label.toLowerCase().includes('desktopaudio')) ||
       audioInputs.find((d) => {
         const name = d.label.toLowerCase()
         return (
@@ -110,6 +111,7 @@ export function useShadowSubmissionRecorder(
         const realMic = devices.find(
           (d) =>
             d.kind === 'audioinput' &&
+            !d.label.toLowerCase().includes('desktopaudio') &&
             !d.label.toLowerCase().includes('monitor') &&
             !d.label.toLowerCase().includes('stereo mix'),
         )

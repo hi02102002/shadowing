@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process'
+import { execFile, execSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
@@ -59,9 +59,40 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(start)
 }
 
+let pulseRemapModuleId = null
+
+function setupLinuxDesktopAudio() {
+  if (process.platform !== 'linux') return
+  try {
+    const defaultSink = execSync('pactl get-default-sink', { encoding: 'utf8' }).trim()
+    if (!defaultSink) return
+    const sources = execSync('pactl list sources short', { encoding: 'utf8' })
+    if (sources.includes('DesktopAudio')) return
+    const out = execSync(
+      `pactl load-module module-remap-source source_name=DesktopAudio master=${defaultSink}.monitor source_properties=device.description="DesktopAudio"`,
+      { encoding: 'utf8' },
+    ).trim()
+    pulseRemapModuleId = out
+  } catch (err) {
+    console.warn('[desktop-audio] Không thể tạo virtual audio source:', err)
+  }
+}
+
+function cleanupLinuxDesktopAudio() {
+  if (pulseRemapModuleId) {
+    try {
+      execSync(`pactl unload-module ${pulseRemapModuleId}`)
+    } catch {
+      /* ignore */
+    }
+    pulseRemapModuleId = null
+  }
+}
+
 app.on('window-all-closed', () => app.quit())
 app.on('before-quit', (event) => {
   quitting = true
+  cleanupLinuxDesktopAudio()
   if (!server) return
   // chờ server (và yt-dlp/ffmpeg nó sinh ra) tắt hẳn rồi mới thoát, không để lại tiến trình mồ côi
   event.preventDefault()
@@ -69,6 +100,7 @@ app.on('before-quit', (event) => {
 })
 
 async function start() {
+  setupLinuxDesktopAudio()
   Menu.setApplicationMenu(buildMenu())
 
   // Cấp quyền tự động cho media, camera, micro, quay màn hình
