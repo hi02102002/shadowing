@@ -2,6 +2,14 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.52 — 2026-11-10
+
+### Sửa lỗi
+
+- **Thu âm thanh máy tính trên Linux Desktop App (PulseAudio / PipeWire)**:
+  - Tự động tạo thiết bị mic ảo `DesktopAudio` ánh xạ từ âm thanh tai nghe/loa máy tính (`.monitor`) để vượt qua giới hạn của Chromium Linux (Chromium chặn `loopback` và ẩn thiết bị monitor trong `enumerateDevices`).
+  - Web Audio API tự động kết nối `DesktopAudio` và micro của học sinh, đảm bảo video bài nộp thu trọn vẹn cả tiếng bài học và giọng đọc trên app Desktop.
+
 ## 0.0.51 — 2026-11-10
 
 ### Mới
