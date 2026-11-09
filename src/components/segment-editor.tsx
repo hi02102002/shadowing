@@ -234,7 +234,7 @@ function ArchivedHistory({ segment }: { segment: VideoDetail['pastSegments'][num
         <span className="block">{segment.text}</span>
         <span className="text-xs text-muted-foreground">{segment.dictationBest == null ? '' : `Chép ${Math.round(segment.dictationBest)} · `}{segment.pronunciationBest == null ? '' : `Nói ${Math.round(segment.pronunciationBest)}`}</span>
       </summary>
-      {open && <div className="mt-2 space-y-2"><DictationHistory segmentId={segment.id} /><PronunciationHistory segmentId={segment.id} /></div>}
+      {open && <div className="mt-2 space-y-2"><DictationHistory segmentId={segment.id} /><PronunciationHistory segmentId={segment.id} segment={segment} /></div>}
     </details>
   )
 }

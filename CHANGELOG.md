@@ -2,6 +2,13 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.48 — 2026-11-09
+
+### Cải thiện
+
+- **Lịch sử luyện phát âm (Pronunciation History)**: thay danh sách nhận xét dài dòng hiển thị trực tiếp trong từng dòng lịch sử bằng nút bấm **"Nhận xét AI (N)"** / **"Xem chi tiết"** mở hộp thoại Dialog chi tiết.
+- Dialog hiển thị trực quan và đầy đủ y như phần chấm bài trực tiếp: các vòng tròn điểm số (Chính xác, Đầy đủ, Trôi chảy, Tốc độ WPM), bảng so sánh từ (`DiffView`), nghe lại bản ghi âm câu nói (`/api/pronunciation-audio/:id`) và nghe câu gốc, nhận xét tổng quan của AI, chi tiết từng lỗi (phiên âm IPA, từ bạn đọc, loại lỗi, giải thích, mẹo khẩu hình, video ví dụ) cùng bài tập luyện lại ngắn có nút bấm nghe phát âm mẫu.
+
 ## 0.0.47 — 2026-11-09
 
 ### Sửa lỗi

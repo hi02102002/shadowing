@@ -406,8 +406,10 @@ export const pronunciationHistory = createServerFn({ method: 'GET' })
         accuracy: pronunciationAttempts.accuracy,
         completeness: pronunciationAttempts.completeness,
         wpm: pronunciationAttempts.wpm,
+        refWpm: pronunciationAttempts.refWpm,
         wordsJson: pronunciationAttempts.wordsJson,
         aiJson: pronunciationAttempts.aiJson,
+        audioPath: pronunciationAttempts.audioPath,
         createdAt: pronunciationAttempts.createdAt,
       })
       .from(pronunciationAttempts)
@@ -415,21 +417,35 @@ export const pronunciationHistory = createServerFn({ method: 'GET' })
       .orderBy(desc(pronunciationAttempts.createdAt))
       .limit(10)
       .all()
-    // chỉ gửi các từ sai/thiếu/thừa và lỗi AI đã nhận xét, để xem lại sai ở đâu
-    return rows.map(({ wordsJson, aiJson, ...a }) => ({
-      ...a,
-      errors:
-        parseJson<StoredWords>(wordsJson)?.tokens.filter(
-          (t) => t.op !== 'correct',
-        ) ?? [],
-      mistakes:
-        parseJson<PronunciationFeedback>(aiJson)?.mistakes.map((m) => ({
-          word: m.word,
-          heard: m.heard,
-          type: m.type,
-          explanation: m.explanation,
-        })) ?? [],
-    }))
+    // gửi đầy đủ kết quả để xem lại chi tiết trong modal giống phần chấm bài
+    return rows.map(({ wordsJson, aiJson, audioPath, ...a }) => {
+      const stored = parseJson<StoredWords>(wordsJson)
+      const feedback = parseJson<PronunciationFeedback>(aiJson)
+      return {
+        ...a,
+        hasAudio: Boolean(audioPath),
+        tokens: stored?.tokens ?? [],
+        errors:
+          stored?.tokens.filter(
+            (t) => t.op !== 'correct',
+          ) ?? [],
+        feedback: feedback
+          ? {
+              summary: feedback.summary,
+              fluency: feedback.fluency,
+              mistakes: feedback.mistakes,
+              drills: feedback.drills,
+            }
+          : null,
+        mistakes:
+          feedback?.mistakes.map((m) => ({
+            word: m.word,
+            heard: m.heard,
+            type: m.type,
+            explanation: m.explanation,
+          })) ?? [],
+      }
+    })
   })
 
 function parseJson<T>(json: string | null): T | null {

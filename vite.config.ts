@@ -25,6 +25,8 @@ const config = defineConfig({
         '/api/tts': './src/server/tts-route.ts',
         '/api/conversation-stream': './src/server/conversation-stream-route.ts',
         '/api/speaking-audio/:id': './src/server/speaking-audio-route.ts',
+        '/api/pronunciation-audio/:id':
+          './src/server/pronunciation-audio-route.ts',
         '/api/listening-audio/:id/:section':
           './src/server/listening-audio-route.ts',
       },

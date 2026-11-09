@@ -11,6 +11,13 @@ import { RecordButton } from '#/components/record-button'
 import { PillarSummary } from '#/components/pillar-summary'
 import { ScoreRing } from '#/components/score-ring'
 import { Button } from '#/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
 import { useAiAnalysis } from '#/hooks/use-app-settings'
 import { useRecorder } from '#/hooks/use-recorder'
 import { playerActions, playerStore } from '#/lib/player-store'
@@ -257,7 +264,7 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
         />
       )}
 
-      <PronunciationHistory segmentId={segment.id} />
+      <PronunciationHistory segmentId={segment.id} segment={segment} />
     </div>
   )
 }
@@ -312,52 +319,163 @@ function EnginePicker({
   )
 }
 
-export function PronunciationHistory({ segmentId }: { segmentId: number }) {
+export function PronunciationHistory({
+  segmentId,
+  segment,
+}: {
+  segmentId: number
+  segment?: Pick<SegmentView, 'startMs' | 'endMs'>
+}) {
   const { data } = useQuery(pronunciationHistoryQuery(segmentId))
+  const [selectedAttempt, setSelectedAttempt] = useState<
+    NonNullable<typeof data>[number] | null
+  >(null)
   if (!data?.length) return null
   return (
-    <details className="rounded-xl border bg-card p-3 text-sm">
-      <summary className="cursor-pointer select-none text-muted-foreground">Lịch sử luyện câu này ({data.length})</summary>
-      <ul className="mt-2 flex flex-col divide-y">
-        {data.map((a) => (
-          <li key={a.id} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0">
-            <div className="flex items-center gap-3">
-              <span
-                className={cn(
-                  'w-10 shrink-0 rounded text-center font-mono text-xs',
-                  scoreTone(a.accuracy) === 'ok' && 'bg-ok-soft text-ok',
-                  scoreTone(a.accuracy) === 'miss' && 'bg-miss-soft text-miss',
-                  scoreTone(a.accuracy) === 'bad' && 'bg-bad-soft text-bad',
+    <>
+      <details className="rounded-xl border bg-card p-3 text-sm">
+        <summary className="cursor-pointer select-none text-muted-foreground">
+          Lịch sử luyện câu này ({data.length})
+        </summary>
+        <ul className="mt-2 flex flex-col divide-y">
+          {data.map((a) => (
+            <li key={a.id} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0">
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    'w-10 shrink-0 rounded py-0.5 text-center font-mono text-xs font-semibold',
+                    scoreTone(a.accuracy) === 'ok' && 'bg-ok-soft text-ok',
+                    scoreTone(a.accuracy) === 'miss' && 'bg-miss-soft text-miss',
+                    scoreTone(a.accuracy) === 'bad' && 'bg-bad-soft text-bad',
+                  )}
+                >
+                  {Math.round(a.accuracy)}
+                </span>
+                <span className="flex-1 truncate italic text-muted-foreground">{a.transcript}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {a.mode === 'shadow' ? <Play className="inline size-3" /> : null} {relativeTime(a.createdAt)}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 pl-13 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {a.errors.length === 0 ? (
+                    <span className="text-ok">Không sai từ nào</span>
+                  ) : (
+                    a.errors.map((t) => <ErrorChip key={`${t.refIndex}:${t.hypIndex}`} token={t} />)
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-xs"
+                  onClick={() => setSelectedAttempt(a)}
+                >
+                  <Sparkles className="size-3 text-primary" />
+                  {a.mistakes.length > 0 ? `Nhận xét AI (${a.mistakes.length})` : 'Xem chi tiết'}
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </details>
+
+      <Dialog open={selectedAttempt != null} onOpenChange={(open) => { if (!open) setSelectedAttempt(null) }}>
+        <DialogContent className="flex max-h-[88vh] max-w-2xl flex-col gap-4 overflow-hidden p-6">
+          {selectedAttempt && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={cn(
+                      'w-10 shrink-0 rounded py-0.5 text-center font-mono text-xs font-semibold',
+                      scoreTone(selectedAttempt.accuracy) === 'ok' && 'bg-ok-soft text-ok',
+                      scoreTone(selectedAttempt.accuracy) === 'miss' && 'bg-miss-soft text-miss',
+                      scoreTone(selectedAttempt.accuracy) === 'bad' && 'bg-bad-soft text-bad',
+                    )}
+                  >
+                    {Math.round(selectedAttempt.accuracy)}
+                  </span>
+                  <DialogTitle className="text-base font-semibold">
+                    Chi tiết lần luyện phát âm
+                  </DialogTitle>
+                </div>
+                <DialogDescription>
+                  {selectedAttempt.mode === 'shadow' ? 'Shadowing' : 'Đọc lặp lại'} · {relativeTime(selectedAttempt.createdAt)}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex flex-1 flex-col gap-4 overflow-y-auto pr-1 text-sm">
+                <div className="flex flex-wrap items-center justify-around gap-4 rounded-xl border bg-card p-3">
+                  <ScoreRing value={selectedAttempt.accuracy} label="Chính xác" size={60} />
+                  <ScoreRing value={selectedAttempt.completeness} label="Đầy đủ" size={60} />
+                  {selectedAttempt.feedback?.fluency != null && (
+                    <ScoreRing value={selectedAttempt.feedback.fluency} label="Trôi chảy" size={60} />
+                  )}
+                  <div className="flex flex-col items-center gap-0.5 text-sm">
+                    <span className="font-mono text-base font-semibold">{selectedAttempt.wpm ?? '–'}</span>
+                    <span className="text-xs text-muted-foreground">
+                      từ/phút{selectedAttempt.refWpm ? ` (gốc ${selectedAttempt.refWpm})` : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {selectedAttempt.tokens.length > 0 && (
+                  <div className="space-y-2 rounded-xl border bg-card p-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      So sánh với câu gốc
+                    </h4>
+                    <DiffView tokens={selectedAttempt.tokens} />
+                    <DiffLegend />
+                  </div>
                 )}
-              >
-                {Math.round(a.accuracy)}
-              </span>
-              <span className="flex-1 truncate italic text-muted-foreground">{a.transcript}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {a.mode === 'shadow' ? <Play className="inline size-3" /> : null} {relativeTime(a.createdAt)}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 pl-13 text-xs">
-              {a.errors.length === 0 ? (
-                <span className="text-ok">Không sai từ nào</span>
-              ) : (
-                a.errors.map((t) => <ErrorChip key={`${t.refIndex}:${t.hypIndex}`} token={t} />)
-              )}
-            </div>
-            {a.mistakes.length > 0 && (
-              <ul className="flex flex-col gap-0.5 pl-13 text-xs text-muted-foreground">
-                {a.mistakes.map((m) => (
-                  <li key={`${m.word}:${m.type}`}>
-                    <b className="text-foreground">{m.word}</b>
-                    {m.heard && <> (bạn nói “{m.heard}”)</>} · {mistakeLabel(m.type)}: {m.explanation}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
-    </details>
+
+                <div className="rounded-lg bg-muted/60 p-3 text-sm">
+                  <span className="text-muted-foreground">Máy nghe được: </span>
+                  <span className="italic">“{selectedAttempt.transcript || '(không nhận dạng được)'}”</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedAttempt.hasAudio && (
+                    <audio
+                      src={`/api/pronunciation-audio/${selectedAttempt.id}`}
+                      controls
+                      className="h-9 max-w-full"
+                    />
+                  )}
+                  {segment && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => playerActions.playRange(segment.startMs, segment.endMs)}
+                    >
+                      <Volume2 className="size-4" />
+                      Nghe bản gốc
+                    </Button>
+                  )}
+                </div>
+
+                {selectedAttempt.feedback ? (
+                  <AiFeedback
+                    status="success"
+                    summary={selectedAttempt.feedback.summary}
+                    mistakes={selectedAttempt.feedback.mistakes}
+                    drills={selectedAttempt.feedback.drills}
+                  />
+                ) : (
+                  <div className="flex items-start gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                    <Sparkles className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <p>
+                      Lần luyện này được chấm tự động bằng thuật toán so sánh từ (chưa có phân tích chi tiết của AI).
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
