@@ -2,6 +2,22 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.49 — 2026-11-09
+
+### Mới
+
+- **Quay video bài nộp cho cô giáo (Shadowing & Luyện phát âm)**:
+  - Tích hợp thanh công cụ quay video bài nộp trên cả hai trang **Shadowing** (`/videos/$videoId/shadow`) và **Phát âm** (`/videos/$videoId/pronounce`).
+  - **Khung Camera khẩu hình nổi (Webcam Bubble)**: hỗ trợ bật/tắt camera riêng biệt, kéo thả tự do mọi vị trí trên màn hình, đổi hình dạng (hình tròn / hình chữ nhật bo góc), đổi kích cỡ (S/M/L) và có nút **"Dừng quay"** ngay dưới khung camera.
+  - **Bộ chọn dải câu nộp bài trực quan**: cho phép chọn nhanh câu hiện tại, từ câu hiện tại đến hết bài, toàn bài hoặc tuỳ chọn dải câu kèm dropdown hiển thị rõ nội dung và thời gian của từng câu. Có card xem trước phụ đề tiếng Anh và danh sách tất cả các câu trong bài.
+  - **Trộn âm thanh tự động**: kết hợp âm thanh micro của học sinh và âm thanh bài học từ trình duyệt để cô giáo nghe rõ cả khẩu hình và ngữ điệu bài học.
+  - Sau khi quay xong, học sinh có thể xem lại video trực tiếp và tải file về máy (`.webm`) để nộp bài.
+
+### Sửa lỗi
+
+- **Lỗi crash `MediaRecorder's state is 'recording'`**: tách hoàn toàn logic đếm ngược và khởi động MediaRecorder ra khỏi React state updater để ngăn chặn hiện tượng double-invocation và xung đột render chu kỳ.
+- Không tự động ngắt quãng playback video khi chuyển câu trong quá trình quay Shadowing.
+
 ## 0.0.48 — 2026-11-09
 
 ### Cải thiện
