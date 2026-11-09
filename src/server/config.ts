@@ -2,7 +2,13 @@ import { z } from 'zod'
 import { db } from '#/db/index.ts'
 import { settings } from '#/db/schema.ts'
 
-export const LLM_PROVIDERS = ['openai', 'anthropic', 'gemini', 'ollama', 'openai-compatible'] as const
+export const LLM_PROVIDERS = [
+  'openai',
+  'anthropic',
+  'gemini',
+  'ollama',
+  'openai-compatible',
+] as const
 /** llm-audio: model LLM nghe trực tiếp bản ghi âm · stt: Whisper rồi LLM đọc chữ */
 export const PRONUNCIATION_ENGINES = ['llm-audio', 'stt'] as const
 /** Tạo phụ đề cho video không có sẵn: local = whisper.cpp trên máy · api = STT API ở trên (tốn phí) */
@@ -19,6 +25,9 @@ export const AppConfigSchema = z.object({
   llmModel: z.string().min(1),
   llmApiKey: z.string(),
   llmBaseUrl: z.string(),
+  talkVilaoApiKey: z.string(),
+  talkVilaoBaseUrl: z.string().url(),
+  talkVilaoModel: z.string().min(1),
   sttBaseUrl: z.string(),
   sttApiKey: z.string(),
   sttModel: z.string().min(1),
@@ -48,18 +57,24 @@ export type WhisperModel = (typeof WHISPER_MODELS)[number]
 function fromEnv(): AppConfig {
   const e = process.env
   return {
-    llmProvider: (LLM_PROVIDERS as readonly string[]).includes(e.LLM_PROVIDER ?? '')
+    llmProvider: (LLM_PROVIDERS as readonly string[]).includes(
+      e.LLM_PROVIDER ?? '',
+    )
       ? (e.LLM_PROVIDER as AppConfig['llmProvider'])
       : 'openai',
     llmModel: e.LLM_MODEL ?? 'gpt-5-mini',
     llmApiKey: e.LLM_API_KEY ?? e.OPENAI_API_KEY ?? '',
     llmBaseUrl: e.LLM_BASE_URL ?? '',
+    talkVilaoApiKey: e.TALK_VILAO_API_KEY ?? '',
+    talkVilaoBaseUrl: e.TALK_VILAO_BASE_URL ?? 'https://api.vilao.ai/v1',
+    talkVilaoModel: e.TALK_VILAO_MODEL ?? 'chib/gemini-3.8-flash',
     sttBaseUrl: e.STT_BASE_URL ?? '',
     sttApiKey: e.STT_API_KEY ?? e.OPENAI_API_KEY ?? '',
     sttModel: e.STT_MODEL ?? 'whisper-1',
     pronunciationEngine: e.PRONUNCIATION_ENGINE === 'stt' ? 'stt' : 'llm-audio',
     captionEngine: e.CAPTION_ENGINE === 'api' ? 'api' : 'local',
-    whisperModel: e.WHISPER_MODEL === 'small.en' ? 'small.en' : 'large-v3-turbo',
+    whisperModel:
+      e.WHISPER_MODEL === 'small.en' ? 'small.en' : 'large-v3-turbo',
     accent: e.ACCENT === 'uk' ? 'uk' : 'us',
     aiAnalysis: e.AI_ANALYSIS === 'off' ? 'off' : 'on',
     newPerDay: 20,
@@ -76,17 +91,24 @@ function fromEnv(): AppConfig {
 export function getConfig(): AppConfig {
   const base = fromEnv()
   const rows = db.select().from(settings).all()
-  const overrides = Object.fromEntries(rows.filter((r) => r.value !== '').map((r) => [r.key, r.value]))
+  const overrides = Object.fromEntries(
+    rows.filter((r) => r.value !== '').map((r) => [r.key, r.value]),
+  )
   const merged = AppConfigSchema.safeParse({ ...base, ...overrides })
   return merged.success ? merged.data : base
 }
 
 export function saveConfig(patch: Partial<AppConfig>) {
-  for (const [key, value] of Object.entries(patch) as Array<[string, string | undefined]>) {
+  for (const [key, value] of Object.entries(patch) as Array<
+    [string, string | undefined]
+  >) {
     if (value === undefined) continue
     db.insert(settings)
       .values({ key, value: String(value) })
-      .onConflictDoUpdate({ target: settings.key, set: { value: String(value) } })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value: String(value) },
+      })
       .run()
   }
 }
@@ -94,7 +116,12 @@ export function saveConfig(patch: Partial<AppConfig>) {
 /** Trả về cấu hình cho client: che API key */
 export function publicConfig(cfg: AppConfig) {
   const mask = (k: string) => (k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '')
-  return { ...cfg, llmApiKey: mask(cfg.llmApiKey), sttApiKey: mask(cfg.sttApiKey) }
+  return {
+    ...cfg,
+    llmApiKey: mask(cfg.llmApiKey),
+    sttApiKey: mask(cfg.sttApiKey),
+    talkVilaoApiKey: mask(cfg.talkVilaoApiKey),
+  }
 }
 
 /** Đã cấu hình LLM (Ollama / OpenAI-compatible chạy local không cần key) */
@@ -106,7 +133,11 @@ export function hasLlm(cfg: AppConfig): boolean {
 
 /** LLM nghe được audio trực tiếp (gửi `input_audio` qua API tương thích OpenAI) */
 export function hasAudioLlm(cfg: AppConfig): boolean {
-  return cfg.llmProvider !== 'anthropic' && cfg.llmProvider !== 'ollama' && hasLlm(cfg)
+  return (
+    cfg.llmProvider !== 'anthropic' &&
+    cfg.llmProvider !== 'ollama' &&
+    hasLlm(cfg)
+  )
 }
 
 export function hasStt(cfg: AppConfig): boolean {

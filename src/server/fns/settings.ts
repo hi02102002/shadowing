@@ -2,19 +2,36 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { structured } from '../ai/provider.ts'
-import { AppConfigSchema, getConfig, publicConfig, saveConfig } from '../config.ts'
+import { verifyVilaoTalk, vilaoTalkConfig } from '../ai/vilao-talk.ts'
+import { settingsPatch } from '../settings-patch.ts'
+import {
+  AppConfigSchema,
+  getConfig,
+  publicConfig,
+  saveConfig,
+} from '../config.ts'
 
-export const getSettings = createServerFn({ method: 'GET' }).handler(async () => publicConfig(getConfig()))
+export const getSettings = createServerFn({ method: 'GET' }).handler(async () =>
+  publicConfig(getConfig()),
+)
 
 export type PublicSettings = Awaited<ReturnType<typeof getSettings>>
-
-/** Key đã bị che (chứa "…") nghĩa là người dùng không sửa → giữ nguyên key cũ */
-const keepIfMasked = (v: string | undefined) => (v && v.includes('…') ? undefined : v)
 
 export const saveSettings = createServerFn({ method: 'POST' })
   .validator(AppConfigSchema.partial())
   .handler(async ({ data }) => {
-    saveConfig({ ...data, llmApiKey: keepIfMasked(data.llmApiKey), sttApiKey: keepIfMasked(data.sttApiKey) })
+    const patch = settingsPatch(data)
+    const current = getConfig()
+    const candidate = AppConfigSchema.parse({ ...current, ...patch })
+    if (
+      candidate.talkVilaoApiKey &&
+      (candidate.talkVilaoApiKey !== current.talkVilaoApiKey ||
+        candidate.talkVilaoBaseUrl !== current.talkVilaoBaseUrl ||
+        candidate.talkVilaoModel !== current.talkVilaoModel)
+    ) {
+      await verifyVilaoTalk(vilaoTalkConfig(candidate))
+    }
+    saveConfig(patch)
     return publicConfig(getConfig())
   })
 
@@ -27,8 +44,14 @@ export const testLlm = createServerFn({ method: 'POST' }).handler(async () => {
       prompt: 'Return ok=true and the IPA of the word "water".',
       schema: z.object({ ok: z.boolean(), ipa: z.string() }),
     })
-    return { ok: res.ok, message: `Kết nối thành công (${Date.now() - started}ms). IPA "water": ${res.ipa}` }
+    return {
+      ok: res.ok,
+      message: `Kết nối thành công (${Date.now() - started}ms). IPA "water": ${res.ipa}`,
+    }
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) }
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    }
   }
 })

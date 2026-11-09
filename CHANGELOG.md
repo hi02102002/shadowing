@@ -2,6 +2,18 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.45 — 2026-11-09
+
+### Cải thiện
+
+- **Nói với AI**: câu trả lời hiện dần khi Vilao tạo nội dung; giọng đọc bắt đầu sau câu hoàn chỉnh đầu tiên. Giữ cách nhận giọng nói và phát âm hiện có.
+- Thêm cấu hình Vilao riêng cho hội thoại trong Cài đặt AI. Khi đổi key hoặc model, app kiểm tra kết nối trước khi lưu. Phần AI khác vẫn dùng cấu hình cũ.
+- Lượt hội thoại chỉ được lưu khi AI trả lời hoàn chỉnh; nếu luồng bị ngắt, có thể thử lại mà không đưa câu trả lời dở vào lịch sử và nhận xét cuối buổi.
+
+### Sửa lỗi
+
+- Lưu cài đặt không còn báo lỗi `llmApiKey` khi API key cũ đang hiển thị dạng che.
+
 ## 0.0.44 — 2026-11-07
 
 ### Mới

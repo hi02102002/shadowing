@@ -165,7 +165,8 @@ function SettingsPage() {
     mutationFn: (values: PublicSettings) => saveSettings({ data: values }),
     onSuccess: (fresh) => {
       queryClient.setQueryData(settingsQuery().queryKey, fresh)
-      for (const queryKey of ACCENT_DEPENDENT_KEYS) void queryClient.invalidateQueries({ queryKey })
+      for (const queryKey of ACCENT_DEPENDENT_KEYS)
+        void queryClient.invalidateQueries({ queryKey })
       // đổi model Whisper → trạng thái tải model khác
       void queryClient.invalidateQueries({ queryKey: ['whisper-status'] })
       form.reset(fresh)
@@ -321,6 +322,49 @@ function SettingsPage() {
           </p>
         </fieldset>
 
+        <fieldset className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+          <legend className="px-1 text-sm font-semibold">
+            Nói với AI · Vilao
+          </legend>
+          <p className="text-xs text-muted-foreground">
+            Chỉ dùng cho hội thoại Nói với AI. Lời nói và giọng đọc vẫn dùng cấu
+            hình hiện có. Khi thay đổi, nút Lưu sẽ kiểm tra model bằng một yêu
+            cầu ngắn tới Vilao.
+          </p>
+          <form.Field name="talkVilaoApiKey">
+            {(field) => (
+              <TextField
+                field={field}
+                label="API key Vilao"
+                type="password"
+                placeholder="Nhập key mới từ Vilao"
+              />
+            )}
+          </form.Field>
+          <form.Field name="talkVilaoBaseUrl">
+            {(field) => (
+              <TextField
+                field={field}
+                label="Base URL"
+                placeholder="https://api.vilao.ai/v1"
+              />
+            )}
+          </form.Field>
+          <form.Field name="talkVilaoModel">
+            {(field) => (
+              <TextField
+                field={field}
+                label="Model ID"
+                placeholder="chib/gemini-3.8-flash"
+              />
+            )}
+          </form.Field>
+          <p className="text-xs text-muted-foreground">
+            Model ID mặc định được suy ra từ đường dẫn trang model. Nếu Vilao
+            dùng ID khác, hãy sao chép đúng ID trong trang model của bạn.
+          </p>
+        </fieldset>
+
         <fieldset className="flex flex-col gap-3 rounded-xl border bg-card p-5">
           <legend className="px-1 text-sm font-semibold">
             Chấm phát âm bằng
@@ -358,20 +402,31 @@ function SettingsPage() {
         </fieldset>
 
         <fieldset className="flex flex-col gap-3 rounded-xl border bg-card p-5">
-          <legend className="px-1 text-sm font-semibold">AI phân tích lỗi</legend>
+          <legend className="px-1 text-sm font-semibold">
+            AI phân tích lỗi
+          </legend>
           <form.Field name="aiAnalysis">
             {(field) => (
               <div className="flex items-start gap-3">
                 <Switch
                   id={field.name}
                   checked={field.state.value === 'on'}
-                  onCheckedChange={(on) => field.handleChange(on ? 'on' : 'off')}
+                  onCheckedChange={(on) =>
+                    field.handleChange(on ? 'on' : 'off')
+                  }
                 />
-                <Label htmlFor={field.name} className="flex flex-col items-start gap-1 font-normal">
-                  <span className="font-medium">Tự động phân tích sau mỗi lần chấm</span>
+                <Label
+                  htmlFor={field.name}
+                  className="flex flex-col items-start gap-1 font-normal"
+                >
+                  <span className="font-medium">
+                    Tự động phân tích sau mỗi lần chấm
+                  </span>
                   <span className="text-xs text-muted-foreground">
-                    Bật: AI giải thích lỗi và ghi vào Sổ lỗi ngay sau khi chấm phát âm / chép chính tả. Tắt: vẫn có
-                    điểm và so từng từ, chỉ gọi AI khi bạn bấm &quot;Nhờ AI phân tích lỗi&quot; (tiết kiệm lượt gọi API).
+                    Bật: AI giải thích lỗi và ghi vào Sổ lỗi ngay sau khi chấm
+                    phát âm / chép chính tả. Tắt: vẫn có điểm và so từng từ, chỉ
+                    gọi AI khi bạn bấm &quot;Nhờ AI phân tích lỗi&quot; (tiết
+                    kiệm lượt gọi API).
                   </span>
                 </Label>
               </div>
@@ -382,7 +437,8 @@ function SettingsPage() {
         <fieldset className="flex flex-col gap-3 rounded-xl border bg-card p-5">
           <legend className="px-1 text-sm font-semibold">Giọng chuẩn</legend>
           <p className="text-xs text-muted-foreground">
-            Áp dụng cho cả app: phiên âm IPA dưới câu, giọng đọc mẫu khi tra từ, cách AI chấm và nhận xét phát âm.
+            Áp dụng cho cả app: phiên âm IPA dưới câu, giọng đọc mẫu khi tra từ,
+            cách AI chấm và nhận xét phát âm.
           </p>
           <form.Field name="accent">
             {(field) => (
@@ -453,13 +509,18 @@ function SettingsPage() {
           <form.Field name="whisperModel">
             {(field) => (
               <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">Model Whisper tạo phụ đề (chấm phát âm trên máy luôn dùng small.en cho nhanh)</span>
+                <span className="text-sm font-medium">
+                  Model Whisper tạo phụ đề (chấm phát âm trên máy luôn dùng
+                  small.en cho nhanh)
+                </span>
                 <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
                   {WHISPER_MODELS.map((m) => (
                     <label
                       key={m.value}
                       className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors ${
-                        field.state.value === m.value ? 'border-primary bg-accent/50' : 'hover:bg-muted'
+                        field.state.value === m.value
+                          ? 'border-primary bg-accent/50'
+                          : 'hover:bg-muted'
                       }`}
                     >
                       <span className="flex items-center gap-2 font-medium">
@@ -472,7 +533,9 @@ function SettingsPage() {
                         />
                         {m.label}
                       </span>
-                      <span className="text-xs text-muted-foreground">{m.desc}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {m.desc}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -598,12 +661,18 @@ function QuickLookupSetting() {
     <fieldset className="flex flex-col gap-2 rounded-xl border bg-card p-5">
       <legend className="px-1 text-sm font-semibold">Tra từ nhanh</legend>
       <label className="flex items-start gap-3 text-sm">
-        <Switch checked={!off} onCheckedChange={(on) => setOff(!on)} className="mt-0.5" />
+        <Switch
+          checked={!off}
+          onCheckedChange={(on) => setOff(!on)}
+          className="mt-0.5"
+        />
         <span className="flex flex-col gap-0.5">
-          <span className="font-medium">Nhấp đúp hoặc bôi đen từ tiếng Anh ở bất kỳ trang nào để tra nghĩa</span>
+          <span className="font-medium">
+            Nhấp đúp hoặc bôi đen từ tiếng Anh ở bất kỳ trang nào để tra nghĩa
+          </span>
           <span className="text-xs text-muted-foreground">
-            Nhấp đúp: mở thẻ tra từ ngay. Bôi đen một cụm: hiện nút “Tra” cạnh chỗ chọn. Thẻ dùng từ điển, nghĩa AI theo
-            câu chỉ tra khi bạn bấm.
+            Nhấp đúp: mở thẻ tra từ ngay. Bôi đen một cụm: hiện nút “Tra” cạnh
+            chỗ chọn. Thẻ dùng từ điển, nghĩa AI theo câu chỉ tra khi bạn bấm.
           </span>
         </span>
       </label>
@@ -617,7 +686,8 @@ function WhisperModelStatus() {
   const { data: status } = useQuery({
     queryKey: ['whisper-status'],
     queryFn: () => whisperStatus(),
-    refetchInterval: (q) => (q.state.data?.model === 'downloading' ? 1000 : false),
+    refetchInterval: (q) =>
+      q.state.data?.model === 'downloading' ? 1000 : false,
   })
   const download = useMutation({
     mutationFn: () => downloadWhisperModel(),
@@ -631,7 +701,8 @@ function WhisperModelStatus() {
       {!status.binary && (
         <p className="flex items-center gap-1.5 text-destructive">
           <XCircle className="size-4 shrink-0" />
-          Không tìm thấy whisper-cli trên máy chủ. Cài whisper.cpp và đặt WHISPER_CPP_PATH, hoặc dùng STT API.
+          Không tìm thấy whisper-cli trên máy chủ. Cài whisper.cpp và đặt
+          WHISPER_CPP_PATH, hoặc dùng STT API.
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
@@ -643,7 +714,9 @@ function WhisperModelStatus() {
               ? `đang tải ${Math.round(status.progress * 100)}%`
               : 'chưa tải'}
         </span>
-        {status.model === 'ready' && <CheckCircle2 className="size-4 text-ok" />}
+        {status.model === 'ready' && (
+          <CheckCircle2 className="size-4 text-ok" />
+        )}
         {status.model === 'missing' && (
           <Button
             type="button"
@@ -712,11 +785,15 @@ function AppVersion() {
   const bridge = desktopBridge()
 
   return (
-    <section id="update" className="flex flex-col gap-3 rounded-xl border bg-card p-5">
+    <section
+      id="update"
+      className="flex flex-col gap-3 rounded-xl border bg-card p-5"
+    >
       <h2 className="text-sm font-semibold">Phiên bản</h2>
       {!update || !bridge ? (
         <p className="text-sm text-muted-foreground">
-          Đang chạy bản web. Cập nhật bằng cách kéo code mới (git pull) hoặc build lại image Docker.
+          Đang chạy bản web. Cập nhật bằng cách kéo code mới (git pull) hoặc
+          build lại image Docker.
         </p>
       ) : (
         <>
@@ -729,7 +806,9 @@ function AppVersion() {
                 <CheckCircle2 className="size-4" /> Đã là bản mới nhất
               </span>
             )}
-            {(update.status === 'available' || update.status === 'downloading' || update.status === 'downloaded') &&
+            {(update.status === 'available' ||
+              update.status === 'downloading' ||
+              update.status === 'downloaded') &&
               update.latestVersion && (
                 <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
                   Có bản mới {update.latestVersion}
@@ -740,56 +819,90 @@ function AppVersion() {
           {update.status === 'downloading' && (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <Progress value={update.progress * 100} className="h-1.5" />
-              <span className="shrink-0 font-mono text-xs">{Math.round(update.progress * 100)}%</span>
+              <span className="shrink-0 font-mono text-xs">
+                {Math.round(update.progress * 100)}%
+              </span>
             </div>
           )}
           {update.status === 'error' && update.error && (
-            <p className="text-xs text-destructive">Không cập nhật được: {update.error}</p>
+            <p className="text-xs text-destructive">
+              Không cập nhật được: {update.error}
+            </p>
           )}
           {update.status === 'dev' && (
-            <p className="text-xs text-muted-foreground">Bản đang chạy từ mã nguồn, chỉ bản đã cài mới cập nhật.</p>
+            <p className="text-xs text-muted-foreground">
+              Bản đang chạy từ mã nguồn, chỉ bản đã cài mới cập nhật.
+            </p>
           )}
 
           <div className="flex flex-wrap gap-2">
             {update.status === 'available' && update.canInstall && (
-              <Button type="button" size="sm" onClick={() => void bridge.updater.download()}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void bridge.updater.download()}
+              >
                 <Download />
                 Cập nhật lên {update.latestVersion}
               </Button>
             )}
             {update.status === 'available' && !update.canInstall && (
-              <Button type="button" size="sm" onClick={() => void bridge.updater.openRelease()}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void bridge.updater.openRelease()}
+              >
                 <Download />
                 Tải bản {update.latestVersion}
               </Button>
             )}
             {update.status === 'downloaded' && (
-              <Button type="button" size="sm" onClick={() => void bridge.updater.install()}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void bridge.updater.install()}
+              >
                 <RotateCw />
                 Khởi động lại để cài {update.latestVersion}
               </Button>
             )}
-            {update.status !== 'dev' && update.status !== 'downloading' && update.status !== 'downloaded' && (
+            {update.status !== 'dev' &&
+              update.status !== 'downloading' &&
+              update.status !== 'downloaded' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={update.status === 'checking'}
+                  onClick={() => void bridge.updater.check()}
+                >
+                  {update.status === 'checking' ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <RefreshCw />
+                  )}
+                  {update.status === 'checking'
+                    ? 'Đang kiểm tra…'
+                    : 'Kiểm tra cập nhật'}
+                </Button>
+              )}
+            {update.latestVersion && (
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
-                disabled={update.status === 'checking'}
-                onClick={() => void bridge.updater.check()}
+                variant="ghost"
+                onClick={() => void bridge.updater.openRelease()}
               >
-                {update.status === 'checking' ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                {update.status === 'checking' ? 'Đang kiểm tra…' : 'Kiểm tra cập nhật'}
-              </Button>
-            )}
-            {update.latestVersion && (
-              <Button type="button" size="sm" variant="ghost" onClick={() => void bridge.updater.openRelease()}>
                 Có gì mới?
               </Button>
             )}
           </div>
-          {update.status === 'downloaded' && navigator.userAgent.includes('Linux') && (
-            <p className="text-xs text-muted-foreground">Bản cài .deb sẽ hỏi mật khẩu máy khi cài.</p>
-          )}
+          {update.status === 'downloaded' &&
+            navigator.userAgent.includes('Linux') && (
+              <p className="text-xs text-muted-foreground">
+                Bản cài .deb sẽ hỏi mật khẩu máy khi cài.
+              </p>
+            )}
         </>
       )}
     </section>

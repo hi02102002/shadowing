@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, CheckCircle2, Lightbulb, Loader2, MessagesSquare, Send, Trash2, Volume2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Lightbulb,
+  Loader2,
+  MessagesSquare,
+  Send,
+  Trash2,
+  Volume2,
+} from 'lucide-react'
 import { z } from 'zod'
 
 import { RecordButton } from '#/components/record-button'
@@ -14,14 +23,30 @@ import { TimeChoice } from '#/components/time-choice'
 import { TALK_TURN_CHOICES, TALK_TURN_LIMIT } from '#/lib/speaking-topics'
 import { useRecorder } from '#/hooks/use-recorder'
 import { useStoredToggle } from '#/hooks/use-stored-toggle'
-import { CUSTOM_SCENARIO, MAX_USER_TURNS, SCENARIOS, TALK_LEVELS, TALK_LEVEL_LABEL, scenarioLabel } from '#/lib/conversation'
+import {
+  CUSTOM_SCENARIO,
+  MAX_USER_TURNS,
+  SCENARIOS,
+  TALK_LEVELS,
+  TALK_LEVEL_LABEL,
+  scenarioLabel,
+} from '#/lib/conversation'
 import type { TalkLevel } from '#/lib/conversation'
-import { conversationQuery, conversationsQuery, statsQuery } from '#/lib/queries'
+import {
+  conversationQuery,
+  conversationsQuery,
+  statsQuery,
+} from '#/lib/queries'
 import { useStopSpeechOnLeave } from '#/hooks/use-stop-speech'
-import { speak, speakLong } from '#/lib/speech'
+import { speak, speakLong, stopSpeech } from '#/lib/speech'
+import { readTalkStream } from '#/lib/talk-stream'
 import { cn } from '#/lib/utils'
 import { mistakeLabel } from '#/server/ai/prompts'
-import { deleteConversation, finishConversation, sendTurn, startConversation } from '#/server/fns/conversation'
+import {
+  deleteConversation,
+  finishConversation,
+  startConversation,
+} from '#/server/fns/conversation'
 import type { ConversationFeedback } from '#/db/schema'
 import type { ConversationDetail } from '#/server/fns/conversation'
 
@@ -66,15 +91,27 @@ function Setup() {
   const { data: history = [] } = useQuery(conversationsQuery())
 
   const start = useMutation({
-    mutationFn: () => startConversation({ data: { scenario, level, custom: scenario === CUSTOM_SCENARIO ? custom : undefined } }),
+    mutationFn: () =>
+      startConversation({
+        data: {
+          scenario,
+          level,
+          custom: scenario === CUSTOM_SCENARIO ? custom : undefined,
+        },
+      }),
     onSuccess: ({ id }) => {
-      void queryClient.invalidateQueries({ queryKey: conversationsQuery().queryKey })
+      void queryClient.invalidateQueries({
+        queryKey: conversationsQuery().queryKey,
+      })
       void navigate({ to: '/talk', search: { id } })
     },
   })
   const remove = useMutation({
     mutationFn: (id: number) => deleteConversation({ data: { id } }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: conversationsQuery().queryKey }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: conversationsQuery().queryKey,
+      }),
   })
 
   return (
@@ -85,7 +122,8 @@ function Setup() {
           <MessagesSquare className="size-6 text-primary" /> Hội thoại với AI
         </h1>
         <p className="text-sm text-muted-foreground">
-          Nhập vai một tình huống thật, nói (hoặc gõ) câu của bạn. Kết thúc buổi để AI chỉ ra câu chưa đúng và cách nói tự nhiên hơn.
+          Nhập vai một tình huống thật, nói (hoặc gõ) câu của bạn. Kết thúc buổi
+          để AI chỉ ra câu chưa đúng và cách nói tự nhiên hơn.
         </p>
       </header>
 
@@ -97,7 +135,14 @@ function Setup() {
         }}
       >
         <div className="grid gap-2 sm:grid-cols-2">
-          {[...SCENARIOS, { id: CUSTOM_SCENARIO, label: 'Chủ đề của bạn', detail: 'Tự mô tả tình huống muốn luyện' }].map((s) => (
+          {[
+            ...SCENARIOS,
+            {
+              id: CUSTOM_SCENARIO,
+              label: 'Chủ đề của bạn',
+              detail: 'Tự mô tả tình huống muốn luyện',
+            },
+          ].map((s) => (
             <button
               key={s.id}
               type="button"
@@ -105,7 +150,9 @@ function Setup() {
               onClick={() => setScenario(s.id)}
               className={cn(
                 'rounded-lg border p-3 text-left transition-colors',
-                scenario === s.id ? 'border-primary bg-primary/5' : 'hover:bg-muted',
+                scenario === s.id
+                  ? 'border-primary bg-primary/5'
+                  : 'hover:bg-muted',
               )}
             >
               <span className="block font-medium">{s.label}</span>
@@ -134,7 +181,9 @@ function Setup() {
               onClick={() => setLevel(l)}
               className={cn(
                 'rounded-full border px-3 py-1 transition-colors',
-                level === l ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                level === l
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted',
               )}
             >
               {TALK_LEVEL_LABEL[l]}
@@ -146,8 +195,18 @@ function Setup() {
             {start.error.message}
           </p>
         )}
-        <Button type="submit" disabled={start.isPending || (scenario === CUSTOM_SCENARIO && !custom.trim())}>
-          {start.isPending ? <Loader2 className="animate-spin" /> : <MessagesSquare />} Bắt đầu nói
+        <Button
+          type="submit"
+          disabled={
+            start.isPending || (scenario === CUSTOM_SCENARIO && !custom.trim())
+          }
+        >
+          {start.isPending ? (
+            <Loader2 className="animate-spin" />
+          ) : (
+            <MessagesSquare />
+          )}{' '}
+          Bắt đầu nói
         </Button>
       </form>
 
@@ -156,12 +215,21 @@ function Setup() {
           <h2 className="font-semibold">Các buổi trước</h2>
           <ul className="divide-y rounded-xl border bg-card">
             {history.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <Link to="/talk" search={{ id: c.id }} className="min-w-0 flex-1 truncate text-foreground no-underline hover:underline">
+              <li
+                key={c.id}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm"
+              >
+                <Link
+                  to="/talk"
+                  search={{ id: c.id }}
+                  className="min-w-0 flex-1 truncate text-foreground no-underline hover:underline"
+                >
                   {scenarioLabel(c.scenario, c.topic)}
                 </Link>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {c.level} · {c.turns} lượt · {c.endedAt ? 'đã nhận xét' : 'đang dở'} · {c.createdAt.toLocaleDateString('vi-VN')}
+                  {c.level} · {c.turns} lượt ·{' '}
+                  {c.endedAt ? 'đã nhận xét' : 'đang dở'} ·{' '}
+                  {c.createdAt.toLocaleDateString('vi-VN')}
                 </span>
                 <Button
                   size="icon"
@@ -194,6 +262,21 @@ function ConversationView({ id }: { id: number }) {
   const [showHints, setShowHints] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const spokenRef = useRef<number | null>(null)
+  const skipNextSpeakRef = useRef(false)
+  const requestRef = useRef<AbortController | null>(null)
+  const initialTriedRef = useRef(false)
+  const speechQueueRef = useRef<string[]>([])
+  const speechBusyRef = useRef(false)
+  const speechRemainderRef = useRef('')
+  const [streaming, setStreaming] = useState(false)
+  const [pendingUser, setPendingUser] = useState('')
+  const [pendingAi, setPendingAi] = useState('')
+  const [streamError, setStreamError] = useState('')
+  const [retryInput, setRetryInput] = useState<{
+    audio?: Blob
+    text?: string
+    initial?: boolean
+  } | null>(null)
 
   const turns = data?.turns ?? []
   const lastAi = [...turns].reverse().find((t) => t.role === 'ai')
@@ -205,32 +288,160 @@ function ConversationView({ id }: { id: number }) {
     if (!lastAi || ended || spokenRef.current === lastAi.id) return
     const first = spokenRef.current === null
     spokenRef.current = lastAi.id
+    if (skipNextSpeakRef.current) {
+      skipNextSpeakRef.current = false
+      return
+    }
     // mở lại buổi cũ thì không tự đọc câu cuối, chỉ đọc khi buổi vừa bắt đầu
-    if (speakOn && (!first || turns.length === 1)) speakLong(lastAi.text, { accent })
+    if (speakOn && (!first || turns.length === 1))
+      speakLong(lastAi.text, { accent })
   }, [lastAi, ended, speakOn, accent, turns.length])
 
-  const send = useMutation({
-    mutationFn: (input: { audio?: Blob; text?: string }) => {
-      const form = new FormData()
-      form.set('id', String(id))
-      if (input.audio)
-        form.set('audio', new File([input.audio], `rec.${input.audio.type.includes('mp4') ? 'm4a' : 'webm'}`, { type: input.audio.type }))
-      if (input.text) form.set('text', input.text)
-      return sendTurn({ data: form })
-    },
-    onSuccess: ({ user, ai }) => {
+  const playNext = () => {
+    if (speechBusyRef.current || !speakOn) return
+    const sentence = speechQueueRef.current.shift()
+    if (!sentence) return
+    speechBusyRef.current = true
+    speak(sentence, {
+      accent,
+      onEnd: () => {
+        speechBusyRef.current = false
+        playNext()
+      },
+    })
+  }
+  const queueSpeech = (sentence: string) => {
+    if (!sentence.trim() || !speakOn) return
+    speechQueueRef.current.push(sentence.trim())
+    playNext()
+  }
+  const runStream = async (input: {
+    audio?: Blob
+    text?: string
+    initial?: boolean
+  }) => {
+    if (requestRef.current) return
+    const previousTurnCount =
+      queryClient.getQueryData<ConversationDetail>(
+        conversationQuery(id).queryKey,
+      )?.turns.length ?? 0
+    stopSpeech()
+    const abort = new AbortController()
+    requestRef.current = abort
+    setStreaming(true)
+    setPendingUser(input.text ?? '')
+    setPendingAi('')
+    setStreamError('')
+    setRetryInput(null)
+    speechRemainderRef.current = ''
+    speechQueueRef.current = []
+    speechBusyRef.current = false
+    const form = new FormData()
+    form.set('id', String(id))
+    if (input.initial) form.set('initial', '1')
+    if (input.text) form.set('text', input.text)
+    if (input.audio)
+      form.set(
+        'audio',
+        new File(
+          [input.audio],
+          `rec.${input.audio.type.includes('mp4') ? 'm4a' : 'webm'}`,
+          { type: input.audio.type },
+        ),
+      )
+    try {
+      await readTalkStream(
+        form,
+        (event) => {
+          if (event.type === 'user') setPendingUser(event.text)
+          if (event.type === 'delta') {
+            setPendingAi((prev) => prev + event.text)
+            speechRemainderRef.current += event.text
+            const matches =
+              speechRemainderRef.current.match(/[^.!?]+[.!?](?:\s|$)/g)
+            if (matches) {
+              for (const sentence of matches) queueSpeech(sentence)
+              speechRemainderRef.current = speechRemainderRef.current.slice(
+                matches.join('').length,
+              )
+            }
+          }
+          if (event.type === 'done') {
+            queueSpeech(speechRemainderRef.current)
+            speechRemainderRef.current = ''
+          }
+        },
+        abort.signal,
+      )
+      skipNextSpeakRef.current = true
+      setPendingUser('')
+      setPendingAi('')
       setText('')
       setShowHints(false)
-      queryClient.setQueryData(conversationQuery(id).queryKey, (old) => (old ? { ...old, turns: [...old.turns, user, ai] } : old))
+      await queryClient.invalidateQueries({
+        queryKey: conversationQuery(id).queryKey,
+      })
       void queryClient.invalidateQueries({ queryKey: statsQuery().queryKey })
+    } catch (streamFailure) {
+      if (!abort.signal.aborted) {
+        // Có thể DB đã lưu nhưng kết nối đứt trước khi trình duyệt nhận event done.
+        skipNextSpeakRef.current = true
+        await queryClient.invalidateQueries({
+          queryKey: conversationQuery(id).queryKey,
+        })
+        const latest = queryClient.getQueryData<ConversationDetail>(
+          conversationQuery(id).queryKey,
+        )
+        if ((latest?.turns.length ?? 0) > previousTurnCount) {
+          setPendingUser('')
+          setPendingAi('')
+          setText('')
+          void queryClient.invalidateQueries({
+            queryKey: statsQuery().queryKey,
+          })
+          return
+        }
+        skipNextSpeakRef.current = false
+        stopSpeech()
+        speechQueueRef.current = []
+        speechBusyRef.current = false
+        setStreamError(
+          streamFailure instanceof Error
+            ? streamFailure.message
+            : 'Không thể trả lời',
+        )
+        setRetryInput(input)
+      }
+    } finally {
+      requestRef.current = null
+      setStreaming(false)
+    }
+  }
+
+  useEffect(
+    () => () => {
+      requestRef.current?.abort()
+      speechQueueRef.current = []
+      stopSpeech()
     },
-  })
+    [],
+  )
+  useEffect(() => {
+    if (data && data.turns.length === 0 && !initialTriedRef.current) {
+      initialTriedRef.current = true
+      void runStream({ initial: true })
+    }
+  }, [data?.turns.length])
 
   const finish = useMutation({
     mutationFn: () => finishConversation({ data: { id } }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: conversationQuery(id).queryKey })
-      void queryClient.invalidateQueries({ queryKey: conversationsQuery().queryKey })
+      void queryClient.invalidateQueries({
+        queryKey: conversationQuery(id).queryKey,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: conversationsQuery().queryKey,
+      })
     },
   })
 
@@ -239,13 +450,13 @@ function ConversationView({ id }: { id: number }) {
     maxMs: turnSeconds * 1000,
     onStop: (blob) => {
       // bản ghi quá ngắn thường là bấm nhầm
-      if (blob.size > 2_000) send.mutate({ audio: blob })
+      if (blob.size > 2_000) void runStream({ audio: blob })
     },
   })
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [turns.length, send.isPending, data?.feedback])
+  }, [turns.length, streaming, data?.feedback])
 
   if (isLoading)
     return (
@@ -253,44 +464,73 @@ function ConversationView({ id }: { id: number }) {
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     )
-  if (!data) return <p className="text-destructive">{error?.message ?? 'Không tìm thấy buổi hội thoại'}</p>
+  if (!data)
+    return (
+      <p className="text-destructive">
+        {error?.message ?? 'Không tìm thấy buổi hội thoại'}
+      </p>
+    )
 
-  const busy = send.isPending || finish.isPending
+  const busy = streaming || finish.isPending
   const limitReached = userTurns >= MAX_USER_TURNS
 
   return (
     <>
       <header className="flex flex-wrap items-center gap-3">
-        <Button asChild size="icon" variant="ghost" title="Chọn tình huống khác">
+        <Button
+          asChild
+          size="icon"
+          variant="ghost"
+          title="Chọn tình huống khác"
+        >
           <Link to="/talk" search={{}}>
             <ArrowLeft />
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">{scenarioLabel(data.scenario, data.topic)}</h1>
+          <h1 className="truncate text-xl font-semibold">
+            {scenarioLabel(data.scenario, data.topic)}
+          </h1>
           <p className="text-xs text-muted-foreground">
             {data.level} · {userTurns} lượt nói
           </p>
         </div>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Switch checked={speakOn} onCheckedChange={(on) => setSpeakOff(!on)} /> Tự đọc
+          <Switch
+            checked={speakOn}
+            onCheckedChange={(on) => setSpeakOff(!on)}
+          />{' '}
+          Tự đọc
         </label>
       </header>
 
       <div className="flex flex-col gap-3">
         {turns.map((t) => (
-          <Bubble key={t.id} turn={t} onSpeak={() => speakLong(t.text, { accent })} />
+          <Bubble
+            key={t.id}
+            turn={t}
+            onSpeak={() => speakLong(t.text, { accent })}
+          />
         ))}
-        {send.isPending && (
-          <div className="flex items-center gap-2 self-end rounded-2xl bg-primary/10 px-4 py-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> {send.variables.audio ? 'Đang nghe…' : 'Đang trả lời…'}
+        {pendingUser && (
+          <div className="self-end rounded-2xl bg-primary/10 px-4 py-2 text-sm">
+            {pendingUser}
+          </div>
+        )}
+        {streaming && (
+          <div className="flex items-center gap-2 self-start rounded-2xl bg-muted px-4 py-2 text-sm">
+            <Loader2 className="size-4 animate-spin" />{' '}
+            {pendingAi || 'Đang nghe…'}
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
       {data.feedback ? (
-        <Feedback feedback={data.feedback} onSpeak={(s) => speak(s, { accent })} />
+        <Feedback
+          feedback={data.feedback}
+          onSpeak={(s) => speak(s, { accent })}
+        />
       ) : (
         <section className="sticky bottom-0 flex flex-col gap-3 rounded-xl border bg-card/95 p-4 backdrop-blur">
           {lastAi?.hints?.length ? (
@@ -300,7 +540,8 @@ function ConversationView({ id }: { id: number }) {
                 className="flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => setShowHints((v) => !v)}
               >
-                <Lightbulb className="size-3.5" /> {showHints ? 'Ẩn gợi ý' : 'Gợi ý câu trả lời'}
+                <Lightbulb className="size-3.5" />{' '}
+                {showHints ? 'Ẩn gợi ý' : 'Gợi ý câu trả lời'}
               </button>
               {showHints && (
                 <div className="flex flex-wrap gap-1.5">
@@ -325,10 +566,15 @@ function ConversationView({ id }: { id: number }) {
           <div className="flex items-end gap-3">
             <RecordButton
               recording={recorder.recording}
-              busy={send.isPending && !!send.variables.audio}
+              busy={streaming}
               level={recorder.level}
               elapsedMs={recorder.elapsedMs}
-              onStart={recorder.start}
+              onStart={() => {
+                stopSpeech()
+                speechQueueRef.current = []
+                speechBusyRef.current = false
+                void recorder.start()
+              }}
               onStop={recorder.stop}
               disabled={busy || limitReached}
               label="Bấm để nói"
@@ -337,7 +583,7 @@ function ConversationView({ id }: { id: number }) {
               className="flex flex-1 items-end gap-2"
               onSubmit={(e) => {
                 e.preventDefault()
-                if (text.trim()) send.mutate({ text: text.trim() })
+                if (text.trim()) void runStream({ text: text.trim() })
               }}
             >
               <Textarea
@@ -346,14 +592,20 @@ function ConversationView({ id }: { id: number }) {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
-                    if (text.trim() && !busy) send.mutate({ text: text.trim() })
+                    if (text.trim() && !busy)
+                      void runStream({ text: text.trim() })
                   }
                 }}
                 placeholder="Hoặc gõ câu trả lời (Enter để gửi)"
                 className="min-h-10"
                 disabled={busy || limitReached}
               />
-              <Button type="submit" size="icon" disabled={busy || limitReached || !text.trim()} aria-label="Gửi">
+              <Button
+                type="submit"
+                size="icon"
+                disabled={busy || limitReached || !text.trim()}
+                aria-label="Gửi"
+              >
                 <Send />
               </Button>
             </form>
@@ -368,15 +620,38 @@ function ConversationView({ id }: { id: number }) {
             disabled={recorder.recording}
           />
 
-          {(send.error || finish.error || recorder.error) && (
+          {(streamError || finish.error || recorder.error) && (
             <p role="alert" className="text-sm text-destructive">
-              {send.error?.message ?? finish.error?.message ?? recorder.error}
+              {streamError || finish.error?.message || recorder.error}
             </p>
           )}
-          {limitReached && <p className="text-sm text-muted-foreground">Đã đủ {MAX_USER_TURNS} lượt cho buổi này.</p>}
+          {retryInput && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void runStream(retryInput)}
+            >
+              Thử lại lượt vừa nói
+            </Button>
+          )}
+          {limitReached && (
+            <p className="text-sm text-muted-foreground">
+              Đã đủ {MAX_USER_TURNS} lượt cho buổi này.
+            </p>
+          )}
 
-          <Button variant="outline" disabled={busy || userTurns === 0} onClick={() => finish.mutate()}>
-            {finish.isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Kết thúc & nhận xét
+          <Button
+            variant="outline"
+            disabled={busy || userTurns === 0}
+            onClick={() => finish.mutate()}
+          >
+            {finish.isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <CheckCircle2 />
+            )}{' '}
+            Kết thúc & nhận xét
           </Button>
         </section>
       )}
@@ -387,10 +662,28 @@ function ConversationView({ id }: { id: number }) {
 function Bubble({ turn, onSpeak }: { turn: Turn; onSpeak: () => void }) {
   const ai = turn.role === 'ai'
   return (
-    <div className={cn('flex max-w-[85%] items-start gap-1', ai ? 'self-start' : 'flex-row-reverse self-end')}>
-      <p className={cn('rounded-2xl px-4 py-2', ai ? 'bg-muted' : 'bg-primary text-primary-foreground')}>{turn.text}</p>
+    <div
+      className={cn(
+        'flex max-w-[85%] items-start gap-1',
+        ai ? 'self-start' : 'flex-row-reverse self-end',
+      )}
+    >
+      <p
+        className={cn(
+          'rounded-2xl px-4 py-2',
+          ai ? 'bg-muted' : 'bg-primary text-primary-foreground',
+        )}
+      >
+        {turn.text}
+      </p>
       {ai && (
-        <Button size="icon" variant="ghost" className="size-8 shrink-0 text-muted-foreground" onClick={onSpeak} aria-label="Nghe lại">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 shrink-0 text-muted-foreground"
+          onClick={onSpeak}
+          aria-label="Nghe lại"
+        >
           <Volume2 />
         </Button>
       )}
@@ -398,17 +691,34 @@ function Bubble({ turn, onSpeak }: { turn: Turn; onSpeak: () => void }) {
   )
 }
 
-function Feedback({ feedback, onSpeak }: { feedback: ConversationFeedback; onSpeak: (text: string) => void }) {
+function Feedback({
+  feedback,
+  onSpeak,
+}: {
+  feedback: ConversationFeedback
+  onSpeak: (text: string) => void
+}) {
   return (
     <section className="flex flex-col gap-5 rounded-xl border bg-card p-5">
       <div className="flex items-center gap-4">
         {feedback.band != null && (
-          <div className="grid size-16 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground" title="Band ước lượng">
+          <div
+            className="grid size-16 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
+            title="Band ước lượng"
+          >
             <span className="text-2xl font-bold">{feedback.band}</span>
           </div>
         )}
         <div>
-          <h2 className="font-semibold">Nhận xét{feedback.band != null && <span className="font-normal text-muted-foreground"> · band ước lượng, chưa chấm Pronunciation</span>}</h2>
+          <h2 className="font-semibold">
+            Nhận xét
+            {feedback.band != null && (
+              <span className="font-normal text-muted-foreground">
+                {' '}
+                · band ước lượng, chưa chấm Pronunciation
+              </span>
+            )}
+          </h2>
           <p className="mt-1 text-sm">{feedback.summary}</p>
         </div>
       </div>
@@ -416,19 +726,29 @@ function Feedback({ feedback, onSpeak }: { feedback: ConversationFeedback; onSpe
       {feedback.corrections.length > 0 && (
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold">
-            Câu nên sửa <span className="font-normal text-muted-foreground">· đã lưu vào Sổ lỗi</span>
+            Câu nên sửa{' '}
+            <span className="font-normal text-muted-foreground">
+              · đã lưu vào Sổ lỗi
+            </span>
           </h3>
           {feedback.corrections.map((c, i) => (
             <div key={i} className="rounded-lg bg-muted/60 p-3 text-sm">
               <p className="text-muted-foreground line-through">{c.said}</p>
               <p className="flex items-center gap-1 font-medium">
                 {c.better}
-                <Button size="icon" variant="ghost" className="size-7" onClick={() => onSpeak(c.better)} aria-label="Nghe">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7"
+                  onClick={() => onSpeak(c.better)}
+                  aria-label="Nghe"
+                >
                   <Volume2 />
                 </Button>
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                <span className="font-medium">{mistakeLabel(c.type)}</span> · {c.explanation}
+                <span className="font-medium">{mistakeLabel(c.type)}</span> ·{' '}
+                {c.explanation}
               </p>
             </div>
           ))}
@@ -440,12 +760,21 @@ function Feedback({ feedback, onSpeak }: { feedback: ConversationFeedback; onSpe
           <h3 className="text-sm font-semibold">Cụm từ nên dùng</h3>
           <ul className="grid gap-2 sm:grid-cols-2">
             {feedback.phrases.map((p) => (
-              <li key={p.en} className="flex items-start gap-1 rounded-lg border p-2 text-sm">
+              <li
+                key={p.en}
+                className="flex items-start gap-1 rounded-lg border p-2 text-sm"
+              >
                 <span className="flex-1">
                   <span className="block font-medium">{p.en}</span>
                   <span className="text-xs text-muted-foreground">{p.vi}</span>
                 </span>
-                <Button size="icon" variant="ghost" className="size-7" onClick={() => onSpeak(p.en)} aria-label="Nghe">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7"
+                  onClick={() => onSpeak(p.en)}
+                  aria-label="Nghe"
+                >
                   <Volume2 />
                 </Button>
               </li>

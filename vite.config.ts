@@ -23,6 +23,7 @@ const config = defineConfig({
         '/api/deck-export/:id': './src/server/deck-export-route.ts',
         '/api/bing-image/:q': './src/server/bing-image-route.ts',
         '/api/tts': './src/server/tts-route.ts',
+        '/api/conversation-stream': './src/server/conversation-stream-route.ts',
         '/api/speaking-audio/:id': './src/server/speaking-audio-route.ts',
         '/api/listening-audio/:id/:section':
           './src/server/listening-audio-route.ts',
