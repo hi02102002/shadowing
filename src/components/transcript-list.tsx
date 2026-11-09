@@ -15,6 +15,7 @@ interface Props {
   /** ẩn chữ để luyện nghe chép (chỉ hiện câu đã làm) */
   hideText?: boolean
   className?: string
+  selectedRange?: { start: number; end: number } | null
 }
 
 export function TranscriptList({
@@ -23,6 +24,7 @@ export function TranscriptList({
   onSelect,
   hideText,
   className,
+  selectedRange,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null)
   const currentMs = useSelector(playerStore, (s) => s.currentMs)
@@ -76,8 +78,10 @@ export function TranscriptList({
               <button
                 type="button"
                 onClick={() => onSelect(item.index)}
+                aria-pressed={selectedRange ? item.index >= selectedRange.start && item.index <= selectedRange.end : undefined}
                 className={cn(
                   'group flex w-full gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                  selectedRange && item.index >= selectedRange.start && item.index <= selectedRange.end && 'ring-2 ring-primary',
                   active
                     ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-muted',

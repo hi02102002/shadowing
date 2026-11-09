@@ -162,6 +162,20 @@
       "when": 1793894303323,
       "tag": "0022_ai_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1794231948015,
+      "tag": "0023_mighty_jimmy_woo",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1794232615087,
+      "tag": "0024_flimsy_peter_parker",
+      "breakpoints": true
     }
   ]
 }

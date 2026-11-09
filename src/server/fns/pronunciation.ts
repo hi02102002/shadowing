@@ -1,11 +1,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
-import { pronunciationAttempts, segments } from '#/db/schema.ts'
+import { pronunciationAttempts, segmentEditStates, segments } from '#/db/schema.ts'
 import { alignWords, displayWords } from '#/lib/align.ts'
 import type { AlignToken } from '#/lib/align.ts'
 import { assessWithAudioLlm } from '../ai/audio-assess.ts'
@@ -167,9 +167,11 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
     const seg = db
       .select()
       .from(segments)
-      .where(eq(segments.id, data.segmentId))
+      .where(and(eq(segments.id, data.segmentId), eq(segments.archived, false)))
       .get()
     if (!seg) throw new Error('Không tìm thấy câu')
+    const revision = db.select({ cursor: segmentEditStates.cursor }).from(segmentEditStates)
+      .where(eq(segmentEditStates.videoId, seg.videoId)).get()?.cursor ?? 0
 
     const cfg = getConfig()
     const raw = Buffer.from(await data.audio.arrayBuffer())
@@ -182,6 +184,12 @@ export const assessPronunciation = createServerFn({ method: 'POST' })
       cfg,
       { focus: data.focus },
     )
+    const latestSegment = db.select({ text: segments.text, startMs: segments.startMs, endMs: segments.endMs, archived: segments.archived })
+      .from(segments).where(eq(segments.id, seg.id)).get()
+    const latestRevision = db.select({ cursor: segmentEditStates.cursor }).from(segmentEditStates)
+      .where(eq(segmentEditStates.videoId, seg.videoId)).get()?.cursor ?? 0
+    if (latestRevision !== revision || !latestSegment || latestSegment.archived || latestSegment.text !== seg.text || latestSegment.startMs !== seg.startMs || latestSegment.endMs !== seg.endMs)
+      throw new Error('Đoạn đã được chỉnh trong lúc chấm. Hãy ghi âm lại đoạn mới.')
     const { engine, transcript, words, spokenSec } = heard
     // tắt tự phân tích: chỉ lấy chữ nghe được; bấm "Nhờ AI phân tích" sẽ phân tích lại và ghi Sổ lỗi
     const feedback = cfg.aiAnalysis === 'on' ? heard.feedback : null

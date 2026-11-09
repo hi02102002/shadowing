@@ -9,9 +9,11 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { useSelector } from '@tanstack/react-store'
 import { Blocks, BookA, Ear, FileText, Mic, PenLine } from 'lucide-react'
 import { z } from 'zod'
+import { useState } from 'react'
 
 import { LocalPlayer } from '#/components/local-player'
 import { TranscriptList } from '#/components/transcript-list'
+import { SegmentEditor } from '#/components/segment-editor'
 import { vocabPracticeStore } from '#/components/vocab-practice'
 import { VimeoPlayer } from '#/components/vimeo-player'
 import { YouTubePlayer } from '#/components/youtube-player'
@@ -71,8 +73,18 @@ function VideoLayout() {
   // ẩn chữ khi chép chính tả hoặc đang luyện gõ từ (khỏi lộ đáp án)
   const typingVocab = useSelector(vocabPracticeStore, (s) => s)
   const hideText = practiceMode === 'dictation' || typingVocab
+  const [editing, setEditing] = useState(false)
+  const [range, setRange] = useState<{ start: number; end: number } | null>(null)
 
   const onSelect = (idx: number) => {
+    if (editing) {
+      setRange((current) => current
+        ? idx >= current.start && idx <= current.end
+          ? { start: idx, end: idx }
+          : { start: Math.min(current.start, idx), end: Math.max(current.start, idx) }
+        : { start: idx, end: idx })
+      return
+    }
     if (practiceMode) {
       void navigate({ to: '.', search: (p) => ({ ...p, seg: idx }) })
     } else {
@@ -118,6 +130,7 @@ function VideoLayout() {
               to={to}
               params={{ videoId }}
               search={{ seg }}
+              onClick={() => { setEditing(false); setRange(null) }}
               activeOptions={{ exact: 'exact' in rest, includeSearch: false }}
               className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground no-underline transition-colors hover:text-foreground"
               activeProps={{
@@ -135,15 +148,25 @@ function VideoLayout() {
       <aside className="flex min-h-0 flex-col rounded-xl border bg-card lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]">
         <div className="flex items-center justify-between border-b px-4 py-2.5">
           <h2 className="text-sm font-semibold">Transcript</h2>
-          <span className="text-xs text-muted-foreground">
-            {data.segments.length} câu
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{data.segments.length} câu</span>
+            <button type="button" className="rounded-md border px-2 py-1 text-xs hover:bg-muted" aria-pressed={editing} onClick={() => {
+              if (editing) { setEditing(false); setRange(null); return }
+              void (async () => {
+                if (practiceMode) await navigate({ to: '/videos/$videoId', params: { videoId }, search: { seg } })
+                playerActions.pause()
+                setEditing(true)
+              })()
+            }}>Chỉnh đoạn</button>
+          </div>
         </div>
+        {editing && <SegmentEditor videoId={videoId} revision={data.editRevision} segments={data.segments} pastSegments={data.pastSegments} range={range} onRangeChange={setRange} onClose={() => { setEditing(false); setRange(null) }} />}
         <TranscriptList
           segments={data.segments}
           selectedIdx={practiceMode ? (seg ?? 0) : undefined}
           onSelect={onSelect}
-          hideText={hideText}
+          hideText={hideText && !editing}
+          selectedRange={editing ? range : null}
           className="h-80 flex-1 p-1 lg:h-auto"
         />
       </aside>

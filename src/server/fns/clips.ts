@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { eq, like } from 'drizzle-orm'
+import { and, eq, like } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
@@ -94,7 +94,7 @@ export const searchLibraryClips = createServerFn({ method: 'GET' })
       })
       .from(segments)
       .innerJoin(videos, eq(segments.videoId, videos.id))
-      .where(like(segments.text, `%${longest.replace(/[%_]/g, '')}%`))
+      .where(and(eq(segments.archived, false), like(segments.text, `%${longest.replace(/[%_]/g, '')}%`)))
       .all()
 
     const clips: Clip[] = []

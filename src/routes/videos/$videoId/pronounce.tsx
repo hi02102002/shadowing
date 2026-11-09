@@ -37,7 +37,7 @@ function PronounceMode() {
         </div>
         <KaraokeText segment={segment} ipa={showIpa} translate={showVi} />
       </div>
-      <PronunciationPanel youtubeId={videoId} segment={segment} mode="repeat" />
+      <PronunciationPanel key={`${segment.id}:${segment.text}:${segment.startMs}:${segment.endMs}`} youtubeId={videoId} segment={segment} mode="repeat" />
     </div>
   )
 }

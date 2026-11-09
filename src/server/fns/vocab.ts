@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
@@ -17,7 +17,7 @@ function videoSegments(youtubeId: string) {
   return db
     .select({ idx: segments.idx, text: segments.text })
     .from(segments)
-    .where(eq(segments.videoId, video.id))
+    .where(and(eq(segments.videoId, video.id), eq(segments.archived, false)))
     .orderBy(asc(segments.idx))
     .all()
 }

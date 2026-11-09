@@ -237,7 +237,7 @@ function ExplainPanel({ data }: { data: GrammarExplain }) {
           </li>
         ))}
       </ol>
-      {!!data.forms?.length && (
+      {data.forms.length > 0 && (
         <div className="flex flex-col gap-2 border-t pt-3">
           <span className="font-medium">Các dạng câu</span>
           <ul className="flex flex-col gap-2">

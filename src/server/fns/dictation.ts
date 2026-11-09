@@ -15,7 +15,7 @@ import { recordMistakes } from '../mistakes.ts'
 export const submitDictation = createServerFn({ method: 'POST' })
   .validator(z.object({ segmentId: z.number().int(), input: z.string() }))
   .handler(async ({ data }) => {
-    const seg = db.select().from(segments).where(eq(segments.id, data.segmentId)).get()
+    const seg = db.select().from(segments).where(and(eq(segments.id, data.segmentId), eq(segments.archived, false))).get()
     if (!seg) throw new Error('Không tìm thấy câu')
     const result = alignWords(seg.text, data.input)
     const attempt = db
@@ -46,7 +46,7 @@ export const analyzeDictation = createServerFn({ method: 'POST' })
     const prev = db
       .select({ text: segments.text })
       .from(segments)
-      .where(and(eq(segments.videoId, row.seg.videoId), eq(segments.idx, row.seg.idx - 1)))
+      .where(and(eq(segments.videoId, row.seg.videoId), eq(segments.archived, false), eq(segments.idx, row.seg.idx - 1)))
       .get()
 
     const tokens = JSON.parse(row.attempt.diffJson) as AlignToken[]

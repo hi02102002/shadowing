@@ -65,18 +65,15 @@ async function tracked<T>(
 ): Promise<T> {
   const cfg = meta.cfg ?? getConfig()
   const started = Date.now()
-  let prompt = 0
-  let completion = 0
-  let total = 0
-  let reported = false
+  const usage = { prompt: 0, completion: 0, total: 0, reported: false }
   const middleware = [
     {
       name: 'usage-tracker',
       onUsage: (_ctx: unknown, u: any) => {
-        reported = true
-        prompt += u?.promptTokens ?? 0
-        completion += u?.completionTokens ?? 0
-        total += u?.totalTokens ?? (u?.promptTokens ?? 0) + (u?.completionTokens ?? 0)
+        usage.reported = true
+        usage.prompt += u?.promptTokens ?? 0
+        usage.completion += u?.completionTokens ?? 0
+        usage.total += u?.totalTokens ?? (u?.promptTokens ?? 0) + (u?.completionTokens ?? 0)
       },
     },
   ]
@@ -89,18 +86,18 @@ async function tracked<T>(
     ok = false
     throw err
   } finally {
-    if (!reported) {
-      prompt = estimateTokens(promptText)
-      completion = result === undefined ? 0 : estimateTokens(outputText(result))
-      total = prompt + completion
+    if (!usage.reported) {
+      usage.prompt = estimateTokens(promptText)
+      usage.completion = result === undefined ? 0 : estimateTokens(outputText(result))
+      usage.total = usage.prompt + usage.completion
     }
     void recordUsage({
       cfg,
       feature: meta.feature ?? 'other',
-      prompt,
-      completion,
-      total,
-      estimated: !reported,
+      prompt: usage.prompt,
+      completion: usage.completion,
+      total: usage.total,
+      estimated: !usage.reported,
       ok,
       durationMs: Date.now() - started,
     })
@@ -237,18 +234,16 @@ export async function* streamText(opts: {
 }) {
   const cfg = opts.cfg ?? getConfig()
   const started = Date.now()
-  let prompt = 0
-  let completion = 0
-  let reported = false
+  const usage = { prompt: 0, completion: 0, reported: false }
   let out = ''
   let ok = true
   const middleware = [
     {
       name: 'usage-tracker',
       onUsage: (_ctx: unknown, u: any) => {
-        reported = true
-        prompt += u?.promptTokens ?? 0
-        completion += u?.completionTokens ?? 0
+        usage.reported = true
+        usage.prompt += u?.promptTokens ?? 0
+        usage.completion += u?.completionTokens ?? 0
       },
     },
   ]
@@ -275,17 +270,17 @@ export async function* streamText(opts: {
     ok = false
     throw err
   } finally {
-    if (!reported) {
-      prompt = estimateTokens(`${opts.system}\n${opts.prompt}`)
-      completion = estimateTokens(out)
+    if (!usage.reported) {
+      usage.prompt = estimateTokens(`${opts.system}\n${opts.prompt}`)
+      usage.completion = estimateTokens(out)
     }
     void recordUsage({
       cfg,
       feature: opts.feature ?? 'other',
-      prompt,
-      completion,
-      total: prompt + completion,
-      estimated: !reported,
+      prompt: usage.prompt,
+      completion: usage.completion,
+      total: usage.prompt + usage.completion,
+      estimated: !usage.reported,
       ok,
       durationMs: Date.now() - started,
     })

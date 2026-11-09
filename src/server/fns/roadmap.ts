@@ -204,12 +204,12 @@ export function scoreKeywordMatch(title: string, query: string): number {
 }
 
 /** Chạy fn trên items với tối đa `limit` tác vụ song song */
-export async function mapLimit<T, R>(
+export async function mapLimit<T, TResult>(
   items: T[],
   limit: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const out = new Array<R>(items.length)
+  fn: (item: T, index: number) => Promise<TResult>,
+): Promise<TResult[]> {
+  const out = new Array<TResult>(items.length)
   let next = 0
   const workers = Array.from(
     { length: Math.min(limit, items.length) },
@@ -235,10 +235,10 @@ interface OverviewPhase {
 }
 
 /** Ép tổng số tuần các phase đúng bằng totalWeeks và đánh lại index */
-export function normalizePhases<P extends { weeks: number }>(
-  phases: P[],
+export function normalizePhases<TPhase extends { weeks: number }>(
+  phases: TPhase[],
   totalWeeks: number,
-): Array<P & { index: number }> {
+): Array<TPhase & { index: number }> {
   const list = phases.slice(0, Math.max(1, totalWeeks))
   const sum = list.reduce((n, p) => n + p.weeks, 0) || 1
   const weeks = list.map((p) => Math.max(1, Math.round((p.weeks / sum) * totalWeeks)))

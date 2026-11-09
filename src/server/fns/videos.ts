@@ -2,11 +2,11 @@ import { createHash, randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
-import { asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
-import { dictationAttempts, pronunciationAttempts, segments, videos } from '#/db/schema.ts'
+import { dictationAttempts, pronunciationAttempts, segmentEditStates, segments, videos } from '#/db/schema.ts'
 import { isLocalKey, localKey, localThumbUrl, parseVideoSource, vimeoKey } from '#/lib/video-source.ts'
 import { youtubeThumbnail } from '#/lib/youtube-id.ts'
 import { estimateCaptioning, generateCaptionWords, MAX_CAPTION_SEC } from '../captions.ts'
@@ -43,6 +43,7 @@ export const listVideos = createServerFn({ method: 'GET' }).handler(async () => 
   const segCount = db
     .select({ videoId: segments.videoId, n: sql<number>`count(*)`.as('n') })
     .from(segments)
+    .where(eq(segments.archived, false))
     .groupBy(segments.videoId)
     .as('seg_count')
 
@@ -54,8 +55,9 @@ export const listVideos = createServerFn({ method: 'GET' }).handler(async () => 
     })
     .from(segments)
     .where(
-      sql`exists (select 1 from ${dictationAttempts} where ${dictationAttempts.segmentId} = ${segments.id})
-        or exists (select 1 from ${pronunciationAttempts} where ${pronunciationAttempts.segmentId} = ${segments.id})`,
+      and(eq(segments.archived, false), sql`(exists (select 1 from ${dictationAttempts} where ${dictationAttempts.segmentId} = ${segments.id})
+        or exists (select 1 from ${pronunciationAttempts} where ${pronunciationAttempts.segmentId} = ${segments.id}))`,
+      )
     )
     .groupBy(segments.videoId)
     .as('practiced')
@@ -88,12 +90,13 @@ export const getVideo = createServerFn({ method: 'GET' })
     const video = db.select().from(videos).where(eq(videos.youtubeId, data.youtubeId)).get()
     if (!video) throw new Error('Không tìm thấy video')
 
-    const segs = db
+    const allSegs = db
       .select()
       .from(segments)
       .where(eq(segments.videoId, video.id))
       .orderBy(asc(segments.idx))
       .all()
+    const segs = allSegs.filter((row) => !row.archived)
 
     // điểm tốt nhất mỗi câu để hiển thị tiến độ trên transcript
     const dict = db
@@ -118,6 +121,8 @@ export const getVideo = createServerFn({ method: 'GET' })
 
     return {
       video,
+      editRevision: db.select({ cursor: segmentEditStates.cursor }).from(segmentEditStates)
+        .where(eq(segmentEditStates.videoId, video.id)).get()?.cursor ?? 0,
       // khoảng phát lấn vào khoảng lặng hai bên để không cụt âm đầu/cuối câu
       segments: playbackBounds(segs).map((s) => ({
         id: s.id,
@@ -126,6 +131,14 @@ export const getVideo = createServerFn({ method: 'GET' })
         endMs: s.endMs,
         text: s.text,
         words: JSON.parse(s.wordsJson) as Array<{ w: string; s: number; e: number }>,
+        dictationBest: dictBest.get(s.id) ?? null,
+        pronunciationBest: pronBest.get(s.id) ?? null,
+      })),
+      pastSegments: allSegs.filter((s) => s.archived && (dictBest.has(s.id) || pronBest.has(s.id))).map((s) => ({
+        id: s.id,
+        text: s.text,
+        startMs: s.startMs,
+        endMs: s.endMs,
         dictationBest: dictBest.get(s.id) ?? null,
         pronunciationBest: pronBest.get(s.id) ?? null,
       })),

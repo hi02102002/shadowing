@@ -45,9 +45,24 @@ export const segments = sqliteTable(
     text: text().notNull(),
     /** JSON: Array<{ w: string; s: number; e: number }> (ms), có thể rỗng */
     wordsJson: text('words_json').notNull().default('[]'),
+    /** Đoạn cũ sau khi ghép/tách: giữ nguyên bài làm và liên kết lịch sử. */
+    archived: integer({ mode: 'boolean' }).notNull().default(false),
   },
   (t) => [index('segments_video_idx').on(t.videoId, t.idx)],
 )
+
+/** Ảnh chụp cách chia đoạn; cursor trỏ phiên bản hiện tại, 0 là bản gốc. */
+export const segmentEditStates = sqliteTable('segment_edit_states', {
+  videoId: integer('video_id').primaryKey().references(() => videos.id, { onDelete: 'cascade' }),
+  cursor: integer().notNull().default(0),
+})
+
+export const segmentEditRevisions = sqliteTable('segment_edit_revisions', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  videoId: integer('video_id').notNull().references(() => videos.id, { onDelete: 'cascade' }),
+  revision: integer().notNull(),
+  snapshotJson: text('snapshot_json').notNull(),
+}, (t) => [uniqueIndex('segment_edit_revision_idx').on(t.videoId, t.revision)])
 
 export const dictationAttempts = sqliteTable(
   'dictation_attempts',

@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '#/db/index.ts'
@@ -39,7 +39,7 @@ async function translateVideo(videoId: number) {
   const pending = db
     .select({ text: segments.text })
     .from(segments)
-    .where(eq(segments.videoId, videoId))
+    .where(and(eq(segments.videoId, videoId), eq(segments.archived, false)))
     .orderBy(asc(segments.startMs))
     .all()
     .map((r) => r.text)

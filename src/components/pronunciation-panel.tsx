@@ -77,6 +77,8 @@ function useEngineChoice() {
 const SHADOW_TAIL_MS = 900
 
 export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
   const queryClient = useQueryClient()
   const [result, setResult] = useState<PronunciationResult | null>(null)
   const shadowingRef = useRef(false)
@@ -110,7 +112,7 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
     onStop: (blob) => {
       shadowingRef.current = false
       // bản ghi quá ngắn thường là bấm nhầm
-      if (blob.size > 2_000) assess.mutate(blob)
+      if (mountedRef.current && blob.size > 2_000) assess.mutate(blob)
     },
   })
 
@@ -310,7 +312,7 @@ function EnginePicker({
   )
 }
 
-function PronunciationHistory({ segmentId }: { segmentId: number }) {
+export function PronunciationHistory({ segmentId }: { segmentId: number }) {
   const { data } = useQuery(pronunciationHistoryQuery(segmentId))
   if (!data?.length) return null
   return (

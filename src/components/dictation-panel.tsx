@@ -230,7 +230,7 @@ export function DictationPanel({ youtubeId, segment, hasNext, onNext }: Props) {
   )
 }
 
-function DictationHistory({ segmentId }: { segmentId: number }) {
+export function DictationHistory({ segmentId }: { segmentId: number }) {
   const { data } = useQuery(dictationHistoryQuery(segmentId))
   if (!data?.length) return null
   return (

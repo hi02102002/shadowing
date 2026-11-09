@@ -153,7 +153,7 @@ export const aiUsageStats = createServerFn({ method: 'GET' }).handler(
     const since = (days: number) => today - (days - 1) * 86400
 
     const totals = (from: number) =>
-      db.get<AiUsageTotals>(sql`
+      db.get<AiUsageTotals | undefined>(sql`
         select count(*) as calls,
           coalesce(sum(prompt_tokens), 0) as promptTokens,
           coalesce(sum(completion_tokens), 0) as completionTokens,
@@ -180,13 +180,13 @@ export const aiUsageStats = createServerFn({ method: 'GET' }).handler(
       from ai_usage where created_at >= ${since(14)}
       group by day order by day`)
 
-    const model = db.get<{ provider: string; model: string }>(
+    const model = db.get<{ provider: string; model: string } | undefined>(
       sql`select provider, model from ai_usage order by id desc limit 1`,
     )
-    const estimatedCalls =
-      db.get<{ n: number }>(
-        sql`select count(*) as n from ai_usage where estimated and created_at >= ${since(30)}`,
-      )?.n ?? 0
+    const estimatedRow = db.get<{ n: number } | undefined>(
+      sql`select count(*) as n from ai_usage where estimated and created_at >= ${since(30)}`,
+    )
+    const estimatedCalls = estimatedRow?.n ?? 0
 
     return {
       today: totals(today),

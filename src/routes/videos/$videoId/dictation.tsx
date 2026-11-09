@@ -21,7 +21,7 @@ function DictationMode() {
         onPrev={() => go(idx - 1)}
         onNext={() => go(idx + 1)}
       />
-      <DictationPanel youtubeId={videoId} segment={segment} hasNext={idx < total - 1} onNext={() => go(idx + 1)} />
+      <DictationPanel key={`${segment.id}:${segment.text}:${segment.startMs}:${segment.endMs}`} youtubeId={videoId} segment={segment} hasNext={idx < total - 1} onNext={() => go(idx + 1)} />
     </div>
   )
 }

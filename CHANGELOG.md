@@ -2,6 +2,13 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.46 — 2026-11-09
+
+### Mới
+
+- **Chỉnh sửa câu phụ đề (Tách & ghép câu)**: nút **"Chỉnh sửa câu"** (biểu tượng ✂️) trong danh sách phụ đề video cho phép ghép hai hay nhiều câu ngắn liền nhau thành một câu, hoặc bấm vào khoảng giữa hai từ để tách một câu dài thành hai câu theo ý muốn.
+- Hỗ trợ hoàn tác (Undo), làm lại (Redo) và khôi phục bản gốc; các bài làm chính tả hay phát âm trước đó vẫn được lưu giữ an toàn. Toàn bộ các tab Shadowing, Chép chính tả và Luyện phát âm tự động chuyển sang luyện theo các câu vừa chia.
+
 ## 0.0.45 — 2026-11-09
 
 ### Cải thiện

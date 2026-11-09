@@ -55,7 +55,7 @@ function ShadowMode() {
         </p>
       </div>
 
-      <PronunciationPanel youtubeId={videoId} segment={segment} mode="shadow" />
+      <PronunciationPanel key={`${segment.id}:${segment.text}:${segment.startMs}:${segment.endMs}`} youtubeId={videoId} segment={segment} mode="shadow" />
     </div>
   )
 }

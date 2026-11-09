@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
@@ -15,7 +16,6 @@ import { activityStatsQuery, aiUsageQuery, statsQuery } from '#/lib/queries'
 import { cn } from '#/lib/utils'
 import { setDailyGoal } from '#/server/fns/stats'
 import type { AiUsageStats } from '#/server/fns/stats'
-import { useQuery } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/stats')({
   loader: ({ context }) =>
