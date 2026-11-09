@@ -28,6 +28,7 @@ export function useShadowSubmissionRecorder(
   const [countdown, setCountdown] = useState<number>(3)
   const [elapsedMs, setElapsedMs] = useState<number>(0)
   const [error, setError] = useState<string | null>(null)
+  const [hasTabAudio, setHasTabAudio] = useState<boolean>(true)
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null)
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
 
@@ -36,6 +37,8 @@ export function useShadowSubmissionRecorder(
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const audioContextRef = useRef<AudioContext | null>(null)
+  // Giữ tham chiếu các AudioNode để V8 Garbage Collector không thu dọn ngắt âm thanh
+  const audioNodesRef = useRef<unknown[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const optionsRef = useRef(options)
@@ -48,14 +51,30 @@ export function useShadowSubmissionRecorder(
       if (webcamStream) return webcamStream
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       })
       setWebcamStream(stream)
       return stream
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      setError(`Không thể mở Camera/Micro: ${msg}`)
-      return null
+      // Fallback: nếu máy tính không có webcam, thử chỉ xin quyền micro
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        })
+        return audioStream
+      } catch {
+        const msg = err instanceof Error ? err.message : String(err)
+        setError(`Không thể mở Camera/Micro: ${msg}`)
+        return null
+      }
     }
   }, [webcamStream])
 
@@ -88,6 +107,7 @@ export function useShadowSubmissionRecorder(
           // ignore
         }
       }
+      audioNodesRef.current = []
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         void audioContextRef.current.close().catch(() => {})
         audioContextRef.current = null
@@ -113,50 +133,83 @@ export function useShadowSubmissionRecorder(
           if (!micStream) return false
         }
 
-        // Yêu cầu chọn Tab / Cửa sổ để quay
+        // Yêu cầu chọn Tab Chrome để quay (gợi ý Chrome Tab và bật audio)
         let screenStream: MediaStream
         try {
-          screenStream = await navigator.mediaDevices.getDisplayMedia({
-            video: { displaySurface: 'browser' },
-            audio: true, // Tiếng hệ thống / tab bài học
-          })
+          const displayMediaOptions = {
+            video: {
+              displaySurface: 'browser',
+            },
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            },
+            // Gợi ý trình duyệt ưu tiên mở Chrome Tab thay vì Entire Screen
+            preferCurrentTab: true,
+            selfBrowserSurface: 'include',
+            systemAudio: 'include',
+            surfaceSwitching: 'include',
+          }
+
+          // @ts-expect-error - Các tham số preferCurrentTab của Chromium
+          screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions)
         } catch {
           setError('Bạn đã huỷ chọn màn hình/tab để quay.')
           return false
         }
         screenStreamRef.current = screenStream
 
-        // Trộn âm thanh nếu có cả tiếng màn hình và tiếng mic
-        const audioCtx = new AudioContext()
-        audioContextRef.current = audioCtx
-
-        const destination = audioCtx.createMediaStreamDestination()
-
-        // Tiếng mic của học sinh
-        const micTracks = micStream.getAudioTracks()
-        if (micTracks.length > 0) {
-          const micSource = audioCtx.createMediaStreamSource(new MediaStream([micTracks[0]]))
-          const micGain = audioCtx.createGain()
-          micGain.gain.value = 1.0
-          micSource.connect(micGain).connect(destination)
-        }
-
-        // Tiếng bài học từ tab/màn hình
+        const micTracks = micStream ? micStream.getAudioTracks() : []
         const screenAudioTracks = screenStream.getAudioTracks()
-        if (screenAudioTracks.length > 0) {
-          const screenSource = audioCtx.createMediaStreamSource(new MediaStream([screenAudioTracks[0]]))
+        const hasTabSound = screenAudioTracks.length > 0
+        setHasTabAudio(hasTabSound)
+
+        let finalAudioTrack: MediaStreamTrack | null = null
+
+        if (hasTabSound && micTracks.length > 0) {
+          // Có CẢ tiếng bài học từ tab VÀ tiếng micro của bạn -> Mix bằng Web Audio API
+          const AudioContextClass =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+          const audioCtx = new AudioContextClass()
+          audioContextRef.current = audioCtx
+
+          // QUAN TRỌNG: Chrome tự động suspend AudioContext nếu không được resume chủ động
+          if (audioCtx.state === 'suspended') {
+            await audioCtx.resume()
+          }
+
+          const destination = audioCtx.createMediaStreamDestination()
+          const micSource = audioCtx.createMediaStreamSource(micStream)
+          const screenSource = audioCtx.createMediaStreamSource(screenStream)
+
+          const micGain = audioCtx.createGain()
+          micGain.gain.value = 1.0 // Giọng người học rõ ràng
+
           const screenGain = audioCtx.createGain()
-          screenGain.gain.value = 0.95
+          screenGain.gain.value = 0.85 // Tiếng bài học nền vừa phải
+
+          micSource.connect(micGain).connect(destination)
           screenSource.connect(screenGain).connect(destination)
+
+          // Giữ tham chiếu AudioNodes trong ref để tránh V8 Garbage Collector ngắt luồng
+          audioNodesRef.current = [micSource, screenSource, micGain, screenGain, destination]
+
+          finalAudioTrack = destination.stream.getAudioTracks()[0]
+        } else if (hasTabSound) {
+          // Chỉ có tiếng bài học
+          finalAudioTrack = screenAudioTracks[0]
+        } else if (micTracks.length > 0) {
+          // Người dùng chọn Entire Screen hoặc quên tích share tab audio
+          // Lấy TRỰC TIẾP track của mic để đảm bảo 100% video luôn có tiếng nói!
+          finalAudioTrack = micTracks[0]
         }
 
-        // Gộp video track từ screenStream và audio track đã mix
-        const finalAudioTracks = destination.stream.getAudioTracks()
+        // Gộp video track từ screenStream và audio track
         const finalTracks: MediaStreamTrack[] = [screenStream.getVideoTracks()[0]]
-        if (finalAudioTracks.length > 0) {
-          finalTracks.push(finalAudioTracks[0])
-        } else if (micTracks.length > 0) {
-          finalTracks.push(micTracks[0])
+        if (finalAudioTrack) {
+          finalTracks.push(finalAudioTrack)
         }
 
         const combinedStream = new MediaStream(finalTracks)
@@ -190,6 +243,7 @@ export function useShadowSubmissionRecorder(
             screenStreamRef.current.getTracks().forEach((t) => t.stop())
             screenStreamRef.current = null
           }
+          audioNodesRef.current = []
           if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
             void audioContextRef.current.close().catch(() => {})
             audioContextRef.current = null
@@ -301,6 +355,7 @@ export function useShadowSubmissionRecorder(
     countdown,
     elapsedMs,
     error,
+    hasTabAudio,
     recordedUrl,
     recordedBlob,
     webcamStream,

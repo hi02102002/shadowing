@@ -595,12 +595,20 @@ export function VideoSubmissionBar({
               </div>
             </div>
 
-            {/* Hướng dẫn thao tác */}
-            <div className="flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
-              <Info className="mt-0.5 size-4 shrink-0 text-primary" />
-              <p>
-                Khi bấm <b>Bắt đầu quay</b>, chọn <b>Tab này</b> trên bảng hỏi của trình duyệt (nhớ tích <i>Chia sẻ âm thanh của thẻ</i>). Sau đó màn hình sẽ đếm ngược <b>3.. 2.. 1..</b> rồi mới chính thức ghi hình.
-              </p>
+            {/* Hướng dẫn thao tác quan trọng để có âm thanh */}
+            <div className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                <Info className="size-4 shrink-0" />
+                <span>Lưu ý quan trọng để video có đầy đủ âm thanh:</span>
+              </div>
+              <ul className="list-disc pl-4 space-y-1 text-foreground/90">
+                <li>
+                  Khi bảng hỏi của trình duyệt hiện lên, hãy nhấp chọn thẻ <b>Chrome Tab</b> (hoặc <i>Thẻ này</i>). <b>KHÔNG CHỌN</b> thẻ <i>Entire Screen</i> (vì hệ điều hành sẽ chặn thu âm thanh từ Entire Screen như thông báo trên ảnh).
+                </li>
+                <li>
+                  Nhớ kiểm tra mục <b>"Also share tab audio"</b> (hoặc <i>Chia sẻ âm thanh của thẻ</i>) được bật ở góc dưới.
+                </li>
+              </ul>
             </div>
           </div>
 
@@ -635,6 +643,12 @@ export function VideoSubmissionBar({
           </DialogHeader>
 
           <div className="flex flex-col gap-3 py-2">
+            {!recorder.hasTabAudio && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                💡 <b>Mẹo:</b> Video này chỉ có tiếng micro của bạn (chưa có tiếng bài học phát từ trình duyệt). Ở lần quay tới, bạn hãy chọn thẻ <b>Chrome Tab</b> thay vì <i>Entire Screen</i> để thu được cả 2 nhé!
+              </div>
+            )}
+
             {recorder.recordedUrl && (
               <video
                 src={recorder.recordedUrl}
