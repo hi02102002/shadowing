@@ -26,6 +26,7 @@ import {
 } from '#/components/ui/dialog'
 import { ShadowWebcamBubble } from '#/components/shadow-webcam-bubble'
 import { useShadowSubmissionRecorder } from '#/hooks/use-shadow-submission-recorder'
+import { desktopBridge } from '#/lib/desktop'
 import { formatTime } from '#/lib/format'
 import { findSegmentIndex, playerActions, playerStore } from '#/lib/player-store'
 import { cn } from '#/lib/utils'
@@ -595,14 +596,18 @@ export function VideoSubmissionBar({
                 <Info className="size-4 shrink-0" />
                 <span>Lưu ý quan trọng để video có đầy đủ âm thanh:</span>
               </div>
-              <ul className="list-disc pl-4 space-y-1 text-foreground/90">
-                <li>
-                  Khi bảng hỏi của trình duyệt hiện lên, hãy nhấp chọn thẻ <b>Chrome Tab</b> (hoặc <i>Thẻ này</i>). <b>KHÔNG CHỌN</b> thẻ <i>Entire Screen</i> (vì hệ điều hành sẽ chặn thu âm thanh từ Entire Screen như thông báo trên ảnh).
-                </li>
-                <li>
-                  Nhớ kiểm tra mục <b>"Also share tab audio"</b> (hoặc <i>Chia sẻ âm thanh của thẻ</i>) được bật ở góc dưới.
-                </li>
-              </ul>
+              {desktopBridge() ? (
+                <p className="text-foreground/90">Hãy phát video trong ứng dụng Shadowing khi quay. Bản ghi sẽ thu tiếng video và micro của bạn.</p>
+              ) : (
+                <ul className="list-disc pl-4 space-y-1 text-foreground/90">
+                  <li>
+                    Khi bảng hỏi của trình duyệt hiện lên, hãy nhấp chọn thẻ <b>Chrome Tab</b> (hoặc <i>Thẻ này</i>). <b>KHÔNG CHỌN</b> thẻ <i>Entire Screen</i> (vì hệ điều hành sẽ chặn thu âm thanh từ Entire Screen như thông báo trên ảnh).
+                  </li>
+                  <li>
+                    Nhớ kiểm tra mục <b>"Also share tab audio"</b> (hoặc <i>Chia sẻ âm thanh của thẻ</i>) được bật ở góc dưới.
+                  </li>
+                </ul>
+              )}
             </div>
           </div>
 
@@ -639,7 +644,11 @@ export function VideoSubmissionBar({
           <div className="flex flex-col gap-3 py-2">
             {!recorder.hasTabAudio && (
               <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
-                💡 <b>Mẹo:</b> Video này chỉ có tiếng micro của bạn (chưa có tiếng bài học phát từ trình duyệt). Ở lần quay tới, bạn hãy chọn thẻ <b>Chrome Tab</b> thay vì <i>Entire Screen</i> để thu được cả 2 nhé!
+                {desktopBridge() ? (
+                  <>Video này chỉ có tiếng micro của bạn; ứng dụng chưa thu được tiếng bài học. Hãy kiểm tra âm thanh video rồi quay lại.</>
+                ) : (
+                  <>💡 <b>Mẹo:</b> Video này chỉ có tiếng micro của bạn (chưa có tiếng bài học phát từ trình duyệt). Ở lần quay tới, bạn hãy chọn thẻ <b>Chrome Tab</b> thay vì <i>Entire Screen</i> để thu được cả 2 nhé!</>
+                )}
               </div>
             )}
 

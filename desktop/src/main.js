@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, desktopCapturer, dialog, Menu, session, shell } from 'electron'
 import ffmpegStatic from 'ffmpeg-static'
 
+import { selectDisplayMediaStreams } from './display-media.js'
 import { checkForUpdates, initUpdater } from './updater.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -120,7 +121,7 @@ async function start() {
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] })
         const shadowWin = sources.find((s) => s.name.includes('Shadowing')) || sources[0]
         if (shadowWin) {
-          callback({ video: shadowWin, audio: 'loopback' })
+          callback(selectDisplayMediaStreams(shadowWin, request, process.platform))
         } else {
           callback({})
         }

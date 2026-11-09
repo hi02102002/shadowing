@@ -2,6 +2,13 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.53 — 2026-11-10
+
+### Sửa lỗi
+
+- Trên Linux Desktop, tính năng quay video bài nộp lấy âm thanh đang phát trong cửa sổ Shadowing để trộn với micro, thay cho `loopback` vốn chỉ được Electron hỗ trợ trên Windows.
+- Hướng dẫn quay và cảnh báo thiếu âm thanh trên Desktop không còn yêu cầu chọn “Chrome Tab” của trình duyệt.
+
 ## 0.0.52 — 2026-11-10
 
 ### Sửa lỗi
