@@ -21,6 +21,54 @@ function getSupportedMimeType(): string {
   return ''
 }
 
+/**
+ * Tìm stream âm thanh hệ thống (PulseAudio/PipeWire Monitor trên Linux, Stereo Mix trên Windows)
+ * Dùng khi getDisplayMedia không trả về audio track (ví dụ trên Electron Desktop Linux hoặc khi chọn Entire Screen).
+ */
+async function captureSystemAudioFallback(): Promise<MediaStream | null> {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const audioInputs = devices.filter((d) => d.kind === 'audioinput')
+
+    // Tìm thiết bị Monitor (âm thanh phát ra từ máy tính / tai nghe / loa)
+    const monitorDevice =
+      audioInputs.find((d) => {
+        const name = d.label.toLowerCase()
+        return (
+          (name.includes('earpods') ||
+            name.includes('headphone') ||
+            name.includes('headset') ||
+            name.includes('speaker')) &&
+          (name.includes('monitor of') || name.includes('monitor'))
+        )
+      }) ||
+      audioInputs.find((d) => {
+        const name = d.label.toLowerCase()
+        return (
+          name.includes('monitor of') ||
+          name.includes('monitor') ||
+          name.includes('stereo mix') ||
+          name.includes('what u hear') ||
+          name.includes('wave out')
+        )
+      })
+
+    if (monitorDevice) {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: monitorDevice.deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      })
+    }
+  } catch (err) {
+    console.warn('Không thể thu âm thanh hệ thống qua monitor fallback:', err)
+  }
+  return null
+}
+
 export function useShadowSubmissionRecorder(
   options: UseShadowSubmissionRecorderOptions = {},
 ) {
@@ -34,10 +82,11 @@ export function useShadowSubmissionRecorder(
 
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
   const screenStreamRef = useRef<MediaStream | null>(null)
+  const systemAudioStreamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const audioContextRef = useRef<AudioContext | null>(null)
-  // Giữ tham chiếu các AudioNode để V8 Garbage Collector không thu dọn ngắt âm thanh
+  // Giữ tham chiếu các AudioNode để V8 Garbage Collector không ngắt âm thanh
   const audioNodesRef = useRef<unknown[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -49,13 +98,36 @@ export function useShadowSubmissionRecorder(
     try {
       setError(null)
       if (webcamStream) return webcamStream
+
+      // Ưu tiên chọn đúng microphone thật (loại trừ thiết bị Monitor của loa/tai nghe)
+      let audioConstraint: boolean | MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      }
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const realMic = devices.find(
+          (d) =>
+            d.kind === 'audioinput' &&
+            !d.label.toLowerCase().includes('monitor') &&
+            !d.label.toLowerCase().includes('stereo mix'),
+        )
+        if (realMic && realMic.deviceId) {
+          audioConstraint = {
+            deviceId: { exact: realMic.deviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: audioConstraint,
       })
       setWebcamStream(stream)
       return stream
@@ -99,6 +171,10 @@ export function useShadowSubmissionRecorder(
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach((t) => t.stop())
         screenStreamRef.current = null
+      }
+      if (systemAudioStreamRef.current) {
+        systemAudioStreamRef.current.getTracks().forEach((t) => t.stop())
+        systemAudioStreamRef.current = null
       }
       if (recorderRef.current && recorderRef.current.state === 'recording') {
         try {
@@ -170,45 +246,58 @@ export function useShadowSubmissionRecorder(
         screenStreamRef.current = screenStream
 
         const micTracks = micStream.getAudioTracks()
-        const screenAudioTracks = screenStream.getAudioTracks()
-        const hasTabSound = screenAudioTracks.length > 0
-        setHasTabAudio(hasTabSound)
+        let screenAudioTracks = screenStream.getAudioTracks()
+
+        // Nếu screenStream không có audio track (trên Electron Desktop Linux hoặc khi chọn Entire Screen):
+        // Tự động thu âm thanh máy tính qua PipeWire/PulseAudio Monitor source!
+        let systemAudioStream: MediaStream | null = null
+        if (screenAudioTracks.length === 0) {
+          systemAudioStream = await captureSystemAudioFallback()
+          if (systemAudioStream) {
+            systemAudioStreamRef.current = systemAudioStream
+            screenAudioTracks = systemAudioStream.getAudioTracks()
+          }
+        }
+
+        const hasSound = screenAudioTracks.length > 0
+        setHasTabAudio(hasSound)
 
         let finalAudioTrack: MediaStreamTrack | null = null
 
-        if (hasTabSound && micTracks.length > 0) {
-          // Có CẢ tiếng bài học từ tab VÀ tiếng micro của bạn -> Mix bằng Web Audio API
+        if (hasSound && micTracks.length > 0) {
+          // Có CẢ tiếng bài học từ máy tính VÀ tiếng micro -> Mix bằng Web Audio API
           const audioCtx = new AudioContext()
           audioContextRef.current = audioCtx
 
-          // QUAN TRỌNG: Chrome tự động suspend AudioContext nếu không được resume chủ động
+          // Chrome / Electron tự động suspend AudioContext nếu không được resume
           if (audioCtx.state === 'suspended') {
             await audioCtx.resume()
           }
 
           const destination = audioCtx.createMediaStreamDestination()
           const micSource = audioCtx.createMediaStreamSource(micStream)
-          const screenSource = audioCtx.createMediaStreamSource(screenStream)
+          const computerSource = audioCtx.createMediaStreamSource(
+            systemAudioStream ?? screenStream,
+          )
 
           const micGain = audioCtx.createGain()
           micGain.gain.value = 1.0 // Giọng người học rõ ràng
 
-          const screenGain = audioCtx.createGain()
-          screenGain.gain.value = 0.85 // Tiếng bài học nền vừa phải
+          const computerGain = audioCtx.createGain()
+          computerGain.gain.value = 0.85 // Tiếng bài học nền vừa phải
 
           micSource.connect(micGain).connect(destination)
-          screenSource.connect(screenGain).connect(destination)
+          computerSource.connect(computerGain).connect(destination)
 
           // Giữ tham chiếu AudioNodes trong ref để tránh V8 Garbage Collector ngắt luồng
-          audioNodesRef.current = [micSource, screenSource, micGain, screenGain, destination]
+          audioNodesRef.current = [micSource, computerSource, micGain, computerGain, destination]
 
           finalAudioTrack = destination.stream.getAudioTracks()[0]
-        } else if (hasTabSound) {
-          // Chỉ có tiếng bài học
+        } else if (hasSound) {
+          // Chỉ có tiếng bài học / máy tính
           finalAudioTrack = screenAudioTracks[0]
         } else if (micTracks.length > 0) {
-          // Người dùng chọn Entire Screen hoặc quên tích share tab audio
-          // Lấy TRỰC TIẾP track của mic để đảm bảo 100% video luôn có tiếng nói!
+          // Chỉ có tiếng micro của bạn
           finalAudioTrack = micTracks[0]
         }
 
@@ -244,10 +333,14 @@ export function useShadowSubmissionRecorder(
             timerRef.current = null
           }
 
-          // Dừng track màn hình
+          // Dừng track màn hình và track âm thanh máy tính
           if (screenStreamRef.current) {
             screenStreamRef.current.getTracks().forEach((t) => t.stop())
             screenStreamRef.current = null
+          }
+          if (systemAudioStreamRef.current) {
+            systemAudioStreamRef.current.getTracks().forEach((t) => t.stop())
+            systemAudioStreamRef.current = null
           }
           audioNodesRef.current = []
           if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
