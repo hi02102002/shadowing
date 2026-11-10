@@ -243,3 +243,41 @@
 .heat-4 {
   background: var(--primary);
 }
+
+/* TipTap Rich Editor styles */
+.ProseMirror {
+  outline: none;
+  min-height: 250px;
+}
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  width: 100%;
+  table-layout: auto;
+}
+.ProseMirror th,
+.ProseMirror td {
+  border: 2px solid #000;
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+  min-width: 80px;
+}
+.dark .ProseMirror th,
+.dark .ProseMirror td {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.ProseMirror .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(200, 200, 255, 0.3);
+  pointer-events: none;
+}
+.ProseMirror mark {
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+

@@ -8,10 +8,12 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Table as TableIcon,
   Trash2,
 } from 'lucide-react'
 import { z } from 'zod'
 
+import { ListeningCustomWorkspace } from '#/components/listening-custom-workspace'
 import { ListeningPlayer } from '#/components/listening-player'
 import { ReadingQuestions } from '#/components/reading-questions'
 import { LessonChunks } from '#/components/lesson-chunks'
@@ -55,7 +57,62 @@ export const Route = createFileRoute('/listening')({
 
 function ListeningPage() {
   const { id } = Route.useSearch()
-  return id ? <ListeningExercise id={id} /> : <ListeningLibrary />
+  const [activeTab, setActiveTab] = useState<'custom' | 'library'>('custom')
+
+  if (id) {
+    return <ListeningExercise id={id} />
+  }
+
+  return (
+    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-3 py-5 sm:gap-8 sm:px-4 sm:py-8">
+      <header className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Headphones className="size-6 text-primary" />
+          <h1 className="text-2xl font-semibold">Luyện nghe</h1>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Dán link / tải file audio để ghi chú và tạo bảng so sánh, hoặc luyện đề từ thư viện có sẵn.
+        </p>
+      </header>
+
+      {/* Điều hướng chuyển Tab: Nghe tự do & Bảng ghi chú VÀ Thư viện bài có sẵn */}
+      <div className="flex flex-wrap items-center gap-2 border-b pb-4">
+        <button
+          type="button"
+          onClick={() => setActiveTab('custom')}
+          className={cn(
+            'flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer',
+            activeTab === 'custom'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <TableIcon className="size-4" />
+          <span>Nghe tự do & Bảng ghi chú (Audio / Link & Table Note)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('library')}
+          className={cn(
+            'flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer',
+            activeTab === 'library'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-muted text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <Headphones className="size-4" />
+          <span>Thư viện đề thi (Cambridge, IELTS, Tactics, ELLLO)</span>
+        </button>
+      </div>
+
+      {activeTab === 'custom' ? (
+        <ListeningCustomWorkspace />
+      ) : (
+        <ListeningLibrary />
+      )}
+    </div>
+  )
 }
 
 function ListeningLibrary() {

@@ -2,6 +2,21 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.54 — 2026-11-10
+
+### Mới
+
+- **Luyện nghe tự do & Shadcn Rich Editor (theo chuẩn htmujahid/shadcn-editor)**:
+  - Tích hợp trình phát audio đa năng tại trang **Luyện nghe (`/listening`)**: dán link trực tiếp (MP3, M4A, Podcast), dán link **YouTube** (tự động nhận diện ID và phát qua player nhúng), hoặc chọn file audio từ máy tính để luyện nghe tức thì.
+  - Tích hợp sẵn các bài nghe mẫu (BBC 6 Minute English: Smart Cities, Future of Food; Cambridge IELTS).
+  - Trình phát điều khiển chuyên sâu: tua 5s (`Alt + ← / →`), chỉnh tốc độ phát (`0.75x` đến `1.5x`), chỉnh âm lượng, phím tắt nhanh (`Alt + Space`), và chế độ lặp đoạn A-B (A-B Repeat) hỗ trợ Shadowing và chép chính tả.
+  - **Shadcn Rich Editor**:
+    - Bộ soạn thảo WYSIWYG hiện đại với thanh công cụ chuẩn phong cách `shadcn-editor`: Heading 1/2/3, In đậm, In nghiêng, Gạch chân, Gạch ngang, Căn lề trái/giữa/phải/đều, Bút highlight nhiều màu sắc.
+    - **Tạo bảng ghi chú theo mẫu Neil & Georgie (Cities)**: Chèn bảng chỉ với 1 click với hàng tiêu đề màu cam đào (`#fed7aa`), viền sắc nét, hỗ trợ gộp ô ngang và chia cột người nói.
+    - Thao tác bảng linh hoạt: Thêm/xoá hàng, thêm/xoá cột, gộp/tách ô, bật/tắt header.
+    - **Mốc thời gian tương tác (Interactive Timestamps)**: Chèn mốc thời gian `⏱ [01:23]` (phím tắt `Alt + M`), bấm vào mốc thời gian trong bài để tua ngay audio tới điểm đó.
+    - Tự động lưu bài vào LocalStorage, hỗ trợ sao chép HTML (dán trực tiếp vào Word / Google Docs), tải file Markdown và in / xuất PDF.
+
 ## 0.0.53 — 2026-11-10
 
 ### Sửa lỗi
