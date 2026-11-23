@@ -2,6 +2,17 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.55 — 2026-11-23
+
+### Mới
+
+- **Nói với AI dùng được mọi provider**: chọn "Dùng chung mô hình ở trên" hoặc một provider riêng (OpenAI, Anthropic, Gemini, Ollama, OpenAI-compatible) trong Cài đặt, thay cho Vilao cố định. Cấu hình Vilao đã lưu được tự chuyển sang OpenAI-compatible nên vẫn chạy như cũ.
+- **Mức suy nghĩ (reasoning)** cho OpenAI / OpenAI-compatible: hạ xuống Low để model "thinking" (Gemini, gpt-5…) trả lời nhanh hơn nhiều khi sinh thẻ, chấm bài và hội thoại.
+
+### Thay đổi
+
+- Bỏ provider Claude Code CLI và Gemini CLI.
+
 ## 0.0.54 — 2026-11-10
 
 ### Mới
