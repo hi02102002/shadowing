@@ -448,9 +448,9 @@ function ConversationView({ id }: { id: number }) {
   const [turnSeconds, setTurnSeconds] = useTalkTurnSeconds()
   const recorder = useRecorder({
     maxMs: turnSeconds * 1000,
-    onStop: (blob) => {
+    onStop: (blob, { silent }) => {
       // bản ghi quá ngắn thường là bấm nhầm
-      if (blob.size > 2_000) void runStream({ audio: blob })
+      if (!silent && blob.size > 2_000) void runStream({ audio: blob })
     },
   })
 

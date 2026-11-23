@@ -287,9 +287,9 @@ function Practice({ topic, onCancel, onDone }: { topic: Topic & { target: Speaki
 
   const recorder = useRecorder({
     maxMs: maxSeconds * 1000,
-    onStop: (blob) => {
+    onStop: (blob, { silent }) => {
       const durationSec = Math.round((performance.now() - startedAt.current) / 1000)
-      if (blob.size > 2_000) submit.mutate({ blob, durationSec })
+      if (!silent && blob.size > 2_000) submit.mutate({ blob, durationSec })
     },
   })
 

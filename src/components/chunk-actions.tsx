@@ -154,8 +154,8 @@ export function ChunkShadow({
   })
   const recorder = useRecorder({
     maxMs: 15_000,
-    onStop: (blob) => {
-      if (blob.size <= 2_000) return
+    onStop: (blob, { silent }) => {
+      if (silent || blob.size <= 2_000) return
       if (urlRef.current) URL.revokeObjectURL(urlRef.current)
       urlRef.current = URL.createObjectURL(blob)
       setRecordingUrl(urlRef.current)

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+/** đỉnh âm lượng (0..1) cả lượt ghi thấp hơn mức này = micro không thu được tiếng (tắt tiếng / sai thiết bị) */
+const SILENT_PEAK = 0.04
+const SILENT_ERROR =
+  'Không thu được tiếng từ micro. Kiểm tra micro có đang bị tắt tiếng (mute) hoặc chọn sai thiết bị trong cài đặt âm thanh của máy.'
+
+export interface RecorderStopInfo {
+  /** cả lượt ghi không có tiếng: không nên gửi đi chấm */
+  silent: boolean
+}
+
 export type RecorderStatus = 'idle' | 'requesting' | 'recording' | 'stopped' | 'error'
 
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
@@ -13,7 +23,10 @@ function pickMime() {
  * Ghi âm micro bằng MediaRecorder, kèm mức âm lượng realtime (0..1) để vẽ meter.
  * Giữ stream giữa các lần ghi để không bị hỏi quyền lại.
  */
-export function useRecorder(opts: { maxMs?: number; onStop?: (blob: Blob) => void } = {}) {
+export function useRecorder(opts: {
+    maxMs?: number
+    onStop?: (blob: Blob, info: RecorderStopInfo) => void
+  } = {},) {
   const { maxMs = 60_000 } = opts
   const [status, setStatus] = useState<RecorderStatus>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -53,6 +66,7 @@ export function useRecorder(opts: { maxMs?: number; onStop?: (blob: Blob) => voi
       const mimeType = pickMime()
       const rec = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 64_000 } : undefined)
       const chunks: Blob[] = []
+      let maxLevel = 0
       rec.ondataavailable = (e) => e.data.size && chunks.push(e.data)
       rec.onstop = () => {
         clearTimeout(timeoutRef.current)
@@ -64,7 +78,9 @@ export function useRecorder(opts: { maxMs?: number; onStop?: (blob: Blob) => voi
           return URL.createObjectURL(b)
         })
         setStatus('stopped')
-        onStopRef.current?.(b)
+        const silent = maxLevel < SILENT_PEAK
+        if (silent) setError(SILENT_ERROR)
+        onStopRef.current?.(b, { silent })
       }
       recRef.current = rec
 
@@ -81,7 +97,9 @@ export function useRecorder(opts: { maxMs?: number; onStop?: (blob: Blob) => voi
         analyser.getByteTimeDomainData(data)
         let peak = 0
         for (const v of data) peak = Math.max(peak, Math.abs(v - 128))
-        setLevel(Math.min(1, peak / 64))
+        const lv = Math.min(1, peak / 64)
+        maxLevel = Math.max(maxLevel, lv)
+        setLevel(lv)
         setElapsedMs(performance.now() - startedAt)
         rafRef.current = requestAnimationFrame(loop)
       }

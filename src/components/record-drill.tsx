@@ -85,9 +85,9 @@ export function RecordDrill({
 
   const recorder = useRecorder({
     maxMs: 20_000,
-    onStop: (blob) => {
-      // bản ghi quá ngắn thường là bấm nhầm
-      if (blob.size <= 2_000) return
+    onStop: (blob, { silent }) => {
+      // bản ghi quá ngắn thường là bấm nhầm; không có tiếng thì recorder đã báo lỗi micro
+      if (silent || blob.size <= 2_000) return
       setRecordingUrl(URL.createObjectURL(blob))
       assess.mutate(blob)
     },

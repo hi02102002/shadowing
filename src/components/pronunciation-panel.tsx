@@ -115,10 +115,10 @@ export function PronunciationPanel({ youtubeId, segment, mode }: Props) {
 
   const recorder = useRecorder({
     maxMs: Math.max(15_000, (segment.endMs - segment.startMs) * 3),
-    onStop: (blob) => {
+    onStop: (blob, { silent }) => {
       shadowingRef.current = false
-      // bản ghi quá ngắn thường là bấm nhầm
-      if (mountedRef.current && blob.size > 2_000) assess.mutate(blob)
+      // bản ghi quá ngắn thường là bấm nhầm; không có tiếng thì recorder đã báo lỗi micro
+      if (mountedRef.current && !silent && blob.size > 2_000) assess.mutate(blob)
     },
   })
 
