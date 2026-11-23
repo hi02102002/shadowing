@@ -2,6 +2,12 @@
 
 Những gì mới trong từng phiên bản của Shadowing. Mỗi bản phát hành trên GitHub hiện đúng phần của phiên bản đó.
 
+## 0.0.56 — 2026-11-23
+
+### Sửa lỗi
+
+- Ghi âm xong mà micro không thu được tiếng (bị tắt tiếng / chọn sai thiết bị) giờ hiện thông báo "Không thu được tiếng từ micro…" thay vì không có gì xảy ra. Áp dụng cho chấm phát âm, Nói theo đề, Nói với AI, bài luyện ghi âm và chunks.
+
 ## 0.0.55 — 2026-11-23
 
 ### Mới
