@@ -6,14 +6,14 @@ describe('settingsPatch', () => {
     const patch = settingsPatch({
       llmApiKey: 'sk-a…aaaa',
       sttApiKey: 'sk-b…bbbb',
-      talkVilaoApiKey: 'sk-c…cccc',
-      talkVilaoModel: 'chib/gemini-3.8-flash',
+      talkApiKey: 'sk-c…cccc',
+      talkModel: 'chib/gemini-3.8-flash',
     })
-    expect(patch).toEqual({ talkVilaoModel: 'chib/gemini-3.8-flash' })
+    expect(patch).toEqual({ talkModel: 'chib/gemini-3.8-flash' })
     expect({ llmApiKey: 'original', ...patch }.llmApiKey).toBe('original')
   })
 
   it('giữ key mới khi người dùng nhập lại', () => {
-    expect(settingsPatch({ talkVilaoApiKey: 'new-key' })).toEqual({ talkVilaoApiKey: 'new-key' })
+    expect(settingsPatch({ talkApiKey: 'new-key' })).toEqual({ talkApiKey: 'new-key' })
   })
 })

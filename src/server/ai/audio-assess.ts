@@ -97,10 +97,16 @@ export async function audioStructured<T extends z.ZodType>(opts: {
       },
     ],
   }
+  // mức suy nghĩ chỉ gửi cho OpenAI-compatible (endpoint chat/completions nhận reasoning_effort)
+  const effort =
+    cfg.llmProvider === 'openai-compatible' && cfg.llmReasoningEffort
+      ? { reasoning_effort: cfg.llmReasoningEffort }
+      : {}
   // cùng câu hỏi nhưng không dùng response_format: schema nằm trong system prompt
   const jsonInPrompt = () =>
     post(url, cfg.llmApiKey, {
       model: cfg.llmModel,
+      ...effort,
       messages: [
         { role: 'system', content: jsonInstruction(opts.system, opts.schema) },
         user,
@@ -109,6 +115,7 @@ export async function audioStructured<T extends z.ZodType>(opts: {
 
   const res = await post(url, cfg.llmApiKey, {
     model: cfg.llmModel,
+    ...effort,
     messages: [{ role: 'system', content: opts.system }, user],
     response_format: {
       type: 'json_schema',

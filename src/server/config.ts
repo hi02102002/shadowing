@@ -9,6 +9,8 @@ export const LLM_PROVIDERS = [
   'ollama',
   'openai-compatible',
 ] as const
+/** Nói với AI: '' = dùng chung cấu hình LLM chính, hoặc chọn provider riêng */
+export const TALK_PROVIDERS = ['', ...LLM_PROVIDERS] as const
 /** llm-audio: model LLM nghe trực tiếp bản ghi âm · stt: Whisper rồi LLM đọc chữ */
 export const PRONUNCIATION_ENGINES = ['llm-audio', 'stt'] as const
 /** Tạo phụ đề cho video không có sẵn: local = whisper.cpp trên máy · api = STT API ở trên (tốn phí) */
@@ -19,15 +21,19 @@ export const WHISPER_MODELS = ['large-v3-turbo', 'small.en'] as const
 export const ACCENTS = ['us', 'uk'] as const
 /** off: không tự gọi AI phân tích lỗi sau mỗi lần chấm, chỉ khi người dùng bấm */
 export const AI_ANALYSIS = ['on', 'off'] as const
+/** reasoning_effort gửi kèm request OpenAI / OpenAI-compatible; '' = không gửi, để model tự chọn */
+export const REASONING_EFFORTS = ['', 'minimal', 'low', 'medium', 'high'] as const
 
 export const AppConfigSchema = z.object({
   llmProvider: z.enum(LLM_PROVIDERS),
   llmModel: z.string().min(1),
   llmApiKey: z.string(),
   llmBaseUrl: z.string(),
-  talkVilaoApiKey: z.string(),
-  talkVilaoBaseUrl: z.string().url(),
-  talkVilaoModel: z.string().min(1),
+  llmReasoningEffort: z.enum(REASONING_EFFORTS),
+  talkProvider: z.enum(TALK_PROVIDERS),
+  talkModel: z.string(),
+  talkApiKey: z.string(),
+  talkBaseUrl: z.string(),
   sttBaseUrl: z.string(),
   sttApiKey: z.string(),
   sttModel: z.string().min(1),
@@ -54,6 +60,41 @@ export const AppConfigSchema = z.object({
 export type AppConfig = z.infer<typeof AppConfigSchema>
 export type WhisperModel = (typeof WHISPER_MODELS)[number]
 
+type TalkFields = Pick<
+  AppConfig,
+  'talkProvider' | 'talkModel' | 'talkApiKey' | 'talkBaseUrl'
+>
+
+function talkFromEnv(e: NodeJS.ProcessEnv): TalkFields {
+  if ((TALK_PROVIDERS as readonly string[]).includes(e.TALK_PROVIDER ?? '-'))
+    return {
+      talkProvider: e.TALK_PROVIDER as AppConfig['talkProvider'],
+      talkModel: e.TALK_MODEL ?? '',
+      talkApiKey: e.TALK_API_KEY ?? '',
+      talkBaseUrl: e.TALK_BASE_URL ?? '',
+    }
+  // biến cũ TALK_VILAO_* (Vilao là OpenAI-compatible)
+  if (e.TALK_VILAO_API_KEY)
+    return {
+      talkProvider: 'openai-compatible',
+      talkModel: e.TALK_VILAO_MODEL ?? 'chib/gemini-3.8-flash',
+      talkApiKey: e.TALK_VILAO_API_KEY,
+      talkBaseUrl: e.TALK_VILAO_BASE_URL ?? 'https://api.vilao.ai/v1',
+    }
+  return { talkProvider: '', talkModel: '', talkApiKey: '', talkBaseUrl: '' }
+}
+
+/** Setting cũ talkVilao* đã lưu ở /settings → cấu hình Nói với AI dạng OpenAI-compatible */
+function legacyTalk(values: Record<string, string>): Partial<TalkFields> {
+  if (!values.talkVilaoApiKey) return {}
+  return {
+    talkProvider: 'openai-compatible',
+    talkApiKey: values.talkVilaoApiKey,
+    talkBaseUrl: values.talkVilaoBaseUrl || 'https://api.vilao.ai/v1',
+    talkModel: values.talkVilaoModel || 'chib/gemini-3.8-flash',
+  }
+}
+
 function fromEnv(): AppConfig {
   const e = process.env
   return {
@@ -65,9 +106,12 @@ function fromEnv(): AppConfig {
     llmModel: e.LLM_MODEL ?? 'gpt-5-mini',
     llmApiKey: e.LLM_API_KEY ?? e.OPENAI_API_KEY ?? '',
     llmBaseUrl: e.LLM_BASE_URL ?? '',
-    talkVilaoApiKey: e.TALK_VILAO_API_KEY ?? '',
-    talkVilaoBaseUrl: e.TALK_VILAO_BASE_URL ?? 'https://api.vilao.ai/v1',
-    talkVilaoModel: e.TALK_VILAO_MODEL ?? 'chib/gemini-3.8-flash',
+    llmReasoningEffort: (REASONING_EFFORTS as readonly string[]).includes(
+      e.LLM_REASONING_EFFORT ?? '',
+    )
+      ? (e.LLM_REASONING_EFFORT as AppConfig['llmReasoningEffort'])
+      : '',
+    ...talkFromEnv(e),
     sttBaseUrl: e.STT_BASE_URL ?? '',
     sttApiKey: e.STT_API_KEY ?? e.OPENAI_API_KEY ?? '',
     sttModel: e.STT_MODEL ?? 'whisper-1',
@@ -91,9 +135,12 @@ function fromEnv(): AppConfig {
 export function getConfig(): AppConfig {
   const base = fromEnv()
   const rows = db.select().from(settings).all()
-  const overrides = Object.fromEntries(
+  const overrides: Record<string, string> = Object.fromEntries(
     rows.filter((r) => r.value !== '').map((r) => [r.key, r.value]),
   )
+  const talkRow = rows.find((r) => r.key === 'talkProvider')
+  if (talkRow) overrides.talkProvider = talkRow.value // '' = dùng chung LLM chính, vẫn là lựa chọn hợp lệ
+  else Object.assign(overrides, legacyTalk(overrides))
   const merged = AppConfigSchema.safeParse({ ...base, ...overrides })
   return merged.success ? merged.data : base
 }
@@ -120,7 +167,7 @@ export function publicConfig(cfg: AppConfig) {
     ...cfg,
     llmApiKey: mask(cfg.llmApiKey),
     sttApiKey: mask(cfg.sttApiKey),
-    talkVilaoApiKey: mask(cfg.talkVilaoApiKey),
+    talkApiKey: mask(cfg.talkApiKey),
   }
 }
 
@@ -129,6 +176,26 @@ export function hasLlm(cfg: AppConfig): boolean {
   if (cfg.llmProvider === 'ollama') return true
   if (cfg.llmProvider === 'openai-compatible') return !!cfg.llmBaseUrl
   return !!cfg.llmApiKey
+}
+
+/** Cấu hình LLM cho Nói với AI: provider riêng nếu có chọn, không thì dùng chung LLM chính */
+export function talkLlmConfig(cfg: AppConfig = getConfig()): AppConfig {
+  const talk: AppConfig = cfg.talkProvider
+    ? {
+        ...cfg,
+        llmProvider: cfg.talkProvider,
+        llmModel: cfg.talkModel.trim(),
+        llmApiKey: cfg.talkApiKey,
+        llmBaseUrl: cfg.talkBaseUrl,
+      }
+    : cfg
+  if (!hasLlm(talk) || !talk.llmModel)
+    throw new Error(
+      cfg.talkProvider
+        ? 'Chưa cấu hình đủ provider cho Nói với AI trong Cài đặt'
+        : 'Chưa cấu hình mô hình ngôn ngữ trong Cài đặt',
+    )
+  return talk
 }
 
 /** LLM nghe được audio trực tiếp (gửi `input_audio` qua API tương thích OpenAI) */

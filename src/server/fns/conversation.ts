@@ -21,8 +21,7 @@ import {
   conversationFeedbackPrompt,
 } from '../ai/prompts.ts'
 import { structured } from '../ai/provider.ts'
-import { vilaoTalkConfig } from '../ai/vilao-talk.ts'
-import { getConfig } from '../config.ts'
+import { talkLlmConfig } from '../config.ts'
 import { recordSpeechMistakes } from '../mistakes.ts'
 
 function requireConversation(id: number) {
@@ -80,7 +79,7 @@ export const startConversation = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ data }) => {
-    vilaoTalkConfig()
+    talkLlmConfig()
     let topic: string
     if (data.scenario === CUSTOM_SCENARIO) {
       if (!data.custom) throw new Error('Hãy nhập chủ đề muốn nói')
@@ -109,16 +108,9 @@ export const finishConversation = createServerFn({ method: 'POST' })
     const turns = turnsOf(convo.id)
     if (!turns.some((t) => t.role === 'user'))
       throw new Error('Bạn chưa nói câu nào trong buổi này')
-    const vilao = vilaoTalkConfig()
     const feedback = await structured({
       feature: 'conversation',
-      cfg: {
-        ...getConfig(),
-        llmProvider: 'openai-compatible',
-        llmApiKey: vilao.talkVilaoApiKey,
-        llmBaseUrl: vilao.talkVilaoBaseUrl,
-        llmModel: vilao.talkVilaoModel,
-      },
+      cfg: talkLlmConfig(),
       system: CONVERSATION_FEEDBACK_SYSTEM,
       prompt: conversationFeedbackPrompt({
         topic: convo.topic,

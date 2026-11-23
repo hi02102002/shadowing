@@ -73,7 +73,8 @@ async function tracked<T>(
         usage.reported = true
         usage.prompt += u?.promptTokens ?? 0
         usage.completion += u?.completionTokens ?? 0
-        usage.total += u?.totalTokens ?? (u?.promptTokens ?? 0) + (u?.completionTokens ?? 0)
+        usage.total +=
+          u?.totalTokens ?? (u?.promptTokens ?? 0) + (u?.completionTokens ?? 0)
       },
     },
   ]
@@ -88,7 +89,8 @@ async function tracked<T>(
   } finally {
     if (!usage.reported) {
       usage.prompt = estimateTokens(promptText)
-      usage.completion = result === undefined ? 0 : estimateTokens(outputText(result))
+      usage.completion =
+        result === undefined ? 0 : estimateTokens(outputText(result))
       usage.total = usage.prompt + usage.completion
     }
     void recordUsage({
@@ -140,6 +142,23 @@ export function textAdapter(cfg: AppConfig = getConfig()) {
   }
 }
 
+/**
+ * Mức suy nghĩ (reasoning effort) gửi kèm request. Model "thinking" mặc định thường nghĩ rất lâu
+ * (vd. proxy Antigravity map gemini-3.8-flash → thinking HIGH), nên cho phép hạ xuống để trả lời nhanh hơn.
+ */
+function modelOptions(cfg: AppConfig) {
+  const effort = cfg.llmReasoningEffort
+  if (!effort) return undefined
+  switch (cfg.llmProvider) {
+    case 'openai-compatible':
+      return { reasoning_effort: effort }
+    case 'openai':
+      return { reasoning: { effort } }
+    default:
+      return undefined
+  }
+}
+
 function requireKey(cfg: AppConfig) {
   if (!cfg.llmApiKey)
     throw new Error(
@@ -180,7 +199,9 @@ export async function structured<T extends z.ZodType>(opts: {
   /** tên tính năng để thống kê usage */
   feature?: string
 }): Promise<z.infer<T>> {
+  const cfg = opts.cfg ?? getConfig()
   const adapter = textAdapter(opts.cfg) as any
+  const options = modelOptions(cfg)
   const messages = [{ role: 'user' as const, content: opts.prompt }]
   const meta = { feature: opts.feature, cfg: opts.cfg }
   const promptText = `${opts.system}\n${opts.prompt}`
@@ -194,6 +215,7 @@ export async function structured<T extends z.ZodType>(opts: {
           systemPrompts: [opts.system],
           messages,
           outputSchema: opts.schema,
+          modelOptions: options,
           middleware,
         } as any) as unknown as Promise<unknown>,
       (r) => JSON.stringify(r),
@@ -211,6 +233,7 @@ export async function structured<T extends z.ZodType>(opts: {
           systemPrompts: [jsonInstruction(opts.system, opts.schema)],
           messages,
           stream: false,
+          modelOptions: options,
           middleware,
         } as any) as unknown as Promise<{ text: string }>,
       (r) => r.text,
@@ -231,8 +254,15 @@ export async function* streamText(opts: {
   prompt: string
   cfg?: AppConfig
   feature?: string
+  /** huỷ giữa chừng (vd. người dùng rời trang) */
+  signal?: AbortSignal
 }) {
   const cfg = opts.cfg ?? getConfig()
+  const abortController = new AbortController()
+  if (opts.signal?.aborted) abortController.abort()
+  opts.signal?.addEventListener('abort', () => abortController.abort(), {
+    once: true,
+  })
   const started = Date.now()
   const usage = { prompt: 0, completion: 0, reported: false }
   let out = ''
@@ -253,6 +283,8 @@ export async function* streamText(opts: {
       systemPrompts: [opts.system],
       messages: [{ role: 'user', content: opts.prompt }],
       stream: true,
+      modelOptions: modelOptions(cfg),
+      abortController,
       middleware,
     } as any)
     for await (const chunk of stream as AsyncIterable<any>) {

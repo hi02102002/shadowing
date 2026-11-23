@@ -265,6 +265,40 @@ function SettingsPage() {
           </div>
 
           <form.Subscribe selector={(s) => s.values.llmProvider}>
+            {(provider) =>
+              provider === 'openai' || provider === 'openai-compatible' ? (
+                <form.Field name="llmReasoningEffort">
+                  {(field) => (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor={field.name}>Mức suy nghĩ (reasoning)</Label>
+                      <select
+                        id={field.name}
+                        className="h-9 rounded-md border bg-background px-2 text-sm"
+                        value={field.state.value}
+                        onChange={(e) =>
+                          field.handleChange(
+                            e.target.value as typeof field.state.value,
+                          )
+                        }
+                      >
+                        <option value="">Mặc định của model</option>
+                        <option value="minimal">Minimal</option>
+                        <option value="low">Low (nhanh)</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High (chậm, kỹ)</option>
+                      </select>
+                      <span className="text-xs text-muted-foreground">
+                        Model &quot;thinking&quot; (Gemini, gpt-5…) nghĩ càng
+                        lâu càng chậm. Sinh thẻ, chấm bài thường chỉ cần Low.
+                      </span>
+                    </div>
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+
+          <form.Subscribe selector={(s) => s.values.llmProvider}>
             {(provider) => (
               <form.Field
                 name="llmBaseUrl"
@@ -323,46 +357,103 @@ function SettingsPage() {
         </fieldset>
 
         <fieldset className="flex flex-col gap-4 rounded-xl border bg-card p-5">
-          <legend className="px-1 text-sm font-semibold">
-            Nói với AI · Vilao
-          </legend>
+          <legend className="px-1 text-sm font-semibold">Nói với AI</legend>
           <p className="text-xs text-muted-foreground">
-            Chỉ dùng cho hội thoại Nói với AI. Lời nói và giọng đọc vẫn dùng cấu
-            hình hiện có. Khi thay đổi, nút Lưu sẽ kiểm tra model bằng một yêu
-            cầu ngắn tới Vilao.
+            Mô hình trả lời trong hội thoại Nói với AI và chấm điểm cuối buổi.
+            Để &quot;Dùng chung&quot; thì dùng mô hình ở trên; chọn provider
+            riêng thì nút Lưu sẽ gọi thử một câu ngắn để kiểm tra.
           </p>
-          <form.Field name="talkVilaoApiKey">
+          <form.Field
+            name="talkProvider"
+            listeners={{
+              onChange: ({ value }) => {
+                if (!value) return
+                const p = LLM_PRESETS[value]
+                form.setFieldValue('talkModel', p.model)
+                form.setFieldValue('talkBaseUrl', p.baseUrl)
+              },
+            }}
+          >
             {(field) => (
-              <TextField
-                field={field}
-                label="API key Vilao"
-                type="password"
-                placeholder="Nhập key mới từ Vilao"
-              />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={field.name}>Provider</Label>
+                <select
+                  id={field.name}
+                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                  value={field.state.value}
+                  onChange={(e) =>
+                    field.handleChange(
+                      e.target.value as typeof field.state.value,
+                    )
+                  }
+                >
+                  <option value="">Dùng chung mô hình ở trên</option>
+                  {(Object.keys(LLM_PRESETS) as Provider[]).map((p) => (
+                    <option key={p} value={p}>
+                      {LLM_PRESETS[p].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </form.Field>
-          <form.Field name="talkVilaoBaseUrl">
-            {(field) => (
-              <TextField
-                field={field}
-                label="Base URL"
-                placeholder="https://api.vilao.ai/v1"
-              />
-            )}
-          </form.Field>
-          <form.Field name="talkVilaoModel">
-            {(field) => (
-              <TextField
-                field={field}
-                label="Model ID"
-                placeholder="chib/gemini-3.8-flash"
-              />
-            )}
-          </form.Field>
-          <p className="text-xs text-muted-foreground">
-            Model ID mặc định được suy ra từ đường dẫn trang model. Nếu Vilao
-            dùng ID khác, hãy sao chép đúng ID trong trang model của bạn.
-          </p>
+          <form.Subscribe selector={(s) => s.values.talkProvider}>
+            {(provider) =>
+              provider ? (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <form.Field
+                      name="talkModel"
+                      validators={{
+                        onChange: ({ value }) =>
+                          !value.trim() ? 'Bắt buộc' : undefined,
+                      }}
+                    >
+                      {(field) => (
+                        <TextField
+                          field={field}
+                          label="Model"
+                          placeholder={LLM_PRESETS[provider].model}
+                        />
+                      )}
+                    </form.Field>
+                    <form.Field name="talkApiKey">
+                      {(field) => (
+                        <TextField
+                          field={field}
+                          label="API key"
+                          type="password"
+                          placeholder={LLM_PRESETS[provider].keyHint}
+                        />
+                      )}
+                    </form.Field>
+                  </div>
+                  <form.Field
+                    name="talkBaseUrl"
+                    validators={{
+                      onChange: ({ value }) =>
+                        provider === 'openai-compatible' && !value.trim()
+                          ? 'Bắt buộc với OpenAI-compatible'
+                          : value && !/^https?:\/\//.test(value)
+                            ? 'Phải bắt đầu bằng http(s)://'
+                            : undefined,
+                    }}
+                  >
+                    {(field) => (
+                      <TextField
+                        field={field}
+                        label="Base URL (tuỳ chọn)"
+                        placeholder={
+                          LLM_PRESETS[provider].baseUrl ||
+                          'Mặc định của provider'
+                        }
+                      />
+                    )}
+                  </form.Field>
+                </>
+              ) : null
+            }
+          </form.Subscribe>
         </fieldset>
 
         <fieldset className="flex flex-col gap-3 rounded-xl border bg-card p-5">

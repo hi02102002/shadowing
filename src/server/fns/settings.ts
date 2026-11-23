@@ -1,15 +1,32 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
-import { structured } from '../ai/provider.ts'
-import { verifyVilaoTalk, vilaoTalkConfig } from '../ai/vilao-talk.ts'
+import { streamText, structured } from '../ai/provider.ts'
 import { settingsPatch } from '../settings-patch.ts'
 import {
   AppConfigSchema,
   getConfig,
   publicConfig,
   saveConfig,
+  talkLlmConfig,
 } from '../config.ts'
+import type { AppConfig } from '../config.ts'
+
+/** gọi thử một câu ngắn để chắc provider riêng của Nói với AI dùng được trước khi lưu */
+async function verifyTalk(cfg: AppConfig) {
+  let output = ''
+  for await (const delta of streamText({
+    system: 'Reply with one English word.',
+    prompt: 'Hello',
+    cfg: talkLlmConfig(cfg),
+    feature: 'settings',
+  }))
+    output += delta
+  if (!output.trim())
+    throw new Error(
+      'Model cho Nói với AI không trả nội dung. Kiểm tra model và API key.',
+    )
+}
 
 export const getSettings = createServerFn({ method: 'GET' }).handler(async () =>
   publicConfig(getConfig()),
@@ -24,12 +41,13 @@ export const saveSettings = createServerFn({ method: 'POST' })
     const current = getConfig()
     const candidate = AppConfigSchema.parse({ ...current, ...patch })
     if (
-      candidate.talkVilaoApiKey &&
-      (candidate.talkVilaoApiKey !== current.talkVilaoApiKey ||
-        candidate.talkVilaoBaseUrl !== current.talkVilaoBaseUrl ||
-        candidate.talkVilaoModel !== current.talkVilaoModel)
+      candidate.talkProvider &&
+      (candidate.talkProvider !== current.talkProvider ||
+        candidate.talkApiKey !== current.talkApiKey ||
+        candidate.talkBaseUrl !== current.talkBaseUrl ||
+        candidate.talkModel !== current.talkModel)
     ) {
-      await verifyVilaoTalk(vilaoTalkConfig(candidate))
+      await verifyTalk(candidate)
     }
     saveConfig(patch)
     return publicConfig(getConfig())

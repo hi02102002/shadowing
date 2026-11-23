@@ -6,7 +6,9 @@ import { conversations, conversationTurns } from '#/db/schema.ts'
 import { MAX_USER_TURNS } from '#/lib/conversation.ts'
 import type { TalkLevel } from '#/lib/conversation.ts'
 import { conversationPrompt, conversationSystem } from './ai/prompts.ts'
-import { streamVilaoTalk, vilaoTalkConfig } from './ai/vilao-talk.ts'
+import { streamText } from './ai/provider.ts'
+import { talkLlmConfig } from './config.ts'
+import type { AppConfig } from './config.ts'
 import { hearSpeech } from './hear-speech.ts'
 
 const active = new Set<number>()
@@ -53,12 +55,12 @@ export default defineHandler(async (event) => {
   if (!initial && !typed && !(audio instanceof File && audio.size))
     return new Response('Hãy nói hoặc nhập câu trả lời', { status: 400 })
 
-  let config: ReturnType<typeof vilaoTalkConfig>
+  let config: AppConfig
   try {
-    config = vilaoTalkConfig()
+    config = talkLlmConfig()
   } catch (error) {
     return new Response(
-      error instanceof Error ? error.message : 'Chưa cấu hình Vilao',
+      error instanceof Error ? error.message : 'Chưa cấu hình AI',
       { status: 400 },
     )
   }
@@ -85,17 +87,18 @@ export default defineHandler(async (event) => {
             ? turns
             : [...turns, { role: 'user', text: said }]
           let reply = ''
-          for await (const delta of streamVilaoTalk(
-            conversationSystem(convo.topic, convo.level as TalkLevel),
-            conversationPrompt(promptTurns),
-            config,
-            abort.signal,
-          )) {
+          for await (const delta of streamText({
+            system: conversationSystem(convo.topic, convo.level as TalkLevel),
+            prompt: conversationPrompt(promptTurns),
+            cfg: config,
+            feature: 'conversation',
+            signal: abort.signal,
+          })) {
             reply += delta
             emit({ type: 'delta', text: delta })
           }
           reply = reply.trim()
-          if (!reply) throw new Error('Vilao trả câu trả lời rỗng')
+          if (!reply) throw new Error('AI trả câu trả lời rỗng')
           if (abort.signal.aborted) throw new Error('Đã huỷ lượt nói')
           db.transaction((tx) => {
             if (!initial)
